@@ -11,6 +11,18 @@ const addProjectSchema = z.object({
   defaultBranch: z.string().max(100).optional(),
 });
 
+// Batch analysis - max 3 projects at a time
+const batchAnalyzeSchema = z.object({
+  projects: z.array(z.object({
+    githubRepoUrl: z.string().url().includes('github.com'),
+    repoName: z.string().min(1).max(200),
+    description: z.string().max(500).optional(),
+    defaultBranch: z.string().max(100).optional(),
+  })).min(1).max(3, 'Maximum 3 projects can be analyzed at a time'),
+});
+
+const MAX_TOTAL_PROJECTS = 10; // Free tier limit
+
 export class ProjectController {
   /**
    * POST /projects
@@ -206,6 +218,69 @@ export class ProjectController {
     } catch (error) {
       logger.error({ error }, 'Failed to toggle pin');
       res.status(500).json({ success: false, message: 'Failed to toggle pin', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /projects/batch
+   * Analyze multiple projects at once (max 3)
+   */
+  static async batchAnalyze(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const result = batchAnalyzeSchema.safeParse(req.body);
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          error: { code: 'VALIDATION_ERROR', details: result.error.format() },
+        });
+        return;
+      }
+
+      // Check total project limit
+      const existingProjects = await ProjectService.getUserProjects(req.user.userId);
+      const newCount = result.data.projects.length;
+      
+      if (existingProjects.length + newCount > MAX_TOTAL_PROJECTS) {
+        res.status(400).json({
+          success: false,
+          message: `Maximum ${MAX_TOTAL_PROJECTS} projects allowed. You have ${existingProjects.length} projects.`,
+          error: { code: 'PROJECT_LIMIT_EXCEEDED' },
+        });
+        return;
+      }
+
+      // Add all projects for analysis
+      const addedProjects = [];
+      for (const projectData of result.data.projects) {
+        try {
+          const project = await ProjectService.addProject(req.user.userId, projectData);
+          addedProjects.push(project);
+        } catch (err) {
+          logger.warn({ error: err, repo: projectData.repoName }, 'Failed to add project in batch');
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        message: `${addedProjects.length} projects added for analysis`,
+        data: {
+          projects: addedProjects,
+          queued: addedProjects.length,
+          failed: result.data.projects.length - addedProjects.length,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to batch analyze');
+      res.status(500).json({ success: false, message: 'Failed to add projects', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 }

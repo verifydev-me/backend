@@ -106,7 +106,7 @@ export interface GoSignals {
   packageStructure: string;
 }
 
-// Aura calculation result
+// Aura calculation result with full analysis
 export interface AuraCalculation {
   projectScore: number;
   breakdown: {
@@ -119,6 +119,69 @@ export interface AuraCalculation {
   };
   skills: SkillScore[];
   improvements: string[];
+  
+  // Full Analysis for Recruiter View
+  fullAnalysis: ProjectFullAnalysis;
+}
+
+export interface ProjectFullAnalysis {
+  // Structure Analysis
+  folderStructure: {
+    hasSrcFolder: boolean;
+    hasComponents: boolean;
+    hasTests: boolean;
+    hasTypes: boolean;
+    hasConfig: boolean;
+    hasDocs: boolean;
+    organizationScore: number;
+    maxDepth: number;
+  };
+  
+  // Code Quality Details
+  codeQuality: {
+    hasLinting: boolean;
+    hasPrettier: boolean;
+    hasTypeScript: boolean;
+    hasDockerfile: boolean;
+    hasCI: boolean;
+    hasEnvExample: boolean;
+    testFilesCount: number;
+    commentDensity: number;
+  };
+  
+  // Best Practices Breakdown
+  bestPractices: {
+    followed: string[];
+    missing: string[];
+    score: number; // out of 100
+  };
+  
+  // Optimization Suggestions
+  optimizations: OptimizationSuggestion[];
+  
+  // Framework-Specific Analysis
+  frameworkAnalysis?: {
+    framework: string;
+    patternsDetected: string[];
+    suggestions: string[];
+    advancedUsage: string[];
+  };
+  
+  // Tech Stack Summary
+  techStack: {
+    languages: { name: string; percentage: number }[];
+    frameworks: string[];
+    databases: string[];
+    tools: string[];
+  };
+}
+
+export interface OptimizationSuggestion {
+  category: 'performance' | 'security' | 'structure' | 'testing' | 'documentation';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
 }
 
 export interface SkillScore {

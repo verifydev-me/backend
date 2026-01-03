@@ -21,10 +21,24 @@ router.get('/candidates/search', /* authenticateRecruiter, */ RecruiterControlle
 
 /**
  * @route   GET /api/v1/candidates/:userId
- * @desc    Get candidate profile
+ * @desc    Get basic candidate profile
  * @access  Private (Recruiter)
  */
 router.get('/candidates/:userId', /* authenticateRecruiter, */ RecruiterController.getCandidateProfile);
+
+/**
+ * @route   GET /api/v1/candidates/:userId/full
+ * @desc    Get FULL candidate profile with all analyzed projects, skills, optimizations
+ * @access  Private (Recruiter)
+ */
+router.get('/candidates/:userId/full', /* authenticateRecruiter, */ RecruiterController.getFullCandidateProfile);
+
+/**
+ * @route   GET /api/v1/candidates/:userId/resume
+ * @desc    Get candidate's resume data
+ * @access  Private (Recruiter)
+ */
+router.get('/candidates/:userId/resume', /* authenticateRecruiter, */ RecruiterController.getCandidateResume);
 
 /**
  * @route   POST /api/v1/candidates/:userId/shortlist

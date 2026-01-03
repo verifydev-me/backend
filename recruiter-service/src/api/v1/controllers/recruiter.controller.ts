@@ -18,7 +18,7 @@ const searchFiltersSchema = z.object({
 export class RecruiterController {
   /**
    * GET /candidates/search
-   * Search for candidates
+   * Search for candidates with filters
    */
   static async searchCandidates(
     req: RecruiterRequest,
@@ -57,7 +57,7 @@ export class RecruiterController {
 
   /**
    * GET /candidates/:userId
-   * Get candidate profile
+   * Get basic candidate profile (for list view)
    */
   static async getCandidateProfile(
     req: RecruiterRequest,
@@ -85,6 +85,131 @@ export class RecruiterController {
     } catch (error) {
       logger.error({ error }, 'Failed to get candidate');
       res.status(500).json({ success: false, message: 'Failed to get candidate', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /candidates/:userId/full
+   * Get FULL candidate profile with all analyzed projects, resume, skills, optimization details
+   */
+  static async getFullCandidateProfile(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { userId } = req.params;
+      const candidate = await CandidateService.getFullCandidateProfile(userId);
+
+      if (!candidate) {
+        res.status(404).json({ success: false, message: 'Candidate not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Full candidate profile retrieved',
+        data: {
+          candidate,
+          // Highlight key info for recruiter
+          summary: {
+            name: candidate.name,
+            auraLevel: getAuraLevel(candidate.auraScore),
+            cores: candidate.coreCount,
+            topSkills: candidate.topSkills.slice(0, 3).map(s => s.name),
+            projectsAnalyzed: candidate.analyzedProjects.length,
+            avgProjectScore: Math.round(
+              candidate.analyzedProjects.reduce((sum, p) => sum + p.overallScore, 0) /
+              candidate.analyzedProjects.length
+            ),
+            isOpenToWork: candidate.isOpenToWork,
+            hasResume: !!candidate.resumeUrl,
+          },
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get full candidate profile');
+      res.status(500).json({ success: false, message: 'Failed to get profile', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /candidates/:userId/resume
+   * Get candidate's resume data for PDF generation or viewing
+   */
+  static async getCandidateResume(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { userId } = req.params;
+      const candidate = await CandidateService.getFullCandidateProfile(userId);
+
+      if (!candidate) {
+        res.status(404).json({ success: false, message: 'Candidate not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      // Build resume-friendly data
+      const resumeData = {
+        user: {
+          id: candidate.id,
+          username: candidate.username,
+          name: candidate.name || candidate.username,
+          email: candidate.email,
+          avatarUrl: candidate.avatarUrl,
+          bio: candidate.bio,
+          location: candidate.location,
+          website: candidate.website,
+          coreCount: candidate.coreCount,
+          auraScore: candidate.auraScore,
+          isVerified: candidate.isVerified,
+        },
+        skills: candidate.allSkills.map(s => ({
+          name: s.name,
+          category: s.category,
+          verifiedScore: s.score,
+          isVerified: s.isVerified,
+          projectCount: s.projectCount,
+        })),
+        projects: candidate.analyzedProjects.map(p => ({
+          repoName: p.repoName,
+          description: p.description,
+          language: p.primaryLanguage,
+          overallScore: p.overallScore,
+          technologies: p.technologies,
+          githubUrl: p.repoUrl,
+        })),
+        experiences: candidate.experiences,
+        education: candidate.education,
+        socialLinks: candidate.socialLinks,
+        auraSummary: {
+          total: candidate.auraScore,
+          level: getAuraLevel(candidate.auraScore),
+          percentile: 85, // Would calculate from all users
+        },
+      };
+
+      res.json({
+        success: true,
+        message: 'Resume data retrieved',
+        data: {
+          resumeData,
+          pdfUrl: candidate.resumeUrl,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get resume');
+      res.status(500).json({ success: false, message: 'Failed to get resume', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 
@@ -161,7 +286,6 @@ export class RecruiterController {
         return;
       }
 
-      // Mock dashboard data
       const dashboard = {
         activeJobs: 5,
         totalApplications: 127,
@@ -181,6 +305,15 @@ export class RecruiterController {
       res.status(500).json({ success: false, message: 'Failed to get dashboard', error: { code: 'INTERNAL_ERROR' } });
     }
   }
+}
+
+// Helper function
+function getAuraLevel(aura: number): string {
+  if (aura >= 501) return 'Legend';
+  if (aura >= 401) return 'Expert';
+  if (aura >= 251) return 'Skilled';
+  if (aura >= 101) return 'Rising';
+  return 'Novice';
 }
 
 export default RecruiterController;

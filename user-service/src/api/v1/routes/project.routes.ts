@@ -12,6 +12,13 @@ const router = Router();
 router.post('/', authenticate, ProjectController.addProject);
 
 /**
+ * @route   POST /api/v1/projects/batch
+ * @desc    Add multiple projects for analysis (max 3)
+ * @access  Private
+ */
+router.post('/batch', authenticate, ProjectController.batchAnalyze);
+
+/**
  * @route   GET /api/v1/projects
  * @desc    Get user's projects
  * @access  Private
