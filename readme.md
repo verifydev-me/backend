@@ -1,312 +1,346 @@
-# Why VerifyDev? 🚀
+# VerifyDev Backend 🚀
 
-> An honest assessment of the VerifyDev project idea
-
----
-
-## 📊 Project Rating
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        VERIFYDEV PROJECT RATING                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   OVERALL SCORE:  ████████████████████░░░░░  8.5/10  ⭐⭐⭐⭐⭐             │
-│                                                                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   Innovation        ████████████████████░░░░  85%   - Unique approach       │
-│   Market Need       ██████████████████████░░  90%   - Real problem          │
-│   Feasibility       ████████████████░░░░░░░░  70%   - Complex but doable    │
-│   Monetization      ████████████████████░░░░  80%   - Clear revenue model   │
-│   Competition       ██████████████████░░░░░░  75%   - Low direct competition│
-│   Virality          ████████████████████░░░░  80%   - Shareable profiles    │
-│   Tech Challenge    ████████████████████████  95%   - High learning value   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+> **Developer-first platform** with **verified skills** from code analysis, **auto-generated resumes**, and **intelligent job matching** for recruiters.
 
 ---
 
-## ✅ Why This Project is GOOD
+## 🏗️ Complete Architecture
 
-### 1️⃣ Solves a REAL Problem
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              VERIFYDEV PLATFORM                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│   👨‍💻 DEVELOPER FLOW                        👔 RECRUITER FLOW                     │
+│   ────────────────────                      ─────────────────                     │
+│   1. GitHub OAuth Login                     1. Register Organization              │
+│   2. Add Projects                           2. Post Jobs                          │
+│   3. Auto-Analyze Code                      3. Search Verified Candidates         │
+│   4. Get Verified Skills                    4. View Aura Scores                   │
+│   5. Generate Resume                        5. Shortlist & Hire                   │
+│   6. Apply to Jobs                                                               │
+│                                                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-| Problem | How VerifyDev Solves It |
-|---------|------------------------|
-| Skills are self-claimed on resumes | **Verified from actual code** |
-| Recruiters can't verify technical skills | **Skill percentages based on analysis** |
-| Resume building is tedious | **Auto-generated from GitHub** |
-| Job hunting is noisy | **Matched based on verified skills** |
-| Developers can't prove their skills | **Code analysis = proof** |
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              MICROSERVICES                                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│   │   Auth      │ │   User      │ │   Job       │ │  Recruiter  │               │
+│   │  Service    │ │  Service    │ │  Service    │ │  Service    │               │
+│   │  (Node.js)  │ │  (Node.js)  │ │  (Node.js)  │ │  (Node.js)  │               │
+│   │   :3001     │ │   :3002     │ │   :3004     │ │   :3005     │               │
+│   └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘               │
+│                                                                                   │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                               │
+│   │  Project    │ │   Resume    │ │    Aura     │                               │
+│   │  Analyzer   │ │  Service    │ │  Processor  │                               │
+│   │   (Go)      │ │   (Go)      │ │  (Node.js)  │                               │
+│   │   :8001     │ │   :8003     │ │   Worker    │                               │
+│   └─────────────┘ └─────────────┘ └─────────────┘                               │
+│                                                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                              INFRASTRUCTURE                                       │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│   │ PostgreSQL  │ │   Redis     │ │  RabbitMQ   │ │   MinIO     │               │
+│   │   :5432     │ │   :6379     │ │   :5672     │ │   :9000     │               │
+│   │  Database   │ │   Cache     │ │   Queue     │ │  Storage    │               │
+│   └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘               │
+│                                                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-### 2️⃣ Unique Value Proposition
+## 📁 Project Structure
 
-**Current Market:**
-- LinkedIn → Self-claimed skills, endorsements mean nothing
-- GitHub → Just code, no analysis or verification
-- Traditional Resume → Anyone can claim anything
-
-**VerifyDev:**
 ```
-"Your skills are not what you SAY you know,
- but what your CODE proves you know."
+verifybackend/
+│
+├── 🔐 auth-service/              # GitHub OAuth, JWT Authentication
+│   ├── src/
+│   │   ├── api/v1/               # Controllers, Routes
+│   │   ├── services/             # Auth, GitHub, Token services
+│   │   ├── middlewares/          # Auth, Error handling
+│   │   └── config/               # Env, Redis
+│   └── prisma/                   # Database schema
+│
+├── 👤 user-service/              # User Profile, Projects, Aura
+│   ├── src/
+│   │   ├── api/v1/               # User & Project endpoints
+│   │   ├── domain/               # Profile, Aura, Visibility services
+│   │   └── rabbitmq/             # Publish analyze requests
+│   └── prisma/
+│
+├── 💼 job-service/               # Job Listings, Applications
+│   ├── src/
+│   │   ├── api/v1/               # Jobs, Applications endpoints
+│   │   ├── domain/               # Job, Application services
+│   │   └── validators/           # Zod schemas
+│   └── prisma/
+│
+├── 👔 recruiter-service/         # Organization Dashboard, Candidate Search
+│   ├── src/
+│   │   ├── api/v1/               # Dashboard, Search, Shortlist
+│   │   └── domain/               # Candidate service
+│   └── prisma/
+│
+├── 🔍 project-analyzer/          # Code Analysis (Go)
+│   ├── cmd/                      # Entry point
+│   └── internal/
+│       ├── analyzer/             # Main analysis logic
+│       ├── parser/               # Language, framework detection
+│       ├── git/                  # Repository cloning
+│       └── rabbitmq/             # Consumer & Publisher
+│
+├── 📄 resume-service/            # PDF Resume Generation (Go)
+│   ├── cmd/                      # Entry point
+│   └── internal/
+│       ├── generator/            # PDF generation with chromedp
+│       ├── templates/            # Resume HTML templates
+│       └── worker/               # Background processing
+│
+├── ⚡ aura-processor/            # Score Calculation (Worker)
+│   └── src/
+│       ├── consumers/            # RabbitMQ message handlers
+│       └── processors/           # Aura calculation logic
+│
+├── docker-compose.yml            # Full stack deployment
+├── feature.md                    # Feature documentation
+├── architecture.md               # Technical architecture
+└── readme.md                     # This file
 ```
-
-**This is the core innovation — turning code into verified credentials.**
 
 ---
 
-### 3️⃣ Strong Market Need
+## 🔄 Complete Flow
 
-**For Developers:**
-- Self-taught developers NEED proof of skills
-- Bootcamp grads struggle to prove competence
-- Career switchers have skills but no "experience"
-- Freelancers need credibility
-
-**For Recruiters:**
-- 70%+ of tech hires are based on resume keywords (unreliable)
-- Technical interviews are expensive ($500-2000/candidate)
-- False positives waste engineering time
-- Need pre-verified candidates
-
----
-
-### 4️⃣ Clear Monetization Path
+### Developer Journey
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     REVENUE STREAMS                              │
-├─────────────────────────────────────────────────────────────────┤
+┌──────────────────────────────────────────────────────────────────┐
+│  1. LOGIN                                                        │
+│     └─► GitHub OAuth ─► Auth Service ─► JWT Tokens               │
 │                                                                  │
-│  1. DEVELOPER PRO ($9-15/month)                                  │
-│     • Unlimited project analysis                                │
-│     • Premium resume templates                                  │
-│     • Priority in recruiter searches                            │
-│     • Analytics dashboard                                       │
+│  2. ADD PROJECT                                                  │
+│     └─► User adds GitHub repo URL                                │
+│     └─► User Service ─► RabbitMQ (project.analyze.request)       │
 │                                                                  │
-│  2. RECRUITER PLAN ($99-299/month)                              │
-│     • Access to verified developer pool                         │
-│     • Advanced search & filters                                 │
-│     • Unlimited job postings                                    │
-│     • API access                                                │
+│  3. ANALYZE CODE (Async)                                         │
+│     └─► Project Analyzer clones repo                            │
+│     └─► Detects frameworks, patterns, quality                    │
+│     └─► Publishes signals to RabbitMQ (project.analyzed)         │
 │                                                                  │
-│  3. ENTERPRISE (Custom pricing)                                  │
-│     • Bulk hiring solutions                                     │
-│     • ATS integration                                           │
-│     • Custom branding                                           │
-│     • Dedicated support                                         │
+│  4. CALCULATE AURA (Async)                                       │
+│     └─► Aura Processor consumes signals                          │
+│     └─► Calculates scores (Structure, Quality, Testing...)       │
+│     └─► Updates User profile with skills & aura                  │
 │                                                                  │
-│  4. API ACCESS                                                   │
-│     • Code analysis API for other platforms                     │
-│     • Verification badges for websites                          │
+│  5. VIEW PROFILE                                                 │
+│     └─► Verified Skills with percentages                         │
+│     └─► Aura Score & Level                                       │
+│     └─► Core Count (1-3)                                         │
 │                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+│  6. GENERATE RESUME                                              │
+│     └─► Resume Service creates PDF with verified skills          │
+│     └─► Multiple templates (Modern, Classic, Developer)          │
+│                                                                  │
+│  7. APPLY TO JOBS                                                │
+│     └─► Browse matched jobs (based on skills)                   │
+│     └─► One-click apply with auto-attached profile               │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Recruiter Journey
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  1. REGISTER ORGANIZATION                                        │
+│     └─► Create company profile                                   │
+│     └─► Add team members                                         │
+│                                                                  │
+│  2. POST JOBS                                                    │
+│     └─► Define requirements (skills, aura, cores)               │
+│     └─► Job Service stores listing                               │
+│                                                                  │
+│  3. SEARCH CANDIDATES                                            │
+│     └─► Filter by verified skills                                │
+│     └─► Filter by aura score                                     │
+│     └─► Filter by core count                                     │
+│     └─► See code quality metrics                                 │
+│                                                                  │
+│  4. REVIEW & SHORTLIST                                           │
+│     └─► View candidate profiles                                  │
+│     └─► See analyzed projects                                    │
+│     └─► Shortlist best matches                                   │
+│                                                                  │
+│  5. HIRE                                                         │
+│     └─► Contact candidates                                       │
+│     └─► Schedule interviews                                      │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 5️⃣ Low Direct Competition
+## 📡 API Endpoints Summary
 
-| Competitor | What They Do | VerifyDev Advantage |
-|------------|--------------|---------------------|
-| LinkedIn | Social network, self-declared | **Verified** skills |
-| GitHub | Code hosting | **Skill analysis** on top |
-| Hired.com | Job matching | **Code-verified** matching |
-| Resume.io | Resume builder | **Auto-generated** from code |
-| HackerRank | Coding challenges | **Real project** analysis |
-| Triplebyte | Technical screening | **Passive** (no test needed) |
+### Auth Service `:3001`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/auth/github` | Start GitHub OAuth |
+| GET | `/api/v1/auth/github/callback` | OAuth callback |
+| POST | `/api/v1/auth/refresh` | Refresh token |
+| POST | `/api/v1/auth/logout` | Logout |
+| GET | `/api/v1/auth/me` | Current user |
 
-**There's no direct competitor doing "code analysis → skill verification → resume → job matching" in one platform.**
+### User Service `:3002`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/users/me` | Get profile |
+| PUT | `/api/v1/users/me` | Update profile |
+| GET | `/api/v1/users/me/aura` | Get aura |
+| POST | `/api/v1/projects` | Add project |
+| GET | `/api/v1/projects` | List projects |
+| POST | `/api/v1/projects/:id/analyze` | Re-analyze |
+| GET | `/api/v1/u/:username` | Public profile |
 
----
+### Job Service `:3004`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/jobs` | List jobs |
+| GET | `/api/v1/jobs/:id` | Job details |
+| GET | `/api/v1/jobs/matched` | Matched jobs |
+| POST | `/api/v1/jobs/:id/apply` | Apply |
+| GET | `/api/v1/applications` | My applications |
 
-### 6️⃣ High Virality Potential
+### Recruiter Service `:3005`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/dashboard` | Dashboard stats |
+| GET | `/api/v1/candidates/search` | Search candidates |
+| GET | `/api/v1/candidates/:id` | Candidate profile |
+| POST | `/api/v1/candidates/:id/shortlist` | Shortlist |
+| GET | `/api/v1/shortlist` | My shortlist |
 
-```
-Developer creates profile
-       ↓
-Gets verified badges
-       ↓
-Shares on LinkedIn/Twitter: "My React is 85% verified by VerifyDev"
-       ↓
-Other developers want the same
-       ↓
-Viral growth 🚀
-```
-
-**Shareable elements:**
-- Verified skill badges
-- Public profile links
-- "Analyzed by VerifyDev" badges for repos
-- Skill comparison with peers
-
----
-
-### 7️⃣ Excellent Learning Project
-
-Building VerifyDev will teach you:
-
-| Tech | What You'll Learn |
-|------|-------------------|
-| **Go** | Concurrency, file parsing, gRPC, performance |
-| **Node.js** | API design, OAuth, microservices |
-| **gRPC** | Service-to-service communication, Protobuf |
-| **PostgreSQL** | Relational data modeling, complex queries |
-| **MongoDB** | Document storage, aggregations |
-| **Docker** | Containerization, multi-service orchestration |
-| **Nginx** | Load balancing, reverse proxy, SSL |
-| **AI/LLMs** | Prompt engineering, code analysis |
-| **System Design** | Microservices architecture at scale |
+### Resume Service `:8003`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/resumes/generate` | Generate PDF |
+| POST | `/api/v1/resumes/preview` | HTML preview |
 
 ---
 
-## ⚠️ Challenges to Consider
+## 🎯 Aura Scoring System
 
-### 1. Technical Complexity (High)
+### Score Breakdown (per project, max 100)
 
-**Challenge:** Building accurate code analysis is HARD.
-**Solution:** Start with rule-based analysis, add AI later. Focus on popular stacks first (React, Node, Go).
+| Category | Points | What It Measures |
+|----------|--------|------------------|
+| **Structure** | 20 | Folder organization, patterns |
+| **Code Quality** | 25 | Linting, TypeScript, Docker, CI |
+| **Testing** | 20 | Test files, coverage |
+| **Documentation** | 15 | README, comments |
+| **Tech Stack** | 15 | Modern frameworks |
+| **Complexity** | 5 | Project size |
 
----
+### Aura Levels
 
-### 2. Accuracy of Skill Scores
+| Level | Score | Badge |
+|-------|-------|-------|
+| Novice | 0-100 | 🌱 |
+| Rising | 101-250 | ⭐ |
+| Skilled | 251-400 | 💫 |
+| Expert | 401-500 | 🔥 |
+| Legend | 501+ | 👑 |
 
-**Challenge:** If scores are wrong, trust is lost.
-**Solution:**
-- Transparent scoring with explanations
-- Allow users to dispute
-- Continuous improvement based on feedback
-- Multiple factors (not just AI)
+### Core System
 
----
-
-### 3. Private Repositories
-
-**Challenge:** Developers may not want to share private code.
-**Solution:**
-- Analysis happens on YOUR server
-- Code is deleted after analysis
-- Only metrics are stored, not code
-- Clear privacy policy
-
----
-
-### 4. Gaming the System
-
-**Challenge:** Users might add copied/fake projects.
-**Solution:**
-- Check code originality (plagiarism detection)
-- GitHub commit history verification
-- Require projects with significant contribution
-- Flag suspicious patterns
+| Cores | Meaning |
+|-------|---------|
+| ⚡ | 1 Core - Beginner |
+| ⚡⚡ | 2 Cores - Intermediate |
+| ⚡⚡⚡ | 3 Cores - Advanced |
 
 ---
 
-### 5. Cold Start Problem
+## 🚀 Quick Start
 
-**Challenge:** Need developers AND recruiters for network effects.
-**Solution:**
-- Start with developers-only (resume builder)
-- Build profile database first
-- Add recruiter features later
-- Partner with bootcamps/communities
+### 1. Start Infrastructure
 
----
-
-## 🎯 Go-To-Market Strategy
-
-### Phase 1: Developer Acquisition
-```
-Week 1-4:  Launch MVP with GitHub login + 3 project analysis
-Week 5-8:  Auto-generated resume feature
-Week 9-12: Community building (Twitter, Reddit, Dev.to)
+```bash
+docker-compose up -d postgres redis rabbitmq minio
 ```
 
-### Phase 2: Value Demonstration
-```
-Month 3-6: Public profiles with verified badges
-           Case studies of developers landing jobs
-           Partnerships with bootcamps
+### 2. Run Services
+
+```bash
+# Terminal 1 - Auth
+cd auth-service && npm install && npm run dev
+
+# Terminal 2 - User
+cd user-service && npm install && npm run dev
+
+# Terminal 3 - Job
+cd job-service && npm install && npm run dev
+
+# Terminal 4 - Recruiter
+cd recruiter-service && npm install && npm run dev
+
+# Terminal 5 - Project Analyzer (Go)
+cd project-analyzer && go mod tidy && go run cmd/main.go
+
+# Terminal 6 - Resume Service (Go)
+cd resume-service && go mod tidy && go run cmd/main.go
+
+# Terminal 7 - Aura Processor
+cd aura-processor && npm install && npm run dev
 ```
 
-### Phase 3: Recruiter Launch
-```
-Month 6+:  Recruiter dashboard in beta
-           Job posting feature
-           Developer-recruiter matching
-```
+### 3. Access
+
+| Service | URL |
+|---------|-----|
+| Auth | http://localhost:3001 |
+| User | http://localhost:3002 |
+| Job | http://localhost:3004 |
+| Recruiter | http://localhost:3005 |
+| Analyzer | http://localhost:8001 |
+| Resume | http://localhost:8003 |
+| RabbitMQ UI | http://localhost:15672 |
+| MinIO Console | http://localhost:9001 |
 
 ---
 
-## 🔥 Why This Will Succeed
+## 🛠️ Tech Stack
 
-### 1. Perfect Timing
-- Remote work = more global hiring = need better verification
-- AI tools make code analysis feasible
-- Developer job market is competitive
-
-### 2. Strong Technical Moat
-- Accurate code analysis is HARD to replicate
-- First-mover advantage in your network
-- Data compounds (more analyses = better scoring)
-
-### 3. Network Effects
-- More developers → More attractive to recruiters
-- More recruiters → More developers join
-- Verified badges spread awareness
-
-### 4. Clear Value Exchange
-- Developers get verified credentials + resume for FREE
-- Recruiters pay for access to quality candidates
-- Win-win model
+| Layer | Technology |
+|-------|------------|
+| **Node.js Services** | Express, Prisma, Zod, Pino |
+| **Go Services** | Gin, go-git, chromedp, zerolog |
+| **Database** | PostgreSQL |
+| **Cache** | Redis |
+| **Message Queue** | RabbitMQ |
+| **Object Storage** | MinIO/S3 |
+| **Auth** | GitHub OAuth, JWT |
+| **PDF Generation** | Chromedp (headless Chrome) |
 
 ---
 
-## 💡 Final Verdict
+## 📋 Service Summary
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                              │
-│     VerifyDev is a SOLID 8.5/10 project idea.                               │
-│                                                                              │
-│     WHY:                                                                     │
-│     ✅ Solves real pain points for both developers and recruiters           │
-│     ✅ Unique approach (code → verified skills)                              │
-│     ✅ Clear monetization path                                               │
-│     ✅ High learning value for builder                                       │
-│     ✅ Low direct competition                                                │
-│     ✅ Strong viral potential                                                │
-│                                                                              │
-│     RISKS:                                                                   │
-│     ⚠️ Technical complexity is high                                         │
-│     ⚠️ Accuracy of analysis is critical                                     │
-│     ⚠️ Cold start problem needs strategy                                    │
-│                                                                              │
-│     RECOMMENDATION:                                                          │
-│     Build it. Start small, iterate fast, ship weekly.                       │
-│     This could be a serious product OR an incredible portfolio piece.       │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+| Service | Language | Port | Responsibility |
+|---------|----------|------|----------------|
+| Auth | Node.js | 3001 | GitHub OAuth, JWT |
+| User | Node.js | 3002 | Profile, Projects |
+| Job | Node.js | 3004 | Job listings |
+| Recruiter | Node.js | 3005 | Candidate search |
+| Analyzer | Go | 8001 | Code analysis |
+| Resume | Go | 8003 | PDF generation |
+| Aura Processor | Node.js | Worker | Score calculation |
 
 ---
 
-## 🚀 Next Steps
-
-1. **Week 1:** Set up project structure, Docker Compose, basic services
-2. **Week 2:** GitHub OAuth + user profile
-3. **Week 3:** Basic project analysis (tech stack detection)
-4. **Week 4:** Skill scoring algorithm v1
-5. **Week 5:** Resume builder + PDF export
-6. **Week 6:** Public profiles + shareable links
-7. **Week 7:** Polish UI, bug fixes
-8. **Week 8:** Launch beta, get feedback
-
----
-
-**Yeh project banane ka time hai! 🔥**
-# backend
+**Built with ❤️ for developers who want to stand out with verified skills, not just keywords.**

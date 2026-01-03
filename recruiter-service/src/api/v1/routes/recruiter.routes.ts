@@ -1,0 +1,43 @@
+import { Router } from 'express';
+import { RecruiterController } from '../controllers/recruiter.controller.js';
+
+// Note: authenticateRecruiter middleware would verify recruiter JWT
+
+const router = Router();
+
+/**
+ * @route   GET /api/v1/dashboard
+ * @desc    Get recruiter dashboard stats
+ * @access  Private (Recruiter)
+ */
+router.get('/dashboard', /* authenticateRecruiter, */ RecruiterController.getDashboard);
+
+/**
+ * @route   GET /api/v1/candidates/search
+ * @desc    Search for candidates by filters
+ * @access  Private (Recruiter)
+ */
+router.get('/candidates/search', /* authenticateRecruiter, */ RecruiterController.searchCandidates);
+
+/**
+ * @route   GET /api/v1/candidates/:userId
+ * @desc    Get candidate profile
+ * @access  Private (Recruiter)
+ */
+router.get('/candidates/:userId', /* authenticateRecruiter, */ RecruiterController.getCandidateProfile);
+
+/**
+ * @route   POST /api/v1/candidates/:userId/shortlist
+ * @desc    Shortlist a candidate
+ * @access  Private (Recruiter)
+ */
+router.post('/candidates/:userId/shortlist', /* authenticateRecruiter, */ RecruiterController.shortlistCandidate);
+
+/**
+ * @route   GET /api/v1/shortlist
+ * @desc    Get shortlisted candidates
+ * @access  Private (Recruiter)
+ */
+router.get('/shortlist', /* authenticateRecruiter, */ RecruiterController.getShortlist);
+
+export default router;
