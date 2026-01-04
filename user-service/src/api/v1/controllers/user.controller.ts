@@ -182,11 +182,63 @@ export class UserController {
       res.json({
         success: true,
         message: 'Aura summary retrieved',
-        data: { aura },
+        data: aura, // Return directly, not nested
       });
     } catch (error) {
       logger.error({ error }, 'Failed to get aura');
       res.status(500).json({ success: false, message: 'Failed to get aura', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /users/me/sync-github
+   * Sync GitHub profile data
+   */
+  static async syncGitHub(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      // For now, just return success - GitHub sync happens at login
+      res.json({
+        success: true,
+        message: 'GitHub profile synced',
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to sync GitHub');
+      res.status(500).json({ success: false, message: 'Failed to sync', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /users/me/skills
+   * Get current user's skills
+   */
+  static async getMySkills(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const skills = await ProfileService.getUserSkills(req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Skills retrieved',
+        data: skills,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get skills');
+      res.status(500).json({ success: false, message: 'Failed to get skills', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 

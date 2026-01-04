@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { ProjectService } from '../../../domain/project.service.js';
 import { logger } from '../../../utils/logger.js';
 import type { AuthenticatedRequest, ApiResponse } from '../../../types/index.js';
@@ -7,8 +7,8 @@ import { z } from 'zod';
 const addProjectSchema = z.object({
   githubRepoUrl: z.string().url().includes('github.com'),
   repoName: z.string().min(1).max(200),
-  description: z.string().max(500).optional(),
-  defaultBranch: z.string().max(100).optional(),
+  description: z.string().max(500).optional().nullable().transform(val => val || undefined),
+  defaultBranch: z.string().max(100).optional().nullable().transform(val => val || undefined),
 });
 
 // Batch analysis - max 3 projects at a time
@@ -16,14 +16,41 @@ const batchAnalyzeSchema = z.object({
   projects: z.array(z.object({
     githubRepoUrl: z.string().url().includes('github.com'),
     repoName: z.string().min(1).max(200),
-    description: z.string().max(500).optional(),
-    defaultBranch: z.string().max(100).optional(),
+    description: z.string().max(500).optional().nullable().transform(val => val || undefined),
+    defaultBranch: z.string().max(100).optional().nullable().transform(val => val || undefined),
   })).min(1).max(3, 'Maximum 3 projects can be analyzed at a time'),
 });
 
 const MAX_TOTAL_PROJECTS = 10; // Free tier limit
 
 export class ProjectController {
+  /**
+   * GET /projects/available
+   * Get user's available GitHub repos
+   */
+  static async getAvailableRepos(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const repos = await ProjectService.getAvailableRepos(req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Available repos retrieved',
+        data: { repos },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get available repos');
+      res.status(500).json({ success: false, message: 'Failed to get repos', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
   /**
    * POST /projects
    * Add a new project for analysis
@@ -56,6 +83,25 @@ export class ProjectController {
         data: { project },
       });
     } catch (error) {
+      // Handle specific errors
+      if (error instanceof Error) {
+        if (error.message === 'REPO_NOT_OWNED') {
+          res.status(403).json({
+            success: false,
+            message: 'You can only add repositories you own',
+            error: { code: 'REPO_NOT_OWNED' },
+          });
+          return;
+        }
+        if (error.message === 'User not found') {
+          res.status(404).json({
+            success: false,
+            message: 'User not found',
+            error: { code: 'USER_NOT_FOUND' },
+          });
+          return;
+        }
+      }
       logger.error({ error }, 'Failed to add project');
       res.status(500).json({ success: false, message: 'Failed to add project', error: { code: 'INTERNAL_ERROR' } });
     }

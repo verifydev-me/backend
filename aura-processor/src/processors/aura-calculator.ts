@@ -5,7 +5,14 @@ import type {
   SkillScore,
   ProjectFullAnalysis,
   OptimizationSuggestion,
+  IndustryAnalysis,
+  VerifiedSkill,
 } from './types.js';
+
+// Extended signals type with industry analysis
+interface ProjectSignalsExtended extends ProjectSignals {
+  industryAnalysis?: IndustryAnalysis;
+}
 
 /**
  * Aura Calculator
@@ -13,15 +20,16 @@ import type {
  * Converts project signals into aura scores with full analysis
  * 
  * SCORING BREAKDOWN (max 100 per project):
- * - Structure: 20 points
- * - Code Quality: 25 points
- * - Testing: 20 points
- * - Documentation: 15 points
- * - Tech Stack: 15 points
- * - Complexity: 5 points
+ * - Structure: 20 points (increased - gives credit to complex structures)
+ * - Code Quality: 20 points
+ * - Testing: 10 points
+ * - Documentation: 10 points
+ * - Tech Stack: 15 points (increased - rewards modern tech)
+ * - Complexity: 10 points (increased - rewards large projects)
+ * - Industry Skills: 15 points (from verified skills)
  */
 export class AuraCalculator {
-  calculate(signals: ProjectSignals): AuraCalculation {
+  calculate(signals: ProjectSignalsExtended): AuraCalculation {
     logger.debug({ projectId: signals.projectId }, 'Calculating aura');
 
     const breakdown = {
@@ -33,20 +41,41 @@ export class AuraCalculator {
       complexity: this.calculateComplexityScore(signals),
     };
 
+    // Calculate industry skills bonus (up to 15 points)
+    const industryBonus = this.calculateIndustryBonus(signals.industryAnalysis);
+
+    // Calculate project type bonus
+    const projectTypeBonus = this.calculateProjectTypeBonus(signals);
+
     const projectScore =
       breakdown.structure +
       breakdown.codeQuality +
       breakdown.testing +
       breakdown.documentation +
       breakdown.techStack +
-      breakdown.complexity;
+      breakdown.complexity +
+      industryBonus +
+      projectTypeBonus;
 
     const skills = this.extractSkills(signals);
     const improvements = this.generateImprovements(signals, breakdown);
     const fullAnalysis = this.generateFullAnalysis(signals, breakdown);
 
-    return {
+    // Add industry analysis to full analysis
+    if (signals.industryAnalysis) {
+      (fullAnalysis as any).industryAnalysis = signals.industryAnalysis;
+    }
+
+    logger.info({
+      projectId: signals.projectId,
       projectScore,
+      industryBonus,
+      verifiedSkillCount: signals.industryAnalysis?.totalSkills || 0,
+      engineeringLevel: signals.industryAnalysis?.engineeringLevel || 'unknown',
+    }, '🎯 Aura calculation complete');
+
+    return {
+      projectScore: Math.min(projectScore, 100),
       breakdown,
       skills,
       improvements,
@@ -54,75 +83,192 @@ export class AuraCalculator {
     };
   }
 
+  /**
+   * Calculate industry skills bonus (max 15 points)
+   * This rewards production-level engineering patterns
+   */
+  private calculateIndustryBonus(industry?: IndustryAnalysis): number {
+    if (!industry || !industry.verifiedSkills) {
+      return 0;
+    }
+
+    let bonus = 0;
+
+    // Base score from verified skills (up to 8 points)
+    const highConfidenceSkills = industry.verifiedSkills.filter(
+      (s: VerifiedSkill) => s.confidence >= 0.7 && s.resumeReady
+    );
+    bonus += Math.min(highConfidenceSkills.length * 1, 8);
+
+    // Architecture bonus (up to 4 points)
+    if (industry.architecture) {
+      switch (industry.architecture.type) {
+        case 'microservices':
+          bonus += 4;
+          break;
+        case 'event_driven':
+          bonus += 3;
+          break;
+        case 'clean_architecture':
+        case 'hexagonal':
+          bonus += 2;
+          break;
+        case 'modular_monolith':
+          bonus += 1;
+          break;
+      }
+    }
+
+    // Engineering level bonus (up to 3 points)
+    switch (industry.engineeringLevel) {
+      case 'Production-grade':
+        bonus += 3;
+        break;
+      case 'Advanced':
+        bonus += 2;
+        break;
+      case 'Intermediate':
+        bonus += 1;
+        break;
+    }
+
+    return Math.min(bonus, 15);
+  }
+
+  /**
+   * Calculate project type bonus (max 10 points)
+   * Rewards complex project architectures
+   */
+  private calculateProjectTypeBonus(signals: ProjectSignalsExtended): number {
+    let bonus = 0;
+
+    // Project type bonus
+    switch (signals.projectType) {
+      case 'microservice':
+        bonus += 5;
+        break;
+      case 'fullstack':
+        bonus += 4;
+        break;
+      case 'api':
+      case 'backend':
+        bonus += 3;
+        break;
+      case 'frontend':
+        bonus += 2;
+        break;
+      case 'library':
+      case 'cli':
+        bonus += 2;
+        break;
+    }
+
+    // Docker compose with multiple services
+    if (signals.codeSignals?.hasDockerCompose) {
+      bonus += 2;
+    }
+
+    // Multiple frameworks (e.g., React + Node.js)
+    if (signals.frameworks?.length >= 2) {
+      bonus += 1;
+    }
+
+    // Multiple databases
+    if (signals.databases?.length >= 2) {
+      bonus += 1;
+    }
+
+    // Has message queue (RabbitMQ, Kafka, etc)
+    const messageQueues = ['RabbitMQ', 'Kafka', 'Redis'];
+    if (signals.databases?.some(db => messageQueues.includes(db)) || 
+        signals.tools?.some(t => messageQueues.includes(t))) {
+      bonus += 1;
+    }
+
+    return Math.min(bonus, 10);
+  }
+
   // Structure Score (max 20)
   private calculateStructureScore(signals: ProjectSignals): number {
     let score = 0;
     const folder = signals.folderStructure;
 
-    if (folder.hasSrcFolder) score += 4;
-    if (folder.hasComponents) score += 3;
-    if (folder.hasUtils) score += 2;
-    if (folder.hasTypes) score += 3;
-    if (folder.hasConfig) score += 2;
+    // Basic structure (8 points)
+    if (folder.hasSrcFolder) score += 2;
+    if (folder.hasComponents) score += 1;
+    if (folder.hasUtils) score += 1;
+    if (folder.hasTypes) score += 2;
+    if (folder.hasConfig) score += 1;
+    if (folder.hasApi) score += 1;
 
-    score += Math.min(folder.organizationScore / 20, 6);
+    // Advanced structure (7 points)
+    if (folder.hasServices) score += 2;
+    if (folder.hasModels) score += 1;
+    if (folder.hasMiddleware) score += 2;
+    if (folder.hasControllers) score += 2;
+
+    // Organization quality (5 points)
+    score += Math.min(Math.round(folder.organizationScore / 20), 5);
 
     return Math.min(score, 20);
   }
 
-  // Code Quality Score (max 25)
+  // Code Quality Score (max 20)
   private calculateCodeQualityScore(signals: ProjectSignals): number {
     let score = 0;
     const code = signals.codeSignals;
 
-    if (code.hasLinting) score += 5;
-    if (code.hasPrettier) score += 3;
-    if (code.hasTypeScript) score += 5;
-    if (code.hasGitignore) score += 2;
-    if (code.hasEnvExample) score += 3;
-    if (code.hasDockerfile) score += 4;
-    if (code.hasCI) score += 3;
+    if (code.hasLinting) score += 3;
+    if (code.hasPrettier) score += 2;
+    if (code.hasTypeScript) score += 4;
+    if (code.hasGitignore) score += 1;
+    if (code.hasEnvExample) score += 2;
+    if (code.hasDockerfile) score += 3;
+    if (code.hasDockerCompose) score += 2;
+    if (code.hasCI) score += 2;
+    if (code.hasMakefile) score += 1;
 
-    return Math.min(score, 25);
+    return Math.min(score, 20);
   }
 
-  // Testing Score (max 20)
+  // Testing Score (max 10)
   private calculateTestingScore(signals: ProjectSignals): number {
     let score = 0;
     const code = signals.codeSignals;
     const folder = signals.folderStructure;
 
-    if (folder.hasTests) score += 5;
-    if (code.testFilesCount > 0) score += 5;
-    if (code.testFilesCount >= 5) score += 3;
-    if (code.testFilesCount >= 10) score += 3;
-    if (code.testFilesCount >= 20) score += 4;
+    if (folder.hasTests) score += 3;
+    if (code.testFilesCount > 0) score += 2;
+    if (code.testFilesCount >= 5) score += 2;
+    if (code.testFilesCount >= 10) score += 2;
+    if (code.testFilesCount >= 20) score += 1;
 
-    return Math.min(score, 20);
+    return Math.min(score, 10);
   }
 
-  // Documentation Score (max 15)
+  // Documentation Score (max 10)
   private calculateDocumentationScore(signals: ProjectSignals): number {
     let score = 0;
     const code = signals.codeSignals;
     const folder = signals.folderStructure;
 
-    if (code.hasReadme) score += 5;
-    if (code.hasLicense) score += 2;
-    if (folder.hasDocs) score += 4;
-    if (code.commentDensity >= 5) score += 2;
-    if (code.commentDensity >= 10) score += 2;
+    if (code.hasReadme) score += 4;
+    if (code.hasLicense) score += 1;
+    if (folder.hasDocs) score += 3;
+    if (code.commentDensity >= 5) score += 1;
+    if (code.commentDensity >= 10) score += 1;
 
-    return Math.min(score, 15);
+    return Math.min(score, 10);
   }
 
-  // Tech Stack Score (max 15)
+  // Tech Stack Score (max 15 - rewards modern tech)
   private calculateTechStackScore(signals: ProjectSignals): number {
     let score = 0;
 
     const modernFrameworks = [
       'React', 'Next.js', 'Vue', 'Nuxt', 'Svelte',
-      'NestJS', 'Fastify', 'Gin', 'Fiber', 'FastAPI'
+      'NestJS', 'Fastify', 'Gin', 'Fiber', 'FastAPI',
+      'Express', 'Koa', 'Echo', 'Chi', 'Django', 'Flask'
     ];
 
     for (const framework of signals.frameworks) {
@@ -131,82 +277,156 @@ export class AuraCalculator {
       }
     }
 
-    const modernTools = ['Vite', 'Vitest', 'Playwright', 'Cypress'];
+    const modernTools = ['Vite', 'Vitest', 'Playwright', 'Cypress', 'Jest', 'Prisma'];
     for (const tool of signals.tools) {
       if (modernTools.includes(tool)) {
-        score += 2;
+        score += 1;
       }
     }
 
+    // Databases
     if (signals.databases.length > 0) score += 2;
+    if (signals.databases.length >= 2) score += 1;
 
     return Math.min(score, 15);
   }
 
   // Complexity Score (max 5)
+  // Complexity Score (max 10 - rewards large, multi-language projects)
   private calculateComplexityScore(signals: ProjectSignals): number {
     let score = 0;
 
+    // Lines of code (up to 5 points)
     if (signals.totalLines >= 500) score += 1;
     if (signals.totalLines >= 2000) score += 1;
     if (signals.totalLines >= 5000) score += 1;
+    if (signals.totalLines >= 10000) score += 1;
+    if (signals.totalLines >= 20000) score += 1;
 
+    // Multi-language (up to 3 points)
     if (signals.languages.length >= 2) score += 1;
-    if (signals.languages.length >= 4) score += 1;
+    if (signals.languages.length >= 3) score += 1;
+    if (signals.languages.length >= 5) score += 1;
 
-    return Math.min(score, 5);
+    // File count (up to 2 points)
+    if (signals.totalFiles >= 20) score += 1;
+    if (signals.totalFiles >= 50) score += 1;
+
+    return Math.min(score, 10);
   }
 
-  // Extract skills from signals
-  private extractSkills(signals: ProjectSignals): SkillScore[] {
+  // Extract skills from signals AND industry analysis verified skills
+  private extractSkills(signals: ProjectSignalsExtended): SkillScore[] {
     const skills: SkillScore[] = [];
+    const addedSkillNames = new Set<string>(); // Track added skills to avoid duplicates
 
-    if (signals.primaryLanguage) {
+    // First, add verified skills from industry analysis (most accurate)
+    if (signals.industryAnalysis?.verifiedSkills) {
+      for (const verifiedSkill of signals.industryAnalysis.verifiedSkills) {
+        // Convert IndustryAnalysis category to SkillScore category
+        const category = this.mapVerifiedSkillCategory(verifiedSkill.category);
+        
+        skills.push({
+          name: verifiedSkill.name,
+          category,
+          score: Math.round(verifiedSkill.confidence * 100), // Convert 0-1 to 0-100
+          evidence: verifiedSkill.evidence,
+        });
+        addedSkillNames.add(verifiedSkill.name.toLowerCase());
+      }
+      
+      logger.debug({
+        projectId: signals.projectId,
+        verifiedSkillCount: signals.industryAnalysis.verifiedSkills.length,
+        skills: signals.industryAnalysis.verifiedSkills.map(s => s.name),
+      }, '🔍 Added verified skills from industry analysis');
+    }
+
+    // Add primary language if not already added
+    if (signals.primaryLanguage && !addedSkillNames.has(signals.primaryLanguage.toLowerCase())) {
       skills.push({
         name: signals.primaryLanguage,
         category: 'LANGUAGE',
         score: this.calculateLanguageScore(signals),
         evidence: [`Primary language with ${signals.totalLines} lines`],
       });
+      addedSkillNames.add(signals.primaryLanguage.toLowerCase());
     }
 
+    // Add frameworks from basic detection (fallback if not in verified skills)
     for (const framework of signals.frameworks) {
-      skills.push({
-        name: framework,
-        category: 'FRAMEWORK',
-        score: this.calculateFrameworkScore(signals, framework),
-        evidence: this.getFrameworkEvidence(signals, framework),
-      });
+      if (!addedSkillNames.has(framework.toLowerCase())) {
+        skills.push({
+          name: framework,
+          category: 'FRAMEWORK',
+          score: this.calculateFrameworkScore(signals, framework),
+          evidence: this.getFrameworkEvidence(signals, framework),
+        });
+        addedSkillNames.add(framework.toLowerCase());
+      }
     }
 
+    // Add databases from basic detection (fallback if not in verified skills)
     for (const db of signals.databases) {
-      skills.push({
-        name: db,
-        category: 'DATABASE',
-        score: 60,
-        evidence: ['Used in project'],
-      });
+      if (!addedSkillNames.has(db.toLowerCase())) {
+        skills.push({
+          name: db,
+          category: 'DATABASE',
+          score: 60,
+          evidence: ['Used in project'],
+        });
+        addedSkillNames.add(db.toLowerCase());
+      }
     }
 
-    if (signals.codeSignals.hasDockerfile) {
+    // Add Docker if detected and not already added
+    if (signals.codeSignals.hasDockerfile && !addedSkillNames.has('docker')) {
       skills.push({
         name: 'Docker',
         category: 'DEVOPS',
         score: 70,
         evidence: ['Dockerfile present'],
       });
+      addedSkillNames.add('docker');
     }
 
-    if (signals.codeSignals.hasCI) {
+    // Add CI/CD if detected and not already added
+    if (signals.codeSignals.hasCI && !addedSkillNames.has('ci/cd')) {
       skills.push({
         name: 'CI/CD',
         category: 'DEVOPS',
         score: 70,
         evidence: ['GitHub Actions or GitLab CI configured'],
       });
+      addedSkillNames.add('ci/cd');
     }
 
+    logger.info({
+      projectId: signals.projectId,
+      totalSkills: skills.length,
+      skillNames: skills.map(s => s.name),
+    }, '📊 Skills extracted');
+
     return skills;
+  }
+
+  // Map verified skill category to SkillScore category
+  private mapVerifiedSkillCategory(category: string): SkillScore['category'] {
+    const categoryMap: Record<string, SkillScore['category']> = {
+      'language': 'LANGUAGE',
+      'framework': 'FRAMEWORK',
+      'database': 'DATABASE',
+      'devops': 'DEVOPS',
+      'infrastructure': 'DEVOPS',
+      'tool': 'TOOL',
+      'library': 'FRAMEWORK',
+      'messaging': 'TOOL',
+      'webserver': 'DEVOPS',
+      'cache': 'DATABASE',
+      'search': 'DATABASE',
+      'testing': 'TOOL',
+    };
+    return categoryMap[category.toLowerCase()] || 'TOOL';
   }
 
   private calculateLanguageScore(signals: ProjectSignals): number {
@@ -454,7 +674,7 @@ export class AuraCalculator {
     return suggestions;
   }
 
-  private generateReactAnalysis(react: typeof signals.reactSignals) {
+  private generateReactAnalysis(react: ProjectSignals['reactSignals']) {
     if (!react) return undefined;
 
     const patterns: string[] = [];

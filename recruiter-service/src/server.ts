@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import recruiterRoutes from './api/v1/routes/recruiter.routes.js';
+import authRoutes from './api/v1/routes/auth.routes.js';
 
 const app = express();
 
@@ -26,7 +27,8 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/v1', recruiterRoutes);
+app.use('/api/v1/recruiters', authRoutes);  // Auth routes: /api/v1/recruiters/login, /register, /me
+app.use('/api/v1/recruiters', recruiterRoutes);  // Recruiter routes
 
 // 404
 app.use((req, res) => {
@@ -47,19 +49,18 @@ app.listen(env.PORT, () => {
 ║   Port:        ${env.PORT}                                     ║
 ║   Environment: ${env.NODE_ENV}                                ║
 ║                                                           ║
-║   Endpoints:                                              ║
-║   • GET  /api/v1/dashboard           - Dashboard stats    ║
-║   • GET  /api/v1/candidates/search   - Search candidates  ║
-║   • GET  /api/v1/candidates/:id      - Candidate profile  ║
-║   • POST /api/v1/candidates/:id/shortlist - Shortlist     ║
-║   • GET  /api/v1/shortlist           - View shortlist     ║
+║   Auth Endpoints:                                         ║
+║   • POST /api/v1/recruiters/register - Register           ║
+║   • POST /api/v1/recruiters/login    - Login              ║
+║   • GET  /api/v1/recruiters/me       - Current user       ║
 ║                                                           ║
-║   Features:                                               ║
-║   • Search by verified skills                             ║
-║   • Filter by aura score                                  ║
-║   • Filter by core count                                  ║
-║   • View candidate profiles                               ║
-║   • Shortlist candidates                                  ║
+║   Candidate Endpoints:                                    ║
+║   • GET  /api/v1/recruiters/dashboard                     ║
+║   • GET  /api/v1/recruiters/candidates/search             ║
+║   • GET  /api/v1/recruiters/candidates/:id                ║
+║   • GET  /api/v1/recruiters/candidates/:id/full           ║
+║   • POST /api/v1/recruiters/candidates/:id/shortlist      ║
+║   • GET  /api/v1/recruiters/shortlist                     ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);

@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent;
+  }
+
+  .aura-glow {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+
+  .aura-glow-strong {
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.5);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10;
+  }
+
+  .glass {
+    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Code block styling */
+pre, code {
+  @apply font-mono;
+}
+
+/* Aura level badges */
+.aura-badge-novice {
+  @apply bg-zinc-500/20 text-zinc-400 border border-zinc-500/30;
+}
+
+.aura-badge-rising {
+  @apply bg-green-500/20 text-green-400 border border-green-500/30;
+}
+
+.aura-badge-established {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+.aura-badge-expert {
+  @apply bg-violet-500/20 text-violet-400 border border-violet-500/30;
+}
+
+.aura-badge-legendary {
+  @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+}
+
+/* Loading animations */
+.skeleton {
+  @apply animate-pulse bg-muted rounded;
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+}

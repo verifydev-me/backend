@@ -20,8 +20,8 @@ export class AuthService {
       GitHubService.getUserEmail(githubAccessToken),
     ]);
 
-    // Create or update user in database
-    const user = await this.upsertUser(githubUser, primaryEmail);
+    // Create or update user in database (with GitHub token for API calls)
+    const user = await this.upsertUser(githubUser, primaryEmail, githubAccessToken);
 
     // Generate JWT tokens
     const tokens = await TokenService.generateTokens(user.id);
@@ -58,7 +58,8 @@ export class AuthService {
    */
   private static async upsertUser(
     githubUser: GitHubUser,
-    email: string | null
+    email: string | null,
+    githubAccessToken: string
   ) {
     const existingUser = await prisma.user.findUnique({
       where: { githubId: githubUser.id.toString() },
@@ -79,6 +80,7 @@ export class AuthService {
       twitterHandle: githubUser.twitter_username,
       githubFollowers: githubUser.followers,
       githubRepos: githubUser.public_repos,
+      githubAccessToken, // Store GitHub token for API calls
     };
 
     if (existingUser) {

@@ -1,30 +1,20 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
 
-FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+
+# Install OpenSSL and other required libraries for Prisma
+RUN apk add --no-cache openssl openssl-dev libc6-compat
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy Prisma and generate with correct binary target
 COPY prisma ./prisma/
-RUN npm ci
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 RUN npx prisma generate
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source
 COPY . .
-RUN npm run build
 
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
-
-COPY --from=builder /app/dist ./dist
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY package.json ./
-
-USER appuser
-
-CMD ["node", "dist/index.js"]
+CMD ["npm", "run", "dev"]

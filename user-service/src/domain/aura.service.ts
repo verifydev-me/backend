@@ -22,7 +22,7 @@ import type { AuraSummary, AuraGain } from '../types/index.js';
  */
 export class AuraService {
   /**
-   * Get user's aura summary
+   * Get user's aura summary with detailed breakdown
    */
   static async getAuraSummary(userId: string): Promise<AuraSummary | null> {
     const user = await prisma.user.findUnique({
@@ -39,14 +39,22 @@ export class AuraService {
 
     if (!user) return null;
 
-    // Calculate breakdown
+    // Calculate breakdown with details
     const profile = await ProfileService.getMyProfile(userId);
     const profileScore = profile ? ProfileService.calculateProfileCompleteness(profile) : 0;
+    const profileDetails = this.getProfileBreakdownDetails(user, profileScore);
 
     const projectsScore = this.calculateProjectsAura(user.projects);
+    const projectDetails = this.getProjectsBreakdownDetails(user.projects, projectsScore);
+
     const skillsScore = this.calculateSkillsAura(user.skills);
+    const skillsDetails = this.getSkillsBreakdownDetails(user.skills, skillsScore);
+
     const activityScore = await this.calculateActivityAura(userId);
+    const activityDetails = this.getActivityBreakdownDetails(activityScore);
+
     const githubScore = this.calculateGitHubAura(user);
+    const githubDetails = this.getGitHubBreakdownDetails(user, githubScore);
 
     const total = profileScore + projectsScore + skillsScore + activityScore + githubScore;
 
@@ -86,11 +94,131 @@ export class AuraService {
         activity: activityScore,
         github: githubScore,
       },
+      breakdownDetails: {
+        profile: profileDetails,
+        projects: projectDetails,
+        skills: skillsDetails,
+        activity: activityDetails,
+        github: githubDetails,
+      },
       level: this.getAuraLevel(total),
       percentile,
       trend,
       recentGains,
     };
+  }
+
+  /**
+   * Get detailed breakdown for profile score
+   */
+  private static getProfileBreakdownDetails(user: any, _totalScore: number): any[] {
+    return [
+      { label: 'Basic Info', points: 10, earned: !!user.name && !!user.email, reason: 'Name and email set' },
+      { label: 'Profile Bio', points: 10, earned: !!user.bio, reason: user.bio ? 'Bio completed' : 'Add a bio' },
+      { label: 'Avatar', points: 10, earned: !!user.avatarUrl, reason: user.avatarUrl ? 'Profile picture set' : 'Add profile picture' },
+      { label: 'Location', points: 10, earned: !!user.location, reason: user.location ? 'Location specified' : 'Add your location' },
+      { label: 'Website/Social', points: 10, earned: !!user.blog || !!user.twitterUsername, reason: 'Social links added' },
+      { label: 'Skills Listed', points: 10, earned: _totalScore >= 60, reason: 'Skills added to profile' }
+    ];
+  }
+
+  /**
+   * Get detailed breakdown for projects score
+   */
+  private static getProjectsBreakdownDetails(projects: any[], totalScore: number): any[] {
+    const analyzedCount = projects.filter(p => p.analysisStatus === 'COMPLETED').length;
+    const avgScore = analyzedCount > 0 
+      ? Math.round(projects.filter(p => p.analysisStatus === 'COMPLETED').reduce((sum, p) => sum + (p.overallScore || 0), 0) / analyzedCount)
+      : 0;
+    
+    // Get top scoring project
+    const topProject = projects
+      .filter(p => p.analysisStatus === 'COMPLETED')
+      .sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))[0];
+    
+    const details = [
+      { 
+        label: `${analyzedCount} Projects Analyzed`, 
+        points: totalScore, 
+        earned: analyzedCount > 0, 
+        reason: analyzedCount > 0 
+          ? `Avg score: ${avgScore}/100 (max 50 pts each for 80+ projects)`
+          : 'Analyze your GitHub projects to earn points'
+      }
+    ];
+
+    if (topProject) {
+      details.push({
+        label: `Top: ${topProject.repoName || 'Project'}`,
+        points: Math.round((topProject.overallScore || 0) * 0.5),
+        earned: true,
+        reason: `Score: ${topProject.overallScore}/100`
+      });
+    }
+
+    return details;
+  }
+
+  /**
+   * Get detailed breakdown for skills score  
+   */
+  private static getSkillsBreakdownDetails(skills: any[], totalScore: number): any[] {
+    const verifiedCount = skills.filter(s => s.isVerified).length;
+    
+    return [
+      {
+        label: `${verifiedCount} Verified Skills`,
+        points: totalScore,
+        earned: verifiedCount > 0,
+        reason: verifiedCount > 0
+          ? `Skills verified from project analysis (0.15 pts per skill score point)`
+          : 'Get skills verified by analyzing projects'
+      }
+    ];
+  }
+
+  /**
+   * Get detailed breakdown for activity score
+   */
+  private static getActivityBreakdownDetails(totalScore: number): any[] {
+    return [
+      {
+        label: 'Platform Activity',
+        points: totalScore,
+        earned: totalScore > 0,
+        reason: `Points from logins, profile views, and engagement (max 100)`
+      }
+    ];
+  }
+
+  /**
+   * Get detailed breakdown for GitHub score
+   */
+  private static getGitHubBreakdownDetails(user: any, _totalScore: number): any[] {
+    const followersPoints = Math.min(Math.round((user.githubFollowers || 0) * 0.04), 40);
+    const reposPoints = Math.min(user.githubRepos || 0, 30);
+    const contribPoints = Math.min(Math.round((user.githubContributions || 0) * 0.1), 30);
+    
+    return [
+      { 
+        label: `${user.githubFollowers || 0} Followers`, 
+        points: followersPoints, 
+        earned: followersPoints > 0, 
+        reason: '0.04 pts per follower (max 40)' 
+      },
+      { 
+        label: `${user.githubRepos || 0} Public Repos`, 
+        points: reposPoints, 
+        earned: reposPoints > 0, 
+        reason: '1 pt per repo (max 30)' 
+      },
+      { 
+        label: `${user.githubContributions || 0} Contributions`, 
+        points: contribPoints, 
+        earned: contribPoints > 0, 
+        reason: '0.1 pts per contribution (max 30)' 
+      }
+    ];
   }
 
   /**
@@ -113,18 +241,33 @@ export class AuraService {
 
   /**
    * Calculate aura from projects
+   * Better formula: Higher scores get more points
    */
   private static calculateProjectsAura(projects: { overallScore: number; analysisStatus: string }[]): number {
     let score = 0;
 
     for (const project of projects) {
       if (project.analysisStatus === 'COMPLETED') {
-        // Each completed project adds up to 40 aura based on score
-        score += Math.round(project.overallScore * 0.4);
+        // Tiered scoring - better projects get more points
+        const projectScore = project.overallScore;
+        
+        if (projectScore >= 80) {
+          // Excellent project: up to 50 aura
+          score += Math.round(projectScore * 0.5);
+        } else if (projectScore >= 60) {
+          // Good project: up to 40 aura
+          score += Math.round(projectScore * 0.4);
+        } else if (projectScore >= 40) {
+          // Average project: up to 30 aura
+          score += Math.round(projectScore * 0.35);
+        } else {
+          // Below average: up to 20 aura
+          score += Math.round(projectScore * 0.3);
+        }
       }
     }
 
-    return Math.min(score, 200); // Cap at 200
+    return Math.min(score, 250); // Cap at 250 (increased from 200)
   }
 
   /**

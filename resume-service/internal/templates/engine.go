@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"html/template"
 
-	"github.com/verifydev/resume-service/internal/generator"
+	"github.com/verifydev/resume-service/internal/models"
 )
 
 // TemplateEngine handles resume template rendering
@@ -57,7 +57,7 @@ func (te *TemplateEngine) LoadTemplates() error {
 }
 
 // Render generates HTML from resume data
-func (te *TemplateEngine) Render(data generator.ResumeData) (string, error) {
+func (te *TemplateEngine) Render(data models.ResumeData) (string, error) {
 	templateName := data.Template
 	if templateName == "" {
 		templateName = "modern"

@@ -71,6 +71,13 @@ export interface PublicProfile {
   socialLinks: SocialLinkSummary[];
 }
 
+export interface AuraDetailItem {
+  label: string;
+  points: number;
+  earned: boolean;
+  reason: string;
+}
+
 export interface AuraSummary {
   total: number;
   breakdown: {
@@ -79,6 +86,13 @@ export interface AuraSummary {
     skills: number;        // From verified skills
     activity: number;      // From platform activity
     github: number;        // From GitHub stats
+  };
+  breakdownDetails?: {
+    profile: AuraDetailItem[];
+    projects: AuraDetailItem[];
+    skills: AuraDetailItem[];
+    activity: AuraDetailItem[];
+    github: AuraDetailItem[];
   };
   level: 'Novice' | 'Rising' | 'Skilled' | 'Expert' | 'Legend';
   percentile: number;      // Top X% of users

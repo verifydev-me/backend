@@ -44,7 +44,7 @@ export class ProfileService {
     userId: string,
     data: UpdateProfileDto
   ): Promise<UserProfile | null> {
-    const user = await prisma.user.update({
+    await prisma.user.update({
       where: { id: userId },
       data: {
         name: data.name,
@@ -147,6 +147,24 @@ export class ProfileService {
       stars: p.stars,
       overallScore: p.overallScore,
       isPublic: p.isPublic,
+    }));
+  }
+
+  /**
+   * Get user's skills (by userId)
+   */
+  static async getUserSkills(userId: string): Promise<SkillSummary[]> {
+    const skills = await prisma.skill.findMany({
+      where: { userId },
+      orderBy: [{ isVerified: 'desc' }, { verifiedScore: 'desc' }],
+    });
+
+    return skills.map((s) => ({
+      name: s.name,
+      category: s.category,
+      isVerified: s.isVerified,
+      verifiedScore: s.verifiedScore,
+      projectCount: s.projectCount,
     }));
   }
 

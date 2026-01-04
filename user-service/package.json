@@ -13,7 +13,14 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix"
   },
-  "keywords": ["user", "profile", "aura", "core", "skills", "verifydev"],
+  "keywords": [
+    "user",
+    "profile",
+    "aura",
+    "core",
+    "skills",
+    "verifydev"
+  ],
   "author": "VerifyDev",
   "license": "MIT",
   "dependencies": {
@@ -32,6 +39,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",

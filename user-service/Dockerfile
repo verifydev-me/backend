@@ -1,31 +1,48 @@
-FROM node:20-alpine AS base
+# ============================================
+# User Service - Production Dockerfile
+# ============================================
+FROM node:20-alpine AS builder
 
-FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+
+COPY package*.json ./
+# Install ALL dependencies (including devDependencies like typescript) for building
+RUN npm ci && npm cache clean --force
+
 COPY prisma ./prisma/
-RUN npm ci
 RUN npx prisma generate
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
+
 RUN npm run build
 
-FROM base AS runner
+# Prune devDependencies after build
+RUN npm prune --production
+
+FROM node:20-alpine AS production
+
 WORKDIR /app
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+RUN apk add --no-cache dumb-init curl openssl
+
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
+
 ENV NODE_ENV=production
+ENV PORT=3002
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
+# Regenerate Prisma client for Alpine Linux
+RUN npx prisma generate
 
-COPY --from=builder /app/dist ./dist
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY package.json ./
+USER nodejs
 
-USER appuser
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3002/health || exit 1
+
 EXPOSE 3002
 
-CMD ["node", "dist/server.js"]
+CMD ["dumb-init", "node", "dist/server.js"]

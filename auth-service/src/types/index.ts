@@ -54,6 +54,10 @@ export interface AuthResponse {
     user: UserResponse;
     tokens: AuthTokens;
   };
+  error?: {
+    code: string;
+    details?: unknown;
+  };
 }
 
 export interface UserResponse {

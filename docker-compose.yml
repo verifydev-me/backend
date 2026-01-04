@@ -1,4 +1,28 @@
 services:
+  # ==================== API GATEWAY ====================
+  gateway:
+    build: ./gateway
+    container_name: verifydev-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./gateway/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - auth-service
+      - user-service
+      - job-service
+      - recruiter-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - verifydev-network
+
+  # ==================== DATABASES ====================
   postgres:
     image: postgres:15-alpine
     container_name: verifydev-postgres
@@ -88,16 +112,17 @@ services:
       - REDIS_URL=redis://redis:6379
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_CALLBACK_URL=http://localhost:3001/api/v1/auth/github/callback
+      - GITHUB_CALLBACK_URL=http://localhost/api/v1/auth/github/callback
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-supersecretrefreshkey32characters}
       - FRONTEND_URL=http://localhost:3000
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -110,14 +135,20 @@ services:
       - NODE_ENV=development
       - PORT=3002
       - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -131,10 +162,11 @@ services:
       - PORT=3004
       - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -149,10 +181,11 @@ services:
       - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-recruiteraccesskey32characters!!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -170,6 +203,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -193,6 +227,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -216,6 +251,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
