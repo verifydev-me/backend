@@ -24,7 +24,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
-  ChevronRight,
   Zap,
   Target,
   Rocket,
@@ -80,7 +79,6 @@ export default function Onboarding() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [currentStep, setCurrentStep] = useState(0)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Form data
   const [profile, setProfile] = useState({
@@ -95,18 +93,23 @@ export default function Onboarding() {
   const [skillSearch, setSkillSearch] = useState('')
 
   const updateProfileMutation = useMutation({
-    mutationFn: () => put('/v1/users/profile', {
+    mutationFn: () => put('/v1/users/me', {
       ...profile,
       skills: selectedSkills,
       goals: selectedGoals,
       onboardingComplete: true,
     }),
-    onSuccess: () => {
-      toast({ title: 'Profile saved!', description: 'Your profile has been set up.' })
-      navigate('/dashboard')
+    onSuccess: async () => {
+      toast({ title: 'Welcome aboard! 🎉', description: 'Your profile has been set up successfully.' })
+      // Wait a bit for backend to update, then navigate
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 500)
     },
-    onError: () => {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save profile.' })
+    onError: (error: any) => {
+      console.error('Onboarding error:', error)
+      const errorMsg = error?.response?.data?.message || 'Failed to save profile'
+      toast({ variant: 'destructive', title: 'Setup failed', description: errorMsg })
     },
   })
 

@@ -9,6 +9,9 @@ import userRoutes from './api/v1/routes/user.routes.js';
 import projectRoutes from './api/v1/routes/project.routes.js';
 import resumeRoutes from './api/v1/routes/resume.routes.js';
 import experienceRoutes from './api/v1/routes/experience.routes.js';
+import onboardingRoutes from './api/v1/routes/onboarding.routes.js';
+import skillRoutes from './api/v1/routes/skill.routes.js';
+import internalRoutes from './api/v1/routes/internal.routes.js';
 import { rabbitmqPublisher } from './rabbitmq/publisher.js';
 import type { ApiResponse } from './types/index.js';
 
@@ -71,9 +74,12 @@ export function createApp(): Express {
 
   // Routes
   app.use('/api/v1/users', userRoutes);
+  app.use('/api/v1/users/me/onboarding', onboardingRoutes); // Step 1.1: Onboarding routes
+  app.use('/api/v1/skills', skillRoutes); // Step 1.2: Skill routes with protection
   app.use('/api/v1/projects', projectRoutes);
   app.use('/api/v1/resume', resumeRoutes);
   app.use('/api/v1/experiences', experienceRoutes);
+  app.use('/api/internal', internalRoutes); // Internal API for inter-service communication
   // Public routes use the same router but different paths
   app.use('/api/v1', userRoutes);
 

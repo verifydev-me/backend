@@ -6,14 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getInitials, formatNumber } from '@/lib/utils'
+import { getInitials } from '@/lib/utils'
 import {
   Search,
   Filter,
   Users,
   Loader2,
   MapPin,
-  Star,
   Sparkles,
   Code,
   X,
@@ -21,7 +20,6 @@ import {
   Building,
   LogOut,
   ChevronRight,
-  Check,
   AlertCircle
 } from 'lucide-react'
 
@@ -55,7 +53,6 @@ export default function RecruiterDashboard() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
   const [minAura, setMinAura] = useState(0)
   const [customSkill, setCustomSkill] = useState('')
-  const [showFilters, setShowFilters] = useState(true)
   const [onlyOpenToWork, setOnlyOpenToWork] = useState(false)
 
   useEffect(() => {
@@ -124,14 +121,14 @@ export default function RecruiterDashboard() {
             {recruiter && (
               <Badge variant="outline" className="hidden sm:flex items-center gap-1">
                 <Building className="h-3 w-3" />
-                {recruiter.company}
+                {(recruiter as any).organization?.name || (recruiter as any).companyName || (recruiter as any).company || 'Independent Recruiter'}
               </Badge>
             )}
           </div>
           
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:block">
-              {recruiter?.name}
+              {(recruiter as any)?.name || (recruiter as any)?.username}
             </span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -280,32 +277,40 @@ export default function RecruiterDashboard() {
             ) : searchResults.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <AnimatePresence>
-                  {searchResults.map((candidate, index) => {
-                    const auraLevel = getAuraLevelBadge(candidate.user.auraScore)
+                  {Array.isArray(searchResults) && searchResults.map((candidate: any, index) => {
+                    const auraScore = candidate.auraScore || candidate.user?.auraScore || 0;
+                    const auraLevel = getAuraLevelBadge(auraScore);
+                    const cId = candidate.id || candidate.user?.id;
+                    const cName = candidate.name || candidate.username || candidate.user?.name || candidate.user?.username || 'Unknown Developer';
+                    const cAvatar = candidate.avatarUrl || candidate.user?.avatarUrl;
+                    const cUsername = candidate.username || candidate.user?.username || 'anonymous';
                     
                     return (
                       <motion.div
-                        key={candidate.user.id}
+                        key={cId || `candidate-${index}`}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
+                        <Card 
+                          className="hover:border-primary/50 transition-colors cursor-pointer group"
+                          onClick={() => cId && navigate(`/recruiter/candidate/${cId}`)}
+                        >
                           <CardContent className="p-6">
                             <div className="flex items-start gap-4">
                               <Avatar className="h-14 w-14 border-2 border-border">
-                                <AvatarImage src={candidate.user.avatarUrl} />
+                                <AvatarImage src={cAvatar} />
                                 <AvatarFallback>
-                                  {getInitials(candidate.user.name || candidate.user.username)}
+                                  {getInitials(cName)}
                                 </AvatarFallback>
                               </Avatar>
                               
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h3 className="font-semibold truncate">
-                                    {candidate.user.name || candidate.user.username}
+                                    {cName}
                                   </h3>
-                                  {candidate.user.role === 'developer' && (
+                                  {(candidate.isOpenToWork || (candidate as any).openToWork) && (
                                     <Badge className="bg-green-500/20 text-green-400 text-xs">
                                       Open to Work
                                     </Badge>
@@ -313,31 +318,31 @@ export default function RecruiterDashboard() {
                                 </div>
                                 
                                 <p className="text-sm text-muted-foreground mb-2">
-                                  @{candidate.user.username}
+                                  @{cUsername}
                                 </p>
                                 
-                                {candidate.user.location && (
+                                {(candidate.location || candidate.user?.location) && (
                                   <p className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
                                     <MapPin className="h-3 w-3" />
-                                    {candidate.user.location}
+                                    {candidate.location || candidate.user?.location}
                                   </p>
                                 )}
                                 
                                 {/* Top Skills */}
-                                {candidate.verifiedSkills && candidate.verifiedSkills.length > 0 && (
+                                {((candidate.verifiedSkills || candidate.topSkills) && (candidate.verifiedSkills || candidate.topSkills).length > 0) && (
                                   <div className="flex flex-wrap gap-1 mb-3">
-                                    {candidate.verifiedSkills.slice(0, 4).map((skill, i: number) => (
+                                    {(candidate.verifiedSkills || candidate.topSkills).slice(0, 4).map((skill: any, i: number) => (
                                       <Badge 
                                         key={i} 
                                         variant="secondary" 
                                         className="text-xs"
                                       >
-                                        {skill.name}
+                                        {skill.name || skill}
                                       </Badge>
                                     ))}
-                                    {candidate.verifiedSkills.length > 4 && (
+                                    {(candidate.verifiedSkills || candidate.topSkills).length > 4 && (
                                       <Badge variant="outline" className="text-xs">
-                                        +{candidate.verifiedSkills.length - 4}
+                                        +{(candidate.verifiedSkills || candidate.topSkills).length - 4}
                                       </Badge>
                                     )}
                                   </div>
@@ -347,7 +352,7 @@ export default function RecruiterDashboard() {
                                 <div className="flex items-center gap-4 text-sm">
                                   <div className="flex items-center gap-1">
                                     <Sparkles className="h-4 w-4 text-yellow-400" />
-                                    <span className="font-medium">{candidate.user.auraScore}</span>
+                                    <span className="font-medium">{auraScore}</span>
                                     <Badge className={`${auraLevel.color} text-xs ml-1`}>
                                       {auraLevel.label}
                                     </Badge>
@@ -366,7 +371,6 @@ export default function RecruiterDashboard() {
                                 size="sm" 
                                 variant="ghost"
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => navigate(`/recruiter/candidate/${candidate.user.id}`)}
                               >
                                 <Eye className="h-4 w-4 mr-1" />
                                 View

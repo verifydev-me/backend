@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller.js';
+import { authenticateRecruiter } from '../../../middlewares/authenticate.js';
 
 const router = Router();
 
@@ -18,10 +19,31 @@ router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);
 
 /**
+ * @route   POST /api/v1/auth/refresh
+ * @desc    Refresh access token
+ * @access  Public
+ */
+router.post('/refresh', AuthController.refresh);
+
+/**
  * @route   GET /api/v1/auth/me
  * @desc    Get current recruiter info
  * @access  Private
  */
-router.get('/me', AuthController.me);
+router.get('/me', authenticateRecruiter, AuthController.me);
+
+/**
+ * @route   PUT /api/v1/auth/profile
+ * @desc    Update recruiter profile
+ * @access  Private
+ */
+router.put('/profile', authenticateRecruiter, AuthController.updateProfile);
+
+/**
+ * @route   POST /api/v1/auth/logout
+ * @desc    Logout recruiter
+ * @access  Private
+ */
+router.post('/logout', authenticateRecruiter, AuthController.logout);
 
 export default router;

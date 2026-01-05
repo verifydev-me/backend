@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { connectDatabase, disconnectDatabase } from './prisma/client.js';
+import { RecruiterAuthService } from './domain/auth.service.js';
 import recruiterRoutes from './api/v1/routes/recruiter.routes.js';
 import authRoutes from './api/v1/routes/auth.routes.js';
 
@@ -39,9 +41,19 @@ app.use((req, res) => {
   });
 });
 
-// Start server
-app.listen(env.PORT, () => {
-  logger.info(`
+// Start server with database connection
+async function startServer() {
+  try {
+    // Connect to database
+    await connectDatabase();
+    
+    // Seed demo data in development
+    if (env.NODE_ENV === 'development') {
+      await RecruiterAuthService.seedDemoData();
+    }
+    
+    app.listen(env.PORT, () => {
+      logger.info(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   👔 Recruiter Service Started                            ║
@@ -63,5 +75,25 @@ app.listen(env.PORT, () => {
 ║   • GET  /api/v1/recruiters/shortlist                     ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-  `);
+      `);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down...');
+  await disconnectDatabase();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down...');
+  await disconnectDatabase();
+  process.exit(0);
+});
+
+startServer();

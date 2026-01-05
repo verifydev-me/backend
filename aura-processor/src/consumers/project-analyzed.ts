@@ -95,7 +95,7 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
     // Update project in database with full analysis data
     await updateProject(signals, auraResult);
 
-    // Update/create skills
+    // Update/create skills (includes Docker, Kafka, Redis, etc. - all in one place)
     await updateSkills(signals.userId, auraResult.skills);
 
     // Update user's total aura
@@ -144,6 +144,7 @@ async function updateProject(
       codeQualityScore: breakdown.codeQuality,
       auraContribution: projectScore,
       language: signals.primaryLanguage,
+      fullAnalysis: auraResult.fullAnalysis as any,
     },
   });
   

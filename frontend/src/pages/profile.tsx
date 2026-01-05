@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth-store'
 import { useUserStore } from '@/store/user-store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -12,6 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AuraScoreCard } from '@/components/aura/AuraScoreCard'
 import { apiClient } from '@/api/client'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -24,13 +31,13 @@ import {
   getInitials,
   formatNumber,
 } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 import type { GitHubRepo, Experience, ExperiencesGrouped, VerifiedSkill, ExperienceType } from '@/types'
 import {
   MapPin,
   Building,
   Link as LinkIcon,
   Twitter,
-  Users,
   GitFork,
   Star,
   Share2,
@@ -59,14 +66,29 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-// Skill category colors
+// Skill category colors - refined for premium aesthetic
 const skillCategoryColors: Record<string, string> = {
-  LANGUAGE: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  FRAMEWORK: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  DATABASE: 'bg-green-500/20 text-green-400 border-green-500/30',
-  DEVOPS: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  TOOL: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  OTHER: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  LANGUAGE: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  FRAMEWORK: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  DATABASE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  DEVOPS: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  TOOL: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  OTHER: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  // New extreme-level categories
+  architecture: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  infrastructure: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  database: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  messaging: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+  security: 'bg-red-500/10 text-red-400 border-red-500/20',
+  devops: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  observability: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  testing: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
+  language: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  framework: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  cloud: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  performance: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+  ml: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+  data_science: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
 }
 
 // Experience type icons
@@ -223,10 +245,15 @@ export default function Profile() {
     try {
       await apiClient.put('/v1/users/me', editForm)
       setIsEditDialogOpen(false)
-      // Refresh aura after profile update
+      // Refresh user data and aura after profile update
+      const { checkAuth } = useAuthStore.getState()
+      await checkAuth()
       await fetchAura()
-    } catch (e) {
+      toast({ title: 'Profile saved! ✅', description: 'Your profile has been updated successfully.' })
+    } catch (e: any) {
       console.error('Failed to save profile:', e)
+      const errorMsg = e?.response?.data?.message || 'Failed to update profile'
+      toast({ variant: 'destructive', title: 'Save failed', description: errorMsg })
     } finally {
       setIsSaving(false)
     }
@@ -293,17 +320,29 @@ export default function Profile() {
 
   const completenessScore = calculateCompleteness()
 
+  // Skill sources mapping for tooltips
+  const skillToProjects = projects.reduce((acc, p) => {
+    const techs = [...((p as any).technologies || [])]
+    if (p.language) techs.push(p.language)
+    techs.forEach(t => {
+      if (!acc[t]) acc[t] = []
+      const projectName = p.name || (p as any).repoName || 'Unnamed Project'
+      if (!acc[t].includes(projectName)) acc[t].push(projectName)
+    })
+    return acc
+  }, {} as Record<string, string[]>)
+
   return (
-    <div className="space-y-6">
-      {/* Premium Header with Gradient */}
+    <div className="space-y-10 pb-12">
+      {/* Refined Professional Header */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 via-purple-500/20 to-pink-500/10 p-8 border border-primary/20"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative overflow-hidden rounded-3xl bg-card border border-border p-8 shadow-2xl backdrop-blur-md"
       >
-        <div className="absolute inset-0 bg-grid-white/5" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-muted/30 rounded-full blur-[100px]" />
         
         <div className="relative flex flex-col md:flex-row gap-8 items-start">
           {/* Avatar with GitHub Badge */}
@@ -323,16 +362,18 @@ export default function Profile() {
           <div className="flex-1 space-y-4">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
+                <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {user.name || user.username}
+                </h1>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold">{user.name || user.username}</h1>
+                  <p className="text-primary font-medium">@{user.username}</p>
                   {user.auraScore > 100 && (
-                    <Badge className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border border-yellow-500/30">
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 animate-pulse-subtle py-0.5">
                       <Sparkles className="h-3 w-3 mr-1" />
-                      Verified
+                      Verified Pro
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground text-lg">@{user.username}</p>
               </div>
               
               {/* Action Buttons */}
@@ -422,10 +463,12 @@ export default function Profile() {
                   <Share2 className="h-4 w-4" />
                   Share
                 </Button>
-                <Button className="gap-2 bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90">
-                  <Download className="h-4 w-4" />
-                  Generate Resume
-                </Button>
+                <Link to="/resume">
+                  <Button className="gap-2 bg-primary hover:opacity-90 text-primary-foreground border-none shadow-lg shadow-primary/20">
+                    <Download className="h-4 w-4" />
+                    Generate Resume
+                  </Button>
+                </Link>
               </div>
             </div>
 
@@ -471,39 +514,50 @@ export default function Profile() {
               )}
             </div>
 
-            {/* GitHub Stats */}
-            <div className="flex flex-wrap gap-6 text-sm">
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-primary" />
-                <strong className="text-foreground">{formatNumber(user.followers)}</strong>
-                <span className="text-muted-foreground">followers</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-primary" />
-                <strong className="text-foreground">{formatNumber(user.following)}</strong>
-                <span className="text-muted-foreground">following</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <FolderGit2 className="h-4 w-4 text-primary" />
-                <strong className="text-foreground">{user.publicRepos}</strong>
-                <span className="text-muted-foreground">repositories</span>
-              </span>
+            {/* Skill Tags - Auto-generated from verified skills */}
+            <div className="flex flex-wrap gap-2">
+              {(() => {
+                // Get unique categories from skills
+                const categories = [...new Set(skills.map(s => s.category))].slice(0, 5)
+                if (categories.length === 0) {
+                  return (
+                    <Badge variant="outline" className="text-muted-foreground border-muted">
+                      <Code className="h-3 w-3 mr-1" />
+                      Add skills via projects
+                    </Badge>
+                  )
+                }
+                return categories.map((cat) => {
+                  const catSkillCount = skills.filter(s => s.category === cat).length
+                  const catColor = skillCategoryColors[cat] || skillCategoryColors['OTHER']
+                  return (
+                    <Badge key={cat} className={`${catColor} border font-medium`}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                      <span className="ml-1.5 text-xs opacity-70">({catSkillCount})</span>
+                    </Badge>
+                  )
+                })
+              })()}
             </div>
           </div>
 
           {/* Aura Score Mini Card */}
-          <div className="hidden lg:flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/20 backdrop-blur-sm min-w-[180px]">
-            <Zap className="h-8 w-8 text-primary mb-2" />
-            <p className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            className="hidden lg:flex flex-col items-center justify-center p-6 rounded-2xl bg-background/60 border border-primary/30 backdrop-blur-xl min-w-[200px] shadow-2xl shadow-primary/10 relative overflow-hidden group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+            <Zap className="h-8 w-8 text-primary mb-2 relative z-10" />
+            <p className="text-5xl font-black bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent relative z-10">
               {formatNumber(aura?.total || user.auraScore || 0)}
             </p>
-            <p className="text-sm text-muted-foreground">Aura Score</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mt-1 relative z-10">Total Aura</p>
             {aura?.level && (
-              <Badge variant="secondary" className="mt-2">
-                {aura.level}
+              <Badge className="mt-3 bg-primary text-primary-foreground font-bold border-none shadow-lg shadow-primary/20 relative z-10">
+                {aura.level.toUpperCase()}
               </Badge>
             )}
-          </div>
+          </motion.div>
         </div>
       </motion.div>
 
@@ -528,12 +582,12 @@ export default function Profile() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-transparent">
+          <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
             <CardContent className="py-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Profile Completeness</span>
+                  <span className="font-medium text-foreground">Profile Completeness</span>
                 </div>
                 <span className="text-sm text-muted-foreground">{completenessScore}%</span>
               </div>
@@ -547,7 +601,7 @@ export default function Profile() {
       )}
 
       {/* Main Content with Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue="overview" className="space-y-8">
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="overview" className="data-[state=active]:bg-background">
             Overview
@@ -564,10 +618,10 @@ export default function Profile() {
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="mt-6 space-y-8">
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Left Column */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-8">
               {/* Skills Card */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -585,28 +639,56 @@ export default function Profile() {
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
                   ) : skills.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {skills.map((skill, index) => (
-                        <motion.div
-                          key={skill.name}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: index * 0.05 }}
-                        >
-                          <Badge
-                            variant="outline"
-                            className={`px-3 py-1.5 text-sm font-medium ${
-                              skillCategoryColors[skill.category] || skillCategoryColors.OTHER
-                            }`}
+                    <TooltipProvider>
+                      <div className="flex flex-wrap gap-2">
+                        {skills.map((skill, index) => (
+                          <motion.div
+                            key={skill.name}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.03 }}
+                            whileHover={{ y: -2 }}
                           >
-                            {skill.name}
-                            {skill.score > 50 && (
-                              <CheckCircle className="h-3 w-3 ml-1.5" />
-                            )}
-                          </Badge>
-                        </motion.div>
-                      ))}
-                    </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="outline"
+                                  className={`px-3 py-2 text-sm font-semibold rounded-lg border-2 transition-all shadow-sm flex items-center gap-2 cursor-help ${
+                                    skillCategoryColors[skill.category] || skillCategoryColors.OTHER
+                                  }`}
+                                >
+                                  <span className="text-foreground">{skill.name}</span>
+                                  <div className="h-4 w-[1px] bg-foreground/20" />
+                                  <span className="text-xs opacity-90">{skill.verifiedScore}%</span>
+                                  {skill.isVerified && (
+                                    <CheckCircle className="h-3 w-3 text-primary animate-pulse" />
+                                  )}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-popover/95 backdrop-blur-md border-primary/20 p-3 shadow-2xl min-w-[200px]">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <p className="font-bold text-primary">{skill.name}</p>
+                                    <Badge variant="secondary" className="text-[10px] h-4">{skill.category}</Badge>
+                                  </div>
+                                  <div className="h-px bg-border/50" />
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] uppercase text-muted-foreground font-bold italic">Source Projects:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {skillToProjects[skill.name]?.map(proj => (
+                                        <Badge key={proj} variant="outline" className="text-[10px] py-0 h-4 border-primary/20">
+                                          {proj}
+                                        </Badge>
+                                      )) || <span className="text-[10px] text-muted-foreground">Auto-detected from ecosystem</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </TooltipProvider>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Code className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -632,34 +714,44 @@ export default function Profile() {
                     </div>
                   ) : projects.length > 0 ? (
                     <div className="space-y-3">
-                      {projects.slice(0, 4).map((project) => (
+                      {projects.slice(0, 4).map((project, idx) => (
                         <motion.div
                           key={project.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/50 transition-colors"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          whileHover={{ scale: 1.02, x: 5 }}
+                          className="group flex items-center justify-between p-4 rounded-xl border border-border bg-card/30 hover:bg-primary/5 hover:border-primary/40 transition-all duration-300 backdrop-blur-sm"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <FolderGit2 className="h-5 w-5 text-primary" />
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-colors">
+                              <FolderGit2 className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                              <p className="font-medium">{project.name}</p>
-                              <p className="text-xs text-muted-foreground flex items-center gap-2">
-                                <span>{project.language}</span>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Star className="h-3 w-3" />
+                              <p className="font-bold text-foreground group-hover:text-primary transition-colors">{project.name}</p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <Badge variant="outline" className="text-[10px] py-0 px-2 h-5 bg-background/50 border-primary/20">
+                                  {project.language}
+                                </Badge>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Star className="h-3 w-3 text-yellow-500" />
                                   {formatNumber(project.stars)}
-                                </span>
-                              </p>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <GitFork className="h-3 w-3" />
+                                  {formatNumber(project.forks || 0)}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          {project.score !== undefined && (
-                            <Badge variant="secondary">
-                              Score: {project.score}/100
-                            </Badge>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            {project.score !== undefined && (
+                              <div className="text-right">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Aura Rank</p>
+                                <p className="text-xl font-black text-primary">#{project.score}</p>
+                              </div>
+                            )}
+                          </div>
                         </motion.div>
                       ))}
                     </div>
@@ -745,24 +837,24 @@ export default function Profile() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          className={`p-4 rounded-lg border transition-all ${
+                          className={`p-4 rounded-xl border transition-all duration-300 ${
                             analyzed 
-                              ? 'border-green-500/30 bg-green-500/5' 
-                              : 'border-border hover:border-primary/50 hover:shadow-lg'
+                              ? 'border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5' 
+                              : 'border-border bg-card hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5'
                           }`}
                         >
                           <div className="flex items-start gap-3">
-                            <FolderGit2 className={`h-5 w-5 mt-0.5 ${analyzed ? 'text-green-500' : 'text-primary'}`} />
+                            <FolderGit2 className={`h-5 w-5 mt-0.5 ${analyzed ? 'text-emerald-400' : 'text-primary'}`} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <a 
                                   href={repo.html_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="font-medium truncate hover:text-primary flex items-center gap-1"
+                                  className="font-bold truncate hover:text-primary text-foreground transition-colors flex items-center gap-1"
                                 >
                                   {repo.name}
-                                  <ExternalLink className="h-3 w-3" />
+                                  <ExternalLink className="h-3 w-3 opacity-50" />
                                 </a>
                                 {analyzed && (
                                   <Badge variant="secondary" className="text-green-500 text-xs">
@@ -868,11 +960,11 @@ export default function Profile() {
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">{skill.name}</span>
-                        {skill.score > 50 && (
+                        {(skill.score || 0) > 50 && (
                           <CheckCircle className="h-4 w-4 text-green-400" />
                         )}
                       </div>
-                      <Progress value={skill.score} className="h-1.5" />
+                      <Progress value={skill.score || 0} className="h-1.5" />
                       <p className="text-xs text-muted-foreground mt-2">
                         Verified from {skill.evidence?.length || 0} projects
                       </p>

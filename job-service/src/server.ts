@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { connectDatabase, disconnectDatabase } from './prisma/client.js';
+import { JobService } from './domain/job.service.js';
 import jobRoutes from './api/v1/routes/job.routes.js';
 
 const app = express();
@@ -37,9 +39,19 @@ app.use((req, res) => {
   });
 });
 
-// Start server
-app.listen(env.PORT, () => {
-  logger.info(`
+// Start server with database connection
+async function startServer() {
+  try {
+    // Connect to database
+    await connectDatabase();
+    
+    // Seed demo data in development
+    if (env.NODE_ENV === 'development') {
+      await JobService.seedDemoJobs();
+    }
+    
+    app.listen(env.PORT, () => {
+      logger.info(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   💼 Job Service Started                                  ║
@@ -57,5 +69,25 @@ app.listen(env.PORT, () => {
 ║   • GET  /api/v1/applications  - My applications          ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-  `);
+      `);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down...');
+  await disconnectDatabase();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down...');
+  await disconnectDatabase();
+  process.exit(0);
+});
+
+startServer();

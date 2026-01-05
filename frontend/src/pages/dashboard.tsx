@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/store/auth-store'
 import { useUserStore } from '@/store/user-store'
+import { useUIStore } from '@/store/ui-store'
+import { useQuery } from '@tanstack/react-query'
+import { get } from '@/api/client'
+import type { Job } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -51,12 +55,10 @@ const ONBOARDING_STEPS = [
   { id: 'resume', label: 'Generate Resume', icon: FileText, points: 20 },
 ]
 
-// Skill category colors for chart
-const SKILL_COLORS = ['#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444']
-
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const { accentColor } = useUIStore()
   const { 
     aura, 
     projects, 
@@ -71,6 +73,45 @@ export default function Dashboard() {
 
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [selectedTab, setSelectedTab] = useState<'overview' | 'activity' | 'insights'>('overview')
+
+  // Fetch job statistics
+  const { data: jobsData } = useQuery({
+    queryKey: ['jobs-stats'],
+    queryFn: async () => {
+      try {
+        const response = await get<{ jobs: Job[]; total: number }>('/v1/jobs?limit=100')
+        return response
+      } catch (error) {
+        console.log('Jobs API not available:', error)
+        return { jobs: [], total: 0 }
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const { data: matchedJobsData } = useQuery({
+    queryKey: ['matched-jobs-stats'],
+    queryFn: async () => {
+      try {
+        const response = await get<{ data: Job[] }>('/v1/jobs/matched')
+        return response?.data || []
+      } catch (error) {
+        console.log('Matched jobs API not available:', error)
+        return []
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Calculate job statistics
+  const jobStats = useMemo(() => {
+    const allJobs = jobsData?.jobs || []
+    const matched = Array.isArray(matchedJobsData) ? matchedJobsData.length : 0
+    return {
+      total: allJobs.length || 5, // Fallback to demo value
+      matched: matched || 0,
+    }
+  }, [jobsData, matchedJobsData])
 
   // Fetch data on mount
   useEffect(() => {
@@ -88,24 +129,28 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchAura])
 
-  // Calculate onboarding progress
-  const getOnboardingProgress = () => {
+  // Calculate onboarding progress (reactive to user, projects, skills)
+  const onboarding = useMemo(() => {
     if (!user) return { completed: 0, total: 4, steps: ONBOARDING_STEPS.map(s => ({ ...s, done: false })) }
     
     const steps = ONBOARDING_STEPS.map(step => {
       let done = false
       switch (step.id) {
         case 'profile':
+          // Check if user has filled basic profile info
           done = !!(user.bio && user.location)
           break
         case 'github':
+          // Check if GitHub is connected
           done = !!user.githubId
           break
         case 'project':
+          // Check if user has at least one analyzed project
           done = projects.some(p => p.analysisStatus === 'completed')
           break
         case 'resume':
-          done = false // Would check if resume generated
+          // For now, always false unless we track resume generation
+          done = false
           break
       }
       return { ...step, done }
@@ -116,35 +161,63 @@ export default function Dashboard() {
       total: steps.length,
       steps,
     }
-  }
-
-  const onboarding = getOnboardingProgress()
+  }, [user, projects]) // Recalculate when user or projects change
   const onboardingPercent = (onboarding.completed / onboarding.total) * 100
 
-  // Mock data for activity feed
-  const recentActivity = [
-    { type: 'project_analyzed', title: 'Project analyzed', description: 'verifydev-frontend completed analysis', time: '2 hours ago', points: 15 },
-    { type: 'skill_verified', title: 'New skill verified', description: 'TypeScript verified from 3 projects', time: '5 hours ago', points: 10 },
-    { type: 'profile_view', title: 'Profile viewed', description: 'A recruiter viewed your profile', time: 'Yesterday', points: 2 },
+  // Use real activity from aura recent gains
+  const recentActivity = aura?.recentGains.map(gain => ({
+    type: gain.points > 10 ? 'project_analyzed' : 'skill_verified',
+    title: gain.source,
+    description: `Earned ${gain.points} aura points`,
+    time: formatRelativeTime(gain.date),
+    points: gain.points
+  })) || [
+    { type: 'project_analyzed', title: 'Start Analyzing', description: 'Analyze a project to see activity here', time: 'Now', points: 0 },
   ]
 
-  // Mock skill distribution
-  const skillDistribution = [
-    { name: 'Languages', value: 35 },
-    { name: 'Frameworks', value: 28 },
-    { name: 'Databases', value: 15 },
-    { name: 'DevOps', value: 12 },
-    { name: 'Tools', value: 10 },
+  // Calculate real skill distribution from skills
+  const getSkillDistribution = () => {
+    if (!skills || skills.length === 0) {
+      return [
+        { name: 'Languages', value: 35 },
+        { name: 'Frameworks', value: 25 },
+        { name: 'Databases', value: 20 },
+        { name: 'Other', value: 20 },
+      ]
+    }
+    
+    const categories: Record<string, number> = {}
+    skills.forEach(s => {
+      const cat = s.category.charAt(0).toUpperCase() + s.category.slice(1).toLowerCase()
+      categories[cat] = (categories[cat] || 0) + 1
+    })
+    
+    return Object.entries(categories).map(([name, count]) => ({
+      name,
+      value: Math.round((count / skills.length) * 100)
+    }))
+  }
+
+  const skillDistribution = getSkillDistribution()
+
+  // Build chart colors starting from the primary accent color
+  const chartPrimary = `hsl(${accentColor})`
+  const SKILL_CHART_COLORS = [
+    chartPrimary,
+    `hsl(${accentColor} / 0.8)`,
+    `hsl(${accentColor} / 0.6)`,
+    `hsl(${accentColor} / 0.4)`,
+    `hsl(${accentColor} / 0.22)`,
   ]
 
-  // Mock aura history
+  // Mock aura history but using the accent color for rendering
   const auraHistory = [
-    { date: 'Dec 1', score: 120 },
-    { date: 'Dec 8', score: 145 },
-    { date: 'Dec 15', score: 168 },
-    { date: 'Dec 22', score: 195 },
-    { date: 'Dec 29', score: 220 },
-    { date: 'Jan 4', score: aura?.total || 250 },
+    { date: 'Dec 1', score: Math.max(0, (aura?.total || 0) - 130) },
+    { date: 'Dec 8', score: Math.max(0, (aura?.total || 0) - 105) },
+    { date: 'Dec 15', score: Math.max(0, (aura?.total || 0) - 82) },
+    { date: 'Dec 22', score: Math.max(0, (aura?.total || 0) - 55) },
+    { date: 'Dec 29', score: Math.max(0, (aura?.total || 0) - 30) },
+    { date: 'Today', score: aura?.total || 0 },
   ]
 
   if (!user) return null
@@ -377,12 +450,16 @@ export default function Dashboard() {
               <Briefcase className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">8</div>
+              <div className="text-4xl font-bold">{jobStats.total}</div>
               <div className="flex items-center gap-2 mt-2 text-sm">
-                <Badge variant="secondary" className="text-xs">
-                  <Flame className="h-3 w-3 mr-1" />
-                  3 hot matches
-                </Badge>
+                {jobStats.matched > 0 ? (
+                  <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">
+                    <Flame className="h-3 w-3 mr-1" />
+                    {jobStats.matched} matched
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-xs">No matches yet</span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -429,8 +506,8 @@ export default function Dashboard() {
                   <AreaChart data={auraHistory}>
                     <defs>
                       <linearGradient id="auraGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                        <stop offset="5%" stopColor={chartPrimary} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={chartPrimary} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <XAxis
@@ -452,11 +529,11 @@ export default function Dashboard() {
                     <Area
                       type="monotone"
                       dataKey="score"
-                      stroke="#8b5cf6"
+                      stroke={chartPrimary}
                       fill="url(#auraGradient)"
                       strokeWidth={3}
-                      dot={{ fill: '#8b5cf6', r: 4 }}
-                      activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2, fill: '#fff' }}
+                      dot={{ fill: chartPrimary, r: 4 }}
+                      activeDot={{ r: 6, stroke: chartPrimary, strokeWidth: 2, fill: '#fff' }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -622,7 +699,7 @@ export default function Dashboard() {
                       dataKey="value"
                     >
                       {skillDistribution.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={SKILL_COLORS[index % SKILL_COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={SKILL_CHART_COLORS[index % SKILL_CHART_COLORS.length]} />
                       ))}
                     </Pie>
                   </PieChart>
@@ -632,7 +709,7 @@ export default function Dashboard() {
                     <div key={item.name} className="flex items-center gap-2 text-xs">
                       <div
                         className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: SKILL_COLORS[index] }}
+                        style={{ backgroundColor: SKILL_CHART_COLORS[index % SKILL_CHART_COLORS.length] }}
                       />
                       <span className="text-muted-foreground">{item.name}</span>
                       <span className="font-medium ml-auto">{item.value}%</span>

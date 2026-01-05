@@ -136,12 +136,12 @@ export const useRecruiterStore = create<RecruiterState>()(
         }
 
         try {
-          const response = await apiClient.get<{ data: Recruiter }>(
+          const response = await apiClient.get<{ data: { recruiter: Recruiter } }>(
             '/v1/recruiters/me',
             { headers: { Authorization: `Bearer ${accessToken}` } }
           )
           set({ 
-            recruiter: response.data.data, 
+            recruiter: response.data.data.recruiter || response.data.data, 
             isAuthenticated: true, 
             isLoading: false 
           })

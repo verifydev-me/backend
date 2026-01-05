@@ -165,6 +165,12 @@ export class AuthService {
     name: string | null;
     avatarUrl: string | null;
     bio: string | null;
+    location: string | null;
+    company: string | null;
+    website: string | null;
+    twitterHandle: string | null;
+    githubFollowers: number;
+    githubRepos: number;
     auraScore: number;
     coreCount: number;
     isVerified: boolean;
@@ -174,14 +180,36 @@ export class AuthService {
       id: user.id,
       username: user.username,
       email: user.email,
-      name: user.name,
+      name: user.name || user.username,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      location: user.location,
+      company: user.company,
+      website: user.website,
+      blog: user.website,
+      twitterUsername: user.twitterHandle,
+      twitter: user.twitterHandle,
+      followers: user.githubFollowers || 0,
+      following: 0,
+      publicRepos: user.githubRepos || 0,
       auraScore: user.auraScore,
+      auraLevel: this.getAuraLevel(user.auraScore),
       coreCount: user.coreCount,
       isVerified: user.isVerified,
       isOpenToWork: user.isOpenToWork,
+      role: 'developer',
     };
+  }
+
+  /**
+   * Get aura level from score
+   */
+  private static getAuraLevel(score: number): string {
+    if (score >= 5000) return 'legend';
+    if (score >= 2500) return 'expert';
+    if (score >= 1000) return 'skilled';
+    if (score >= 500) return 'rising';
+    return 'novice';
   }
 
   /**

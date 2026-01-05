@@ -2,9 +2,12 @@ import { Request } from 'express';
 
 export interface RecruiterRequest extends Request {
   recruiter?: {
-    recruiterId: string;
+    id: string;
+    email: string;
+    name: string;
     organizationId: string;
     role: RecruiterRole;
+    organization?: Organization;
   };
 }
 
@@ -49,6 +52,7 @@ export interface Organization {
 // Candidate search
 export interface CandidateSearchFilters {
   skills?: string[];
+  minAura?: number;
   minAuraScore?: number;
   minCoreCount?: number;
   location?: string;

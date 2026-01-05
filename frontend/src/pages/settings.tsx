@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/store/auth-store'
 import { useUIStore } from '@/store/ui-store'
-import { put } from '@/api/client'
+import { get, put, del } from '@/api/client'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { 
@@ -61,13 +61,21 @@ const itemVariants = {
 // Section types
 type SettingsSection = 'profile' | 'appearance' | 'notifications' | 'privacy' | 'connected' | 'danger'
 
+// Settings interface matching backend
+interface UserSettings {
+  isPublic: boolean
+  isOpenToWork: boolean
+  emailNotifications: boolean
+  showEmail: boolean
+  showLocation: boolean
+}
+
 export default function Settings() {
-  const { user, logout } = useAuthStore()
-  const { theme, setTheme } = useUIStore()
+  const { user, logout, checkAuth } = useAuthStore()
+  const { theme, setTheme, accentColor } = useUIStore()
   const queryClient = useQueryClient()
   
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
-  // const [isSaving, setIsSaving] = useState(false)
   
   // Profile form state
   const [profile, setProfile] = useState({
@@ -76,11 +84,33 @@ export default function Settings() {
     location: user?.location || '',
     website: user?.website || '',
     company: user?.company || '',
-    twitter: user?.twitter || '',
+    twitter: user?.twitterUsername || user?.twitter || '',
     linkedin: user?.linkedin || '',
   })
+
+  // Update profile when user changes
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.name || '',
+        bio: user.bio || '',
+        location: user.location || '',
+        website: user.website || '',
+        company: user.company || '',
+        twitter: user.twitterUsername || user.twitter || '',
+        linkedin: user.linkedin || '',
+      })
+    }
+  }, [user])
   
-  // Notification settings
+  // Fetch settings from backend
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => get<{ settings: UserSettings }>('/v1/users/settings'),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+
+  // Notification settings (local for now, can be extended)
   const [notifications, setNotifications] = useState({
     emailAnalysis: true,
     emailJobMatch: true,
@@ -90,7 +120,7 @@ export default function Settings() {
     pushRecruiterView: true,
   })
   
-  // Privacy settings
+  // Privacy settings from backend
   const [privacy, setPrivacy] = useState({
     showEmail: false,
     showLocation: true,
@@ -100,14 +130,80 @@ export default function Settings() {
     allowRecruiterContact: true,
   })
 
+  // Sync privacy settings from backend
+  useEffect(() => {
+    if (settingsData?.settings) {
+      setPrivacy(prev => ({
+        ...prev,
+        profilePublic: settingsData.settings.isPublic,
+        showEmail: settingsData.settings.showEmail,
+        showLocation: settingsData.settings.showLocation,
+        showInSearch: settingsData.settings.isOpenToWork,
+      }))
+    }
+  }, [settingsData])
+
+  // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: (data: typeof profile) => put('/v1/users/profile', data),
-    onSuccess: () => {
+    mutationFn: (data: typeof profile) => put('/v1/users/me', data),
+    onSuccess: async () => {
+      await checkAuth() // Refresh user data from backend
       queryClient.invalidateQueries({ queryKey: ['user'] })
-      toast({ title: 'Profile updated', description: 'Your changes have been saved.' })
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+      toast({ title: 'Profile updated! ✅', description: 'Your changes have been saved successfully.' })
+    },
+    onError: (error: any) => {
+      console.error('Profile update error:', error)
+      const errorMsg = error?.response?.data?.message || 'Failed to update profile'
+      toast({ variant: 'destructive', title: 'Update failed', description: errorMsg })
+    },
+  })
+
+  // Update settings mutation (privacy/visibility)
+  const updateSettingsMutation = useMutation({
+    mutationFn: (data: { isPublic?: boolean; isOpenToWork?: boolean }) => 
+      put('/v1/users/settings', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+      toast({ title: 'Settings updated', description: 'Your privacy settings have been saved.' })
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update profile.' })
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update settings.' })
+    },
+  })
+
+  // Export data mutation
+  const exportDataMutation = useMutation({
+    mutationFn: async () => {
+      const response = await get<any>('/v1/users/me/export')
+      return response
+    },
+    onSuccess: (data) => {
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `verifydev-export-${new Date().toISOString().split('T')[0]}.json`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode?.removeChild(link)
+      toast({ title: 'Data exported', description: 'Your data has been downloaded.' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to export data.' })
+    },
+  })
+
+  // Delete account mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => del('/v1/users/me'),
+    onSuccess: () => {
+      toast({ title: 'Account deleted', description: 'Your account has been permanently deleted.' })
+      logout()
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete account.' })
     },
   })
 
@@ -115,12 +211,39 @@ export default function Settings() {
     updateProfileMutation.mutate(profile)
   }
 
+  const handlePrivacyChange = (key: string, value: boolean) => {
+    setPrivacy(prev => ({ ...prev, [key]: value }))
+    
+    // Map to backend fields and save
+    if (key === 'profilePublic') {
+      updateSettingsMutation.mutate({ isPublic: value })
+    } else if (key === 'showInSearch') {
+      updateSettingsMutation.mutate({ isOpenToWork: value })
+    }
+  }
+
   const handleDeleteAccount = () => {
     if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      // Implement delete logic
-      toast({ variant: 'destructive', title: 'Account deleted', description: 'Your account has been permanently deleted.' })
-      logout()
+      deleteAccountMutation.mutate()
     }
+  }
+
+  const handleExportData = () => {
+    exportDataMutation.mutate()
+  }
+
+  // Calculate profile completion
+  const calculateProfileCompletion = () => {
+    const fields = [
+      user?.name,
+      user?.bio,
+      user?.location,
+      user?.avatarUrl,
+      user?.website,
+      user?.company,
+    ]
+    const filled = fields.filter(Boolean).length
+    return Math.round((filled / fields.length) * 100)
   }
 
   const sections = [
@@ -185,9 +308,9 @@ export default function Settings() {
                 <Sparkles className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Profile Completion</span>
               </div>
-              <Progress value={75} className="h-2 mb-2" />
+              <Progress value={calculateProfileCompletion()} className="h-2 mb-2" />
               <p className="text-xs text-muted-foreground">
-                Complete your profile to increase visibility
+                {calculateProfileCompletion()}% complete - {calculateProfileCompletion() < 100 ? 'Add more details to increase visibility' : 'Great job!'}
               </p>
             </CardContent>
           </Card>
@@ -225,10 +348,8 @@ export default function Settings() {
                     </div>
                     <div>
                       <p className="font-medium">{user?.name || 'Your Name'}</p>
-                      <p className="text-sm text-muted-foreground">@{user?.githubUsername || 'username'}</p>
-                      <Button variant="outline" size="sm" className="mt-2">
-                        Change Avatar
-                      </Button>
+                      <p className="text-sm text-muted-foreground">@{user?.githubUsername || user?.username || 'username'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Avatar synced from GitHub</p>
                     </div>
                   </div>
                   
@@ -370,7 +491,7 @@ export default function Settings() {
                     Appearance
                   </CardTitle>
                   <CardDescription>
-                    Customize how DevVerify looks for you
+                    Customize how VerifyDev looks for you
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -429,14 +550,38 @@ export default function Settings() {
                   
                   <div>
                     <h3 className="font-medium mb-4">Accent Color</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Coming soon - customize your accent color</p>
-                    <div className="flex gap-2">
-                      {['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4'].map((color) => (
+                    <p className="text-sm text-muted-foreground mb-6">Personalize the application's highlight color</p>
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { name: 'Indigo', value: '239 84% 67%' },
+                        { name: 'Violet', value: '258 89% 66%' },
+                        { name: 'Pink', value: '330 81% 60%' },
+                        { name: 'Rose', value: '341 81% 58%' },
+                        { name: 'Red', value: '0 84% 60%' },
+                        { name: 'Orange', value: '24 94% 53%' },
+                        { name: 'Amber', value: '45 93% 47%' },
+                        { name: 'Yellow', value: '48 96% 53%' },
+                        { name: 'Lime', value: '84 81% 44%' },
+                        { name: 'Emerald', value: '142 70% 45%' },
+                        { name: 'Teal', value: '173 80% 40%' },
+                        { name: 'Cyan', value: '189 94% 43%' },
+                        { name: 'Sky', value: '199 89% 48%' },
+                        { name: 'Zinc', value: '240 5% 65%' },
+                        { name: 'Slate', value: '215 16% 47%' },
+                      ].map((c) => (
                         <button
-                          key={color}
-                          className="h-8 w-8 rounded-full border-2 border-transparent hover:border-foreground/20 transition-colors opacity-50 cursor-not-allowed"
-                          style={{ backgroundColor: color }}
-                          disabled
+                          key={c.value}
+                          onClick={() => {
+                            const { setAccentColor } = useUIStore.getState()
+                            setAccentColor(c.value)
+                            toast({ title: `${c.name} applied`, description: `Accent color updated to ${c.name}.` })
+                          }}
+                          className={cn(
+                            "h-10 w-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 shadow-lg",
+                            accentColor === c.value ? "border-foreground ring-2 ring-primary ring-offset-2 ring-offset-background" : "border-transparent"
+                          )}
+                          style={{ backgroundColor: `hsl(${c.value})` }}
+                          title={c.name}
                         />
                       ))}
                     </div>
@@ -500,13 +645,14 @@ export default function Settings() {
                   <CardTitle className="flex items-center gap-2">
                     <BellRing className="h-5 w-5 text-primary" />
                     Push Notifications
+                    <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
                   </CardTitle>
                   <CardDescription>
                     Real-time notifications in your browser
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between opacity-50">
                     <div>
                       <p className="font-medium">Analysis Updates</p>
                       <p className="text-sm text-muted-foreground">Real-time analysis progress and completion</p>
@@ -514,10 +660,11 @@ export default function Settings() {
                     <Switch 
                       checked={notifications.pushAnalysis}
                       onCheckedChange={(c: boolean) => setNotifications(n => ({ ...n, pushAnalysis: c }))}
+                      disabled
                     />
                   </div>
                   <Separator />
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between opacity-50">
                     <div>
                       <p className="font-medium">New Job Matches</p>
                       <p className="text-sm text-muted-foreground">Instant alerts for matching jobs</p>
@@ -525,10 +672,11 @@ export default function Settings() {
                     <Switch 
                       checked={notifications.pushJobMatch}
                       onCheckedChange={(c: boolean) => setNotifications(n => ({ ...n, pushJobMatch: c }))}
+                      disabled
                     />
                   </div>
                   <Separator />
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between opacity-50">
                     <div>
                       <p className="font-medium">Recruiter Views</p>
                       <p className="text-sm text-muted-foreground">Know when recruiters view your profile</p>
@@ -536,6 +684,7 @@ export default function Settings() {
                     <Switch 
                       checked={notifications.pushRecruiterView}
                       onCheckedChange={(c: boolean) => setNotifications(n => ({ ...n, pushRecruiterView: c }))}
+                      disabled
                     />
                   </div>
                 </CardContent>
@@ -564,7 +713,8 @@ export default function Settings() {
                     </div>
                     <Switch 
                       checked={privacy.profilePublic}
-                      onCheckedChange={(c: boolean) => setPrivacy(p => ({ ...p, profilePublic: c }))}
+                      onCheckedChange={(c: boolean) => handlePrivacyChange('profilePublic', c)}
+                      disabled={updateSettingsMutation.isPending}
                     />
                   </div>
                   <Separator />
@@ -616,12 +766,13 @@ export default function Settings() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Appear in Search</p>
-                      <p className="text-sm text-muted-foreground">Let recruiters find you through search</p>
+                      <p className="font-medium">Open to Work</p>
+                      <p className="text-sm text-muted-foreground">Let recruiters know you're looking for opportunities</p>
                     </div>
                     <Switch 
                       checked={privacy.showInSearch}
-                      onCheckedChange={(c: boolean) => setPrivacy(p => ({ ...p, showInSearch: c }))}
+                      onCheckedChange={(c: boolean) => handlePrivacyChange('showInSearch', c)}
+                      disabled={updateSettingsMutation.isPending}
                     />
                   </div>
                   <Separator />
@@ -637,6 +788,13 @@ export default function Settings() {
                   </div>
                 </CardContent>
               </Card>
+              
+              {updateSettingsMutation.isPending && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving changes...
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -662,17 +820,17 @@ export default function Settings() {
                       </div>
                       <div>
                         <p className="font-medium">GitHub</p>
-                        <p className="text-sm text-muted-foreground">@{user?.githubUsername}</p>
+                        <p className="text-sm text-muted-foreground">@{user?.githubUsername || user?.username}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="success" className="gap-1">
+                      <Badge variant="default" className="gap-1 bg-green-500">
                         <Check className="h-3 w-3" />
                         Connected
                       </Badge>
                       <Button variant="ghost" size="sm" asChild>
                         <a 
-                          href={`https://github.com/${user?.githubUsername}`} 
+                          href={`https://github.com/${user?.githubUsername || user?.username}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                         >
@@ -732,13 +890,21 @@ export default function Settings() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+                  <div className="flex items-center justify-between p-4 rounded-lg border border-muted bg-muted/30">
                     <div>
                       <p className="font-medium">Export Data</p>
                       <p className="text-sm text-muted-foreground">Download all your data in JSON format</p>
                     </div>
-                    <Button variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleExportData}
+                      disabled={exportDataMutation.isPending}
+                    >
+                      {exportDataMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
                       Export
                     </Button>
                   </div>
@@ -748,8 +914,16 @@ export default function Settings() {
                       <p className="font-medium text-destructive">Delete Account</p>
                       <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
                     </div>
-                    <Button variant="destructive" onClick={handleDeleteAccount}>
-                      <Trash2 className="h-4 w-4 mr-2" />
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteAccount}
+                      disabled={deleteAccountMutation.isPending}
+                    >
+                      {deleteAccountMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
                       Delete Account
                     </Button>
                   </div>

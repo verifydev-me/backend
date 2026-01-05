@@ -13,7 +13,7 @@ export interface ApiResponse<T = unknown> {
   message: string;
   data?: T;
   error?: { code: string; details?: unknown };
-  meta?: { page?: number; limit?: number; total?: number };
+  meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
 }
 
 // Job Types

@@ -128,6 +128,199 @@ const (
 	SignalConnectionPool  InfraSignal = "connection_pool"
 	SignalAsyncProcessing InfraSignal = "async_processing"
 	SignalWorkerQueues    InfraSignal = "worker_queues"
+	SignalHTTPFramework   InfraSignal = "http_framework"
+
+	// Cloud-Native Signals
+	SignalServerless     InfraSignal = "serverless"
+	SignalLambda         InfraSignal = "aws_lambda"
+	SignalCloudFunction  InfraSignal = "cloud_function"
+	SignalFargate        InfraSignal = "fargate"
+	SignalEKS            InfraSignal = "eks"
+	SignalGKE            InfraSignal = "gke"
+	SignalAKS            InfraSignal = "aks"
+	SignalTerraform      InfraSignal = "terraform"
+	SignalPulumi         InfraSignal = "pulumi"
+	SignalCloudFormation InfraSignal = "cloudformation"
+	SignalAnsible        InfraSignal = "ansible"
+
+	// Service Mesh & Advanced Networking
+	SignalIstio       InfraSignal = "istio"
+	SignalLinkerd     InfraSignal = "linkerd"
+	SignalConsul      InfraSignal = "consul"
+	SignalVault       InfraSignal = "vault"
+	SignalServiceMesh InfraSignal = "service_mesh"
+
+	// Advanced Security Signals
+	SignalOWASP           InfraSignal = "owasp"
+	SignalSecurityHeaders InfraSignal = "security_headers"
+	SignalSQLInjection    InfraSignal = "sql_injection_prevention"
+	SignalXSSPrevention   InfraSignal = "xss_prevention"
+	SignalEncryption      InfraSignal = "encryption"
+	SignalHashing         InfraSignal = "hashing"
+	SignalSecretRotation  InfraSignal = "secret_rotation"
+	SignalMFA             InfraSignal = "mfa"
+	SignalAuditLogging    InfraSignal = "audit_logging"
+	SignalPenetrationTest InfraSignal = "penetration_testing"
+
+	// Search & Analytics
+	SignalElasticsearch InfraSignal = "elasticsearch"
+	SignalOpenSearch    InfraSignal = "opensearch"
+	SignalAlgolia       InfraSignal = "algolia"
+	SignalMeiliSearch   InfraSignal = "meilisearch"
+	SignalClickHouse    InfraSignal = "clickhouse"
+	SignalTimescaleDB   InfraSignal = "timescaledb"
+
+	// Real-time & Streaming
+	SignalWebRTC           InfraSignal = "webrtc"
+	SignalSocketIO         InfraSignal = "socketio"
+	SignalSSE              InfraSignal = "sse"
+	SignalStreamProcessing InfraSignal = "stream_processing"
+	SignalApacheFlink      InfraSignal = "apache_flink"
+	SignalApacheSpark      InfraSignal = "apache_spark"
+
+	// Machine Learning & AI
+	SignalTensorFlow   InfraSignal = "tensorflow"
+	SignalPyTorch      InfraSignal = "pytorch"
+	SignalMLPipeline   InfraSignal = "ml_pipeline"
+	SignalFeatureStore InfraSignal = "feature_store"
+	SignalModelServing InfraSignal = "model_serving"
+	SignalMLOps        InfraSignal = "mlops"
+
+	// Advanced Database Patterns
+	SignalSharding      InfraSignal = "sharding"
+	SignalReplication   InfraSignal = "replication"
+	SignalReadReplica   InfraSignal = "read_replica"
+	SignalMultiTenancy  InfraSignal = "multi_tenancy"
+	SignalDataMigration InfraSignal = "data_migration"
+	SignalDBVersioning  InfraSignal = "db_versioning"
+
+	// Design Pattern Signals
+	SignalRepositoryPattern   InfraSignal = "repository_pattern"
+	SignalFactoryPattern      InfraSignal = "factory_pattern"
+	SignalSingletonPattern    InfraSignal = "singleton_pattern"
+	SignalObserverPattern     InfraSignal = "observer_pattern"
+	SignalStrategyPattern     InfraSignal = "strategy_pattern"
+	SignalDecoratorPattern    InfraSignal = "decorator_pattern"
+	SignalAdapterPattern      InfraSignal = "adapter_pattern"
+	SignalFacadePattern       InfraSignal = "facade_pattern"
+	SignalBuilderPattern      InfraSignal = "builder_pattern"
+	SignalDependencyInjection InfraSignal = "dependency_injection"
+	SignalCleanArchitecture   InfraSignal = "clean_architecture"
+	SignalHexagonalArch       InfraSignal = "hexagonal_architecture"
+	SignalDDDPattern          InfraSignal = "ddd_pattern"
+	SignalSOLID               InfraSignal = "solid_principles"
+
+	// Code Quality Signals
+	SignalCodeReview       InfraSignal = "code_review"
+	SignalStaticAnalysis   InfraSignal = "static_analysis"
+	SignalSecurityScan     InfraSignal = "security_scan"
+	SignalDependabotSnyk   InfraSignal = "dependency_scanning"
+	SignalCodeCoverage     InfraSignal = "code_coverage"
+	SignalMutationTesting  InfraSignal = "mutation_testing"
+	SignalContractTesting  InfraSignal = "contract_testing"
+	SignalPropertyTesting  InfraSignal = "property_testing"
+	SignalFuzzTesting      InfraSignal = "fuzz_testing"
+	SignalBenchmarking     InfraSignal = "benchmarking"
+	SignalLoadTesting      InfraSignal = "load_testing"
+	SignalChaosEngineering InfraSignal = "chaos_engineering"
+
+	// API & Protocol Signals
+	SignalOpenAPI           InfraSignal = "openapi"
+	SignalSwagger           InfraSignal = "swagger"
+	SignalAsyncAPI          InfraSignal = "asyncapi"
+	SignalProtobuf          InfraSignal = "protobuf"
+	SignalAvro              InfraSignal = "avro"
+	SignalJSONSchema        InfraSignal = "json_schema"
+	SignalGraphQLFederation InfraSignal = "graphql_federation"
+
+	// Advanced Caching
+	SignalMultiLevelCache   InfraSignal = "multi_level_cache"
+	SignalCacheInvalidation InfraSignal = "cache_invalidation"
+	SignalDistributedCache  InfraSignal = "distributed_cache"
+	SignalMemcached         InfraSignal = "memcached"
+
+	// Feature Flags & Experimentation
+	SignalFeatureFlags  InfraSignal = "feature_flags"
+	SignalABTesting     InfraSignal = "ab_testing"
+	SignalCanaryDeploy  InfraSignal = "canary_deployment"
+	SignalBlueGreen     InfraSignal = "blue_green_deployment"
+	SignalRollingUpdate InfraSignal = "rolling_update"
+
+	// Compliance & Governance
+	SignalGDPRCompliance    InfraSignal = "gdpr_compliance"
+	SignalSOC2Compliance    InfraSignal = "soc2_compliance"
+	SignalDataAnonymization InfraSignal = "data_anonymization"
+	SignalDataRetention     InfraSignal = "data_retention"
+	SignalAccessControl     InfraSignal = "access_control"
+
+	// Additional Infrastructure as Code
+	SignalIaC InfraSignal = "infrastructure_as_code"
+
+	// Additional AWS Services
+	SignalS3  InfraSignal = "aws_s3"
+	SignalSNS InfraSignal = "aws_sns"
+
+	// Additional ML/AI Signals
+	SignalScikitLearn InfraSignal = "scikit_learn"
+	SignalPandas      InfraSignal = "pandas"
+	SignalNumpy       InfraSignal = "numpy"
+	SignalMLflow      InfraSignal = "mlflow"
+	SignalKubeflow    InfraSignal = "kubeflow"
+	SignalML          InfraSignal = "machine_learning"
+	SignalLLM         InfraSignal = "llm"
+	SignalVectorDB    InfraSignal = "vector_database"
+	SignalJupyter     InfraSignal = "jupyter"
+
+	// Additional Database Signals
+	SignalInfluxDB InfraSignal = "influxdb"
+
+	// Additional Security Signals
+	SignalPasswordHashing        InfraSignal = "password_hashing"
+	SignalInputSanitization      InfraSignal = "input_sanitization"
+	SignalSQLInjectionPrevention InfraSignal = "sql_injection_prevention_impl"
+	SignalGDPR                   InfraSignal = "gdpr"
+	SignalPCIDSS                 InfraSignal = "pci_dss"
+
+	// Additional Architecture Signals
+	SignalHexagonalArchitecture InfraSignal = "hexagonal_arch"
+	SignalGRPC                  InfraSignal = "grpc"
+	SignalGraphQL               InfraSignal = "graphql"
+	SignalWebSocket             InfraSignal = "websocket"
+	SignalETL                   InfraSignal = "etl"
+	SignalBatchProcessing       InfraSignal = "batch_processing"
+	SignalErrorHandling         InfraSignal = "error_handling"
+	SignalTimeout               InfraSignal = "timeout"
+	SignalI18n                  InfraSignal = "i18n"
+	SignalAsyncPatterns         InfraSignal = "async_patterns"
+	SignalConcurrencyControl    InfraSignal = "concurrency_control"
+	SignalPagination            InfraSignal = "pagination"
+	SignalLazyLoading           InfraSignal = "lazy_loading"
+	SignalConnectionPooling     InfraSignal = "connection_pooling"
+	SignalCodeDocumentation     InfraSignal = "code_documentation"
+
+	// Additional Testing Signals
+	SignalSnapshotTesting  InfraSignal = "snapshot_testing"
+	SignalVisualRegression InfraSignal = "visual_regression"
+	SignalAPITesting       InfraSignal = "api_testing"
+	SignalBDD              InfraSignal = "bdd"
+	SignalTDD              InfraSignal = "tdd"
+
+	// Additional Observability Signals
+	SignalOpenTelemetry InfraSignal = "opentelemetry"
+	SignalLoki          InfraSignal = "loki"
+	SignalAlerting      InfraSignal = "alerting"
+	SignalSLO           InfraSignal = "slo"
+
+	// Additional Deployment Signals
+	SignalCanaryDeployment    InfraSignal = "canary"
+	SignalArgoCD              InfraSignal = "argocd"
+	SignalFlux                InfraSignal = "flux"
+	SignalPreviewEnvironments InfraSignal = "preview_environments"
+	SignalDatabaseMigrations  InfraSignal = "database_migrations"
+	SignalRollback            InfraSignal = "rollback"
+
+	// Project Quality Signals
+	SignalIncompleteProject InfraSignal = "incomplete_project"
 )
 
 // InfrastructureSignals - All extracted infrastructure facts

@@ -208,8 +208,8 @@ export default function PublicProfile() {
                   <p className="text-6xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent mb-2">
                     {formatNumber(user.auraScore)}
                   </p>
-                  <Badge className={getAuraBadgeClass(auraLevel)} variant="outline">
-                    {auraLevel.charAt(0).toUpperCase() + auraLevel.slice(1)} Level
+                  <Badge className={getAuraBadgeClass(user.auraScore)} variant="outline">
+                    {auraLevel.label} Level
                   </Badge>
                   <p className="text-sm text-muted-foreground mt-3">Verified Aura Score</p>
                 </div>
@@ -254,7 +254,7 @@ export default function PublicProfile() {
                             }`}
                           >
                             {skill.name}
-                            {skill.score > 50 && (
+                            {(skill.score || 0) > 50 && (
                               <CheckCircle className="h-3.5 w-3.5 ml-2" />
                             )}
                           </Badge>

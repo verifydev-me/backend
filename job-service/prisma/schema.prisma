@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== JOB MODELS ====================
+
+model Job {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Organization who posted
+  organizationId  String          @db.ObjectId @map("organization_id")
+  recruiterId     String          @db.ObjectId @map("recruiter_id")
+  organizationName String?        @map("organization_name") // Denormalized for performance
+  
+  // Job Details
+  title           String
+  description     String          
+  shortDescription String?        @map("short_description") 
+  requirements    String?         
+  responsibilities String?        
+  
+  // Classification
+  jobType         JobType         @default(FULL_TIME) @map("job_type")
+  experienceLevel ExperienceLevel @default(MID) @map("experience_level")
+  location        String?
+  locationType    LocationType    @default(ONSITE) @map("location_type")
+  
+  // Compensation
+  salaryMin       Int?            @map("salary_min")
+  salaryMax       Int?            @map("salary_max")
+  salaryCurrency  String          @default("INR") @map("salary_currency")
+  
+  // Requirements
+  minAuraScore    Int             @default(0) @map("min_aura_score")
+  minCoreCount    Int             @default(1) @map("min_core_count")
+  
+  // Status
+  status          JobStatus       @default(ACTIVE)
+  applicationsCount Int           @default(0) @map("applications_count")
+  viewsCount      Int             @default(0) @map("views_count")
+  
+  // Timestamps
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  expiresAt       DateTime?       @map("expires_at")
+  
+  // Relations
+  requiredSkills  JobSkill[]
+  applications    Application[]
+  
+  @@index([organizationId])
+  @@index([status])
+  @@index([jobType])
+  @@index([experienceLevel])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+model JobSkill {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  jobId      String  @db.ObjectId @map("job_id")
+  job        Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skillName  String  @map("skill_name")
+  minScore   Int     @default(0) @map("min_score")
+  isRequired Boolean @default(false) @map("is_required")
+  
+  @@unique([jobId, skillName])
+  @@index([skillName])
+  @@map("job_skills")
+}
+
+model Application {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // References
+  jobId           String            @db.ObjectId @map("job_id")
+  job             Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId          String            @map("user_id") // References user-service User
+  
+  // Application Details
+  coverLetter     String?           @map("cover_letter") 
+  resumeUrl       String?           @map("resume_url")
+  resumeSnapshot  Json?             @map("resume_snapshot") // Copy of resume data at apply time
+  
+  // Match Score (calculated at apply time)
+  matchScore      Int               @default(0) @map("match_score") // 0-100
+  matchBreakdown  Json?             @map("match_breakdown") // Detailed skill matching breakdown
+  
+  // Status
+  status          ApplicationStatus @default(PENDING)
+  
+  // Recruiter Notes
+  recruiterNotes  String?           @map("recruiter_notes") 
+  rating          Int?              // 1-5 stars
+  
+  // Timestamps
+  appliedAt       DateTime          @default(now()) @map("applied_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  reviewedAt      DateTime?         @map("reviewed_at")
+  
+  @@unique([jobId, userId]) // Can only apply once per job
+  @@index([jobId])
+  @@index([userId])
+  @@index([status])
+  @@index([appliedAt])
+  @@map("applications")
+}
+
+// ==================== ENUMS ====================
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum LocationType {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum ExperienceLevel {
+  ENTRY       // 0-1 years
+  JUNIOR      // 1-2 years
+  MID         // 2-5 years
+  SENIOR      // 5-8 years
+  LEAD        // 8+ years
+  PRINCIPAL   // 10+ years
+}
+
+enum JobStatus {
+  DRAFT       // Not yet published
+  ACTIVE      // Accepting applications
+  PAUSED      // Temporarily not accepting
+  CLOSED      // Filled or ended
+  EXPIRED     // Past deadline
+}
+
+enum ApplicationStatus {
+  PENDING     // Just applied
+  REVIEWING   // Being reviewed
+  SHORTLISTED // In shortlist
+  INTERVIEW   // Interview scheduled
+  OFFER       // Job offered
+  REJECTED    // Not selected
+  WITHDRAWN   // Candidate withdrew
+}

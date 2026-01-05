@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String  @id @default(uuid())
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
   githubId      String  @unique @map("github_id")
   username      String  @unique
   email         String? @unique
@@ -20,30 +20,51 @@ model User {
   website       String?
   twitterHandle String? @map("twitter_handle")
 
-  isPublic            Boolean      @default(true) @map("is_public")
-  isOpenToWork        Boolean      @default(false) @map("is_open_to_work")
-  isVerified          Boolean      @default(false) @map("is_verified")
-  auraScore           Int          @default(0) @map("aura_score")
-  coreCount           Int          @default(1) @map("core_count")
-  githubFollowers     Int          @default(0) @map("github_followers")
-  githubRepos         Int          @default(0) @map("github_repos")
-  githubContributions Int          @default(0) @map("github_contributions")
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-  lastLoginAt         DateTime?    @map("last_login_at")
-  githubAccessToken   String?      @map("github_access_token")
-  sessions            Session[]
-  skills              Skill[]
-  projects            Project[]
-  experiences         Experience[]
-  socialLinks         SocialLink[]
-  activities          Activity[]
+  // ========== STUDENT INFO ==========
+  isStudent      Boolean @default(false) @map("is_student")
+  collegeName    String? @map("college_name")
+  collegeYear    Int?    @map("college_year") // 1, 2, 3, 4
+  branch         String? // Computer Science, IT, etc.
+  cgpa           Float?  @map("cgpa")
+  graduationYear Int?    @map("graduation_year")
+
+  // ========== ONBOARDING STATUS ==========
+  onboardingComplete Boolean @default(false) @map("onboarding_complete")
+  onboardingStep     Int     @default(0) @map("onboarding_step") // 0-4
+
+  // ========== PROFILE VISIBILITY ==========
+  isPublic     Boolean @default(true) @map("is_public")
+  isOpenToWork Boolean @default(false) @map("is_open_to_work")
+  isVerified   Boolean @default(false) @map("is_verified")
+  showEmail    Boolean @default(false) @map("show_email")
+  showCgpa     Boolean @default(false) @map("show_cgpa")
+
+  // ========== AURA & STATS ==========
+  auraScore           Int @default(0) @map("aura_score")
+  coreCount           Int @default(1) @map("core_count")
+  githubFollowers     Int @default(0) @map("github_followers")
+  githubRepos         Int @default(0) @map("github_repos")
+  githubContributions Int @default(0) @map("github_contributions")
+
+  // ========== TIMESTAMPS ==========
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+  githubAccessToken String?   @map("github_access_token")
+
+  // ========== RELATIONS ==========
+  sessions    Session[]
+  skills      Skill[]
+  projects    Project[]
+  experiences Experience[]
+  socialLinks SocialLink[]
+  activities  Activity[]
 
   @@map("users")
 }
 
 model Session {
-  id           String   @id @default(uuid())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   userId       String   @map("user_id")
   refreshToken String   @unique @map("refresh_token")
   userAgent    String?  @map("user_agent")
@@ -59,23 +80,43 @@ model Session {
 }
 
 model Skill {
-  id                String        @id @default(uuid())
-  userId            String        @map("user_id")
-  name              String
-  category          SkillCategory @default(OTHER)
-  isVerified        Boolean       @default(false) @map("is_verified")
-  verifiedScore     Int           @default(0) @map("verified_score")
-  selfDeclaredLevel SkillLevel    @default(BEGINNER) @map("self_declared_level")
-  projectCount      Int           @default(0) @map("project_count")
-  linesOfCode       Int           @default(0) @map("lines_of_code")
-  auraContribution  Int           @default(0) @map("aura_contribution")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String        @map("user_id") @db.ObjectId
+  name     String
+  category SkillCategory @default(OTHER)
+
+  // ========== SKILL SOURCE & VERIFICATION ==========
+  source        SkillSource @default(MANUAL) // Where did this skill come from?
+  isVerified    Boolean     @default(false) @map("is_verified")
+  verifiedScore Int         @default(0) @map("verified_score") // 0-100 score
+  verifiedAt    DateTime?   @map("verified_at")
+
+  // Evidence for verified skills (JSON array of project IDs, commit counts, etc.)
+  evidence Json? @default("[]")
+
+  // Self-declared for manual skills
+  selfDeclaredLevel SkillLevel @default(BEGINNER) @map("self_declared_level")
+
+  // Stats
+  projectCount     Int @default(0) @map("project_count")
+  linesOfCode      Int @default(0) @map("lines_of_code")
+  auraContribution Int @default(0) @map("aura_contribution")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([source])
   @@map("skills")
+}
+
+// Where did the skill come from?
+enum SkillSource {
+  GITHUB // Auto-detected from GitHub repos (languages, etc.)
+  ANALYSIS // Verified through project analyzer (protected - can't edit)
+  MANUAL // User-declared (unverified, can edit/delete)
 }
 
 enum SkillCategory {
@@ -96,8 +137,8 @@ enum SkillLevel {
 }
 
 model Project {
-  id     String @id @default(uuid())
-  userId String @map("user_id")
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
 
   // GitHub info
   githubRepoUrl    String         @map("github_repo_url")
@@ -135,8 +176,8 @@ enum AnalysisStatus {
 }
 
 model Experience {
-  id     String @id @default(uuid())
-  userId String @map("user_id")
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
 
   type         ExperienceType
   title        String
@@ -165,7 +206,7 @@ enum ExperienceType {
 }
 
 model SocialLink {
-  id       String         @id @default(uuid())
+  id       String         @id @default(auto()) @map("_id") @db.ObjectId
   userId   String         @map("user_id")
   platform SocialPlatform
   url      String
@@ -192,7 +233,7 @@ enum SocialPlatform {
 }
 
 model Activity {
-  id          String       @id @default(uuid())
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
   userId      String       @map("user_id")
   type        ActivityType
   description String?

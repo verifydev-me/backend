@@ -216,6 +216,45 @@ export class UserController {
   }
 
   /**
+   * GET /users/:userId/skills-summary
+   * Internal endpoint for job service to get user skills
+   */
+  static async getSkillsSummary(
+    req: Request,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      
+      const [skills, user] = await Promise.all([
+        ProfileService.getUserSkills(userId),
+        ProfileService.getMyProfile(userId)
+      ]);
+
+      if (!user) {
+         res.status(404).json({ success: false, message: 'User not found', error: { code: 'NOT_FOUND' } });
+         return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Skills summary retrieved',
+        data: {
+          skills: skills.map(s => ({
+            name: s.name,
+            score: s.verifiedScore || 0,
+            isVerified: s.isVerified
+          })),
+          auraScore: user.auraScore
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get skills summary');
+      res.status(500).json({ success: false, message: 'Failed to get skills summary', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
    * GET /users/me/skills
    * Get current user's skills
    */

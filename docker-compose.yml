@@ -23,24 +23,9 @@ services:
       - verifydev-network
 
   # ==================== DATABASES ====================
-  postgres:
-    image: postgres:15-alpine
-    container_name: verifydev-postgres
-    environment:
-      POSTGRES_USER: verifydev
-      POSTGRES_PASSWORD: verifydev123
-      POSTGRES_DB: verifydev
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U verifydev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - verifydev-network
+  # Using MongoDB Atlas (managed cloud database)
+  # Connection: mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/
+  # No local MongoDB container needed - using cloud
 
   redis:
     image: redis:7-alpine
@@ -108,7 +93,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - REDIS_URL=redis://redis:6379
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
@@ -118,8 +103,6 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -134,7 +117,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3002
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
@@ -142,8 +125,6 @@ services:
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     depends_on:
-      postgres:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -160,12 +141,9 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3004
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_jobs
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - verifydev-network
@@ -178,13 +156,10 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3005
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_recruiters
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-recruiteraccesskey32characters!!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - verifydev-network
@@ -194,13 +169,11 @@ services:
     container_name: verifydev-aura
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - CONSUME_QUEUE=project.analyzed
       - EXCHANGE_NAME=project.events
     depends_on:
-      postgres:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
@@ -239,7 +212,7 @@ services:
     environment:
       - ENV=development
       - PORT=8003
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - STORAGE_ENDPOINT=minio:9000
       - STORAGE_ACCESS_KEY=minioadmin
@@ -247,8 +220,6 @@ services:
       - STORAGE_BUCKET=resumes
       - STORAGE_USE_SSL=false
     depends_on:
-      postgres:
-        condition: service_healthy
       minio:
         condition: service_healthy
     restart: unless-stopped
@@ -256,7 +227,6 @@ services:
       - verifydev-network
 
 volumes:
-  postgres_data:
   redis_data:
   rabbitmq_data:
   minio_data:

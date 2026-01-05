@@ -1,98 +1,95 @@
-import { type ClassValue, clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-import type { AuraLevel } from '@/types'
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Get initials from a name
+ */
+export function getInitials(name: string): string {
+  if (!name) return '?'
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+/**
+ * Format a number with commas
+ */
 export function formatNumber(num: number | undefined | null): string {
-  if (num == null) return '0'
+  if (num === undefined || num === null || isNaN(num)) return '0'
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1) + 'M'
   }
   if (num >= 1000) {
     return (num / 1000).toFixed(1) + 'K'
   }
-  return num.toString()
+  return num.toLocaleString()
 }
 
-export function formatDate(date?: string | Date | null): string {
-  if (!date) return 'N/A'
+/**
+ * Format a date string
+ */
+export function formatDate(date: string | Date): string {
   const d = new Date(date)
-  if (isNaN(d.getTime())) return 'N/A'
-  return new Intl.DateTimeFormat('en-US', {
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(d)
+  })
 }
 
-export function formatRelativeTime(date?: string | Date | null): string {
-  if (!date) return 'N/A'
+/**
+ * Format relative time (e.g., "2 hours ago")
+ */
+export function formatRelativeTime(date: string | Date): string {
+  const d = new Date(date)
   const now = new Date()
-  const then = new Date(date)
-  if (isNaN(then.getTime())) return 'N/A'
-  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000)
+  const diff = now.getTime() - d.getTime()
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(months / 12)
 
-  if (seconds < 0) return 'just now'
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
-  if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w ago`
-  return formatDate(date)
+  if (years > 0) return `${years}y ago`
+  if (months > 0) return `${months}mo ago`
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  return 'just now'
 }
 
-export function getAuraLevel(score: number): AuraLevel {
-  if (score >= 501) return 'legend'
-  if (score >= 401) return 'expert'
-  if (score >= 251) return 'skilled'
-  if (score >= 101) return 'rising'
-  return 'novice'
-}
-
-export function getAuraColor(level: AuraLevel): string {
-  const colors: Record<AuraLevel, string> = {
-    novice: '#71717a',
-    rising: '#22c55e',
-    skilled: '#3b82f6',
-    expert: '#8b5cf6',
-    legend: '#f59e0b',
+/**
+ * Format salary range
+ */
+export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
+  if (!min && !max) return 'Competitive'
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  })
+  if (min && max) {
+    return `${formatter.format(min)} - ${formatter.format(max)}`
   }
-  return colors[level]
+  if (min) return `From ${formatter.format(min)}`
+  if (max) return `Up to ${formatter.format(max)}`
+  return 'Competitive'
 }
 
-export function getAuraBadgeClass(level: AuraLevel): string {
-  return `aura-badge-${level}`
-}
-
-export function getInitials(name?: string | null): string {
-  if (!name) return '??'
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .filter(Boolean)
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '??'
-}
-
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w ]+/g, '')
-    .replace(/ +/g, '-')
-}
-
-export function truncate(text: string, length: number): string {
-  if (text.length <= length) return text
-  return text.slice(0, length) + '...'
-}
-
+/**
+ * Get language color for programming languages
+ */
 export function getLanguageColor(language: string): string {
   const colors: Record<string, string> = {
-    JavaScript: '#f7df1e',
+    JavaScript: '#f1e05a',
     TypeScript: '#3178c6',
     Python: '#3572A5',
     Go: '#00ADD8',
@@ -105,22 +102,33 @@ export function getLanguageColor(language: string): string {
     Swift: '#ffac45',
     Kotlin: '#A97BFF',
     Dart: '#00B4AB',
-    Shell: '#89e051',
     HTML: '#e34c26',
     CSS: '#563d7c',
+    SCSS: '#c6538c',
+    Vue: '#41b883',
+    Shell: '#89e051',
   }
   return colors[language] || '#6e7681'
 }
 
-export function formatSalary(min?: number, max?: number, currency = 'USD'): string {
-  if (!min && !max) return 'Competitive'
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  })
-  if (min && max) return `${formatter.format(min)} - ${formatter.format(max)}`
-  if (min) return `${formatter.format(min)}+`
-  if (max) return `Up to ${formatter.format(max)}`
-  return 'Competitive'
+/**
+ * Get aura level info
+ */
+export function getAuraLevel(score: number): { label: string; color: string; gradient: string } {
+  if (score >= 90) return { label: 'Elite', color: 'purple', gradient: 'from-purple-500 to-pink-500' }
+  if (score >= 70) return { label: 'Expert', color: 'blue', gradient: 'from-blue-500 to-cyan-500' }
+  if (score >= 50) return { label: 'Advanced', color: 'green', gradient: 'from-green-500 to-emerald-500' }
+  if (score >= 30) return { label: 'Intermediate', color: 'yellow', gradient: 'from-yellow-500 to-orange-500' }
+  return { label: 'Beginner', color: 'gray', gradient: 'from-gray-400 to-gray-600' }
+}
+
+/**
+ * Get CSS class for aura badge
+ */
+export function getAuraBadgeClass(score: number): string {
+  if (score >= 90) return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+  if (score >= 70) return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+  if (score >= 50) return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+  if (score >= 30) return 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white'
+  return 'bg-gradient-to-r from-gray-400 to-gray-600 text-white'
 }

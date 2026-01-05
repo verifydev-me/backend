@@ -230,7 +230,7 @@ export class RecruiterController {
       const { userId } = req.params;
       const { jobId } = req.body;
 
-      await CandidateService.shortlistCandidate(req.recruiter.recruiterId, userId, jobId);
+      await CandidateService.shortlistCandidate(req.recruiter.id, userId, jobId);
 
       res.json({
         success: true,
@@ -257,7 +257,7 @@ export class RecruiterController {
       }
 
       const candidates = await CandidateService.getShortlist(
-        req.recruiter.recruiterId,
+        req.recruiter.id,
         req.recruiter.organizationId
       );
 

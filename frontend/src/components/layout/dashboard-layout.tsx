@@ -1,9 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth-store'
 import { useUIStore } from '@/store/ui-store'
-import { cn } from '@/lib/utils'
+import { cn, getInitials } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { NotificationCenter } from '@/components/ui/notification-center'
 import {
   LayoutDashboard,
   FolderGit2,
@@ -14,12 +15,13 @@ import {
   ChevronLeft,
   User,
   Menu,
+  ScrollText,
 } from 'lucide-react'
-import { getInitials } from '@/lib/utils'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Projects', href: '/projects', icon: FolderGit2 },
+  { name: 'Resume', href: '/resume', icon: ScrollText },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Applications', href: '/applications', icon: FileText },
   { name: 'Profile', href: '/profile', icon: User },
@@ -133,7 +135,21 @@ export default function DashboardLayout() {
           sidebarOpen ? 'ml-64' : 'ml-16'
         )}
       >
-        <div className="min-h-screen p-6">
+        {/* Top Header Bar */}
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+          <div className="flex h-14 items-center justify-end px-6 gap-2">
+            <NotificationCenter />
+            {user && (
+              <Link to="/profile">
+                <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
+                  <AvatarImage src={user.avatarUrl} alt={user.name} />
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+              </Link>
+            )}
+          </div>
+        </div>
+        <div className="min-h-screen p-6 bg-background">
           <Outlet />
         </div>
       </main>

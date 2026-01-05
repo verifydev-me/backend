@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
+import { AnalysisResults } from '@/components/features/project/AnalysisResults'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -308,6 +309,22 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Detailed Analysis */}
+      {project.fullAnalysis ? (
+        <div className="mt-8">
+           <h2 className="text-2xl font-bold mb-4">Deep Analysis</h2>
+           <AnalysisResults analysis={project.fullAnalysis} />
+        </div>
+      ) : (
+         <div className="mt-8 p-6 border border-dashed border-zinc-700 rounded-lg text-center bg-zinc-900/20">
+            <Code className="h-10 w-10 text-zinc-500 mx-auto mb-3" />
+            <h3 className="text-lg font-medium">Deep analysis pending</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto mt-2">
+              Detailed code structure, optimization tips, and framework analysis will appear here once the deep scan is complete.
+            </p>
+         </div>
+      )}
 
       {/* Timeline */}
       <Card>

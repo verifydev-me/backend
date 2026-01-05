@@ -7,6 +7,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl openssl-dev libc6-compat
+
 # Install dependencies (including devDependencies for build)
 COPY package*.json ./
 RUN npm ci && npm cache clean --force

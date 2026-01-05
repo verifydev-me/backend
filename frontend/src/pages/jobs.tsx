@@ -467,7 +467,7 @@ export default function Jobs() {
         >
           {filteredJobs.map((job) => {
             const matchScore = getMatchScore(job)
-            const isMatched = matchedJobs?.some(m => m.id === job.id)
+            const isMatched = Array.isArray(matchedJobs) && matchedJobs.some(m => m.id === job.id)
             const isSaved = savedJobs.has(job.id)
             
             return (
@@ -579,14 +579,14 @@ export default function Jobs() {
 
                         {/* Skills */}
                         <div className="flex flex-wrap gap-2 mt-3">
-                          {job.skills.slice(0, 6).map((skill) => (
+                          {(job.skills || []).slice(0, 6).map((skill) => (
                             <Badge key={skill} variant="secondary" className="text-xs">
                               {skill}
                             </Badge>
                           ))}
-                          {job.skills.length > 6 && (
+                          {(job.skills || []).length > 6 && (
                             <Badge variant="outline" className="text-xs">
-                              +{job.skills.length - 6} more
+                              +{(job.skills || []).length - 6} more
                             </Badge>
                           )}
                         </div>

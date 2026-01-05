@@ -34,7 +34,7 @@ interface IndustryAnalysisCardProps {
 }
 
 // Category icons and colors
-const categoryConfig: Record<SkillCategory, { icon: typeof Building2; color: string; label: string }> = {
+const categoryConfig: Record<SkillCategory | 'tool', { icon: typeof Building2; color: string; label: string }> = {
   architecture: { icon: Building2, color: 'text-purple-400', label: 'Architecture' },
   infrastructure: { icon: Server, color: 'text-blue-400', label: 'Infrastructure' },
   database: { icon: Database, color: 'text-green-400', label: 'Database' },
@@ -47,6 +47,7 @@ const categoryConfig: Record<SkillCategory, { icon: typeof Building2; color: str
   framework: { icon: Box, color: 'text-emerald-400', label: 'Framework' },
   cloud: { icon: Cloud, color: 'text-sky-400', label: 'Cloud' },
   performance: { icon: Zap, color: 'text-amber-400', label: 'Performance' },
+  tool: { icon: Code, color: 'text-gray-400', label: 'Tool' },
 }
 
 // Engineering level config
@@ -167,7 +168,7 @@ export function IndustryAnalysisCard({ analysis, showDetails = true }: IndustryA
             <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
               <TooltipProvider>
                 {analysis.verifiedSkills
-                  .sort((a, b) => b.confidence - a.confidence)
+                  .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
                   .map((skill, index) => (
                     <SkillRow key={`${skill.name}-${index}`} skill={skill} />
                   ))}
@@ -202,7 +203,7 @@ export function IndustryAnalysisCard({ analysis, showDetails = true }: IndustryA
 function SkillRow({ skill }: { skill: VerifiedSkill }) {
   const config = categoryConfig[skill.category] || categoryConfig.language
   const Icon = config.icon
-  const confidencePercent = Math.round(skill.confidence * 100)
+  const confidencePercent = Math.round((skill.confidence || 0) * 100)
 
   return (
     <Tooltip>
@@ -240,11 +241,11 @@ function SkillRow({ skill }: { skill: VerifiedSkill }) {
           <p className="text-xs text-muted-foreground">
             Category: <span className={config.color}>{config.label}</span>
           </p>
-          {skill.evidence.length > 0 && (
+          {(skill.evidence?.length || 0) > 0 && (
             <div>
               <p className="text-xs font-medium mb-1">Evidence:</p>
               <ul className="text-xs text-muted-foreground space-y-0.5">
-                {skill.evidence.slice(0, 3).map((e, i) => (
+                {(skill.evidence || []).slice(0, 3).map((e, i) => (
                   <li key={i} className="flex items-start gap-1">
                     <span className="text-primary">•</span>
                     <span className="line-clamp-2">{e}</span>
@@ -253,9 +254,9 @@ function SkillRow({ skill }: { skill: VerifiedSkill }) {
               </ul>
             </div>
           )}
-          {skill.keywords.length > 0 && (
+          {(skill.keywords?.length || 0) > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
-              {skill.keywords.slice(0, 4).map((kw) => (
+              {(skill.keywords || []).slice(0, 4).map((kw) => (
                 <Badge key={kw} variant="secondary" className="text-xs py-0">
                   {kw}
                 </Badge>
@@ -272,7 +273,7 @@ function SkillRow({ skill }: { skill: VerifiedSkill }) {
 export function IndustrySkillsBadges({ analysis, max = 5 }: { analysis: IndustryAnalysis; max?: number }) {
   const topSkills = analysis.verifiedSkills
     .filter(s => s.resumeReady)
-    .sort((a, b) => b.confidence - a.confidence)
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
     .slice(0, max)
 
   return (

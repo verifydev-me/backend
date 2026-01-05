@@ -1,33 +1,33 @@
-import amqp, { Connection, Channel, ConsumeMessage } from 'amqplib';
+import amqp, { Channel, ConsumeMessage, ChannelModel } from 'amqplib';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/index.js';
 
 export class RabbitMQClient {
-  private connection: Connection | null = null;
+  private connection: ChannelModel | null = null;
   private channel: Channel | null = null;
 
   async connect(): Promise<void> {
     try {
       this.connection = await amqp.connect(config.rabbitmqUrl);
-      this.channel = await this.connection.createChannel();
+      this.channel = await this.connection!.createChannel();
 
       // Setup queue
-      await this.channel.assertExchange(config.exchangeName, 'direct', {
+      await this.channel!.assertExchange(config.exchangeName, 'direct', {
         durable: true,
       });
 
-      await this.channel.assertQueue(config.consumeQueue, {
+      await this.channel!.assertQueue(config.consumeQueue, {
         durable: true,
       });
 
-      await this.channel.bindQueue(
+      await this.channel!.bindQueue(
         config.consumeQueue,
         config.exchangeName,
         config.consumeQueue
       );
 
       // Prefetch 1 - process one at a time
-      await this.channel.prefetch(1);
+      await this.channel!.prefetch(1);
 
       logger.info('✅ RabbitMQ connected');
     } catch (error) {

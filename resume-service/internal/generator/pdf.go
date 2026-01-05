@@ -58,6 +58,15 @@ func (g *PDFGenerator) Generate(ctx context.Context, data models.ResumeData) ([]
 	return pdf, nil
 }
 
+// GenerateHTML generates HTML from resume data without converting to PDF
+func (g *PDFGenerator) GenerateHTML(data models.ResumeData) (string, error) {
+	html, err := g.templateEngine.Render(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to render template: %w", err)
+	}
+	return html, nil
+}
+
 // htmlToPDF converts HTML to PDF using headless Chrome
 func (g *PDFGenerator) htmlToPDF(ctx context.Context, html string) ([]byte, error) {
 	// Create context with timeout

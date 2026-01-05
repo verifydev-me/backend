@@ -4,12 +4,14 @@ import { persist } from 'zustand/middleware'
 interface UIState {
   sidebarOpen: boolean
   theme: 'light' | 'dark' | 'system'
+  accentColor: string
   commandPaletteOpen: boolean
 
   // Actions
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   setTheme: (theme: 'light' | 'dark' | 'system') => void
+  setAccentColor: (color: string) => void
   toggleCommandPalette: () => void
 }
 
@@ -18,6 +20,7 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       sidebarOpen: true,
       theme: 'dark',
+      accentColor: '239 84% 67%', // Default Indigo
       commandPaletteOpen: false,
 
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -38,6 +41,11 @@ export const useUIStore = create<UIState>()(
           }
         }
       },
+      setAccentColor: (color) => {
+        set({ accentColor: color })
+        document.documentElement.style.setProperty('--primary', color)
+        document.documentElement.style.setProperty('--ring', color)
+      },
       toggleCommandPalette: () =>
         set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
     }),
@@ -46,6 +54,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         sidebarOpen: state.sidebarOpen,
         theme: state.theme,
+        accentColor: state.accentColor,
       }),
     }
   )

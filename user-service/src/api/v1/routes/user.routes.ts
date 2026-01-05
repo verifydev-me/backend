@@ -83,6 +83,9 @@ router.get('/me/aura', authenticate, UserController.getMyAura);
 // PUBLIC ROUTES
 // ============================================
 
+// Internal endpoint for job service
+router.get('/:userId/skills-summary', UserController.getSkillsSummary);
+
 /**
  * @route   GET /api/v1/u/:username
  * @desc    Get public profile by username

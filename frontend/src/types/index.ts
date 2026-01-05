@@ -21,6 +21,7 @@ export interface User {
   githubContributions?: number
   auraScore: number
   auraLevel: AuraLevel
+  coreCount: number
   role: 'developer' | 'recruiter' | 'admin'
   createdAt: string
   updatedAt: string
@@ -63,8 +64,10 @@ export interface Project {
   id: string
   userId: string
   name: string
+  repoName?: string
   description?: string
   repoUrl: string
+  technologies?: string[]
   url?: string
   language: string
   languages: Record<string, number>
@@ -78,6 +81,7 @@ export interface Project {
   score?: number
   isPinned: boolean
   metrics?: ProjectMetrics
+  fullAnalysis?: ProjectFullAnalysis
   createdAt: string
   updatedAt: string
 }
@@ -91,6 +95,55 @@ export interface ProjectMetrics {
   maintainability: number
   complexity: number
   activityScore: number
+}
+
+export interface ProjectFullAnalysis {
+  folderStructure: {
+    hasSrcFolder: boolean
+    hasComponents: boolean
+    hasTests: boolean
+    hasTypes: boolean
+    hasConfig: boolean
+    hasDocs: boolean
+    organizationScore: number
+    maxDepth: number
+  }
+  codeQuality: {
+    hasLinting: boolean
+    hasPrettier: boolean
+    hasTypeScript: boolean
+    hasDockerfile: boolean
+    hasCI: boolean
+    hasEnvExample: boolean
+    testFilesCount: number
+    commentDensity: number
+  }
+  bestPractices?: {
+    followed: string[]
+    missing: string[]
+    score: number
+  }
+  optimizations?: OptimizationSuggestion[]
+  frameworkAnalysis?: {
+    framework: string
+    patternsDetected: string[]
+    suggestions: string[]
+    advancedUsage?: string[]
+  }
+  techStack?: {
+    languages: { name: string, percentage: number }[]
+    frameworks: string[]
+    databases: string[]
+    tools: string[]
+  }
+}
+
+export interface OptimizationSuggestion {
+  category: string
+  priority: 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  impact: string
 }
 
 // Job Types
@@ -176,14 +229,19 @@ export type CommunicationType =
 
 export interface VerifiedSkill {
   name: string
-  category: SkillCategory
-  level: SkillLevel
-  confidence: number // 0.0 - 1.0
-  evidence: string[] // Human-readable proof
-  signals: string[] // Underlying signals
-  keywords: string[] // Related keywords
-  resumeReady: boolean // Safe for resume
-  weight: number // Importance (1-10)
+  category: SkillCategory | 'language' | 'framework' | 'database' | 'devops' | 'tool'
+  level?: SkillLevel
+  confidence?: number // 0.0 - 1.0 or 0-100
+  score?: number // Alternative to confidence (0-100)
+  verifiedScore: number
+  isVerified: boolean
+  evidence?: string[] // Human-readable proof
+  signals?: string[] // Underlying signals
+  keywords?: string[] // Related keywords
+  resumeReady?: boolean // Safe for resume
+  weight?: number // Importance (1-10)
+  verifiedAt?: string // When skill was verified
+  projectCount?: number // Number of projects using this skill
 }
 
 export interface SystemArchitecture {
@@ -332,13 +390,7 @@ export interface CandidateProfile {
   verifiedSkills: VerifiedSkill[]
 }
 
-export interface VerifiedSkill {
-  name: string
-  category: 'language' | 'framework' | 'database' | 'devops' | 'tool'
-  score: number
-  evidence: string[]
-  verifiedAt: string
-}
+// Note: VerifiedSkill interface is defined above at lines 177-188
 
 // Experience Types
 export type ExperienceType = 'WORK' | 'EDUCATION' | 'CERTIFICATION' | 'VOLUNTEER'

@@ -47,7 +47,93 @@ func (e *InfraExtractor) Extract() *signals.InfrastructureSignals {
 	// Phase 6: Docker compose analysis
 	e.extractDockerComposeSignals()
 
+	// ===== EXTREME LEVEL EXTRACTION =====
+	// Phase 7: Cloud-native & Infrastructure as Code
+	e.extractCloudNativeSignals()
+
+	// Phase 8: Machine Learning & AI patterns
+	e.extractMLSignals()
+
+	// Phase 9: Search & Analytics patterns
+	e.extractSearchSignals()
+
+	// Phase 10: Advanced Testing patterns
+	e.extractTestingSignals()
+
+	// Phase 11: Advanced Observability patterns
+	e.extractObservabilitySignals()
+
+	// Phase 12: Deployment & Release patterns
+	e.extractDeploymentSignals()
+
+	// Phase 13: Project Completeness Validation
+	// Reduces confidence for frameworks that are declared but not implemented
+	e.validateProjectCompleteness()
+
 	return e.signals
+}
+
+// validateProjectCompleteness reduces confidence for incomplete projects
+func (e *InfraExtractor) validateProjectCompleteness() {
+	// Check if React/Next.js is declared but no actual components exist
+	if e.signals.HasSignal(signals.SignalHTTPFramework) {
+		// For Go projects, verify there are actual .go files with handlers
+		goFiles := e.findFiles("*.go")
+		hasHandlers := e.findCodePattern(`func.*Handler|func.*http\\.ResponseWriter|c\\.JSON|ctx\\.JSON|r\\.GET|e\\.GET`)
+
+		if len(goFiles) < 3 || !hasHandlers {
+			// Reduce confidence - project is likely incomplete
+			if detail, ok := e.signals.SignalDetails[signals.SignalHTTPFramework]; ok {
+				detail.Confidence = detail.Confidence * 0.5
+				detail.Evidence = append(detail.Evidence, "Warning: Framework declared but limited implementation detected")
+				e.signals.SignalDetails[signals.SignalHTTPFramework] = detail
+			}
+		}
+	}
+
+	// Check total code files - incomplete projects often have very few files
+	jsFiles := e.findFiles("*.js", "*.jsx", "*.ts", "*.tsx")
+	goFiles := e.findFiles("*.go")
+	pyFiles := e.findFiles("*.py")
+
+	totalCodeFiles := len(jsFiles) + len(goFiles) + len(pyFiles)
+
+	// If project has very few code files, mark as potentially incomplete
+	if totalCodeFiles < 5 {
+		e.signals.AddSignal(signals.SignalIncompleteProject, 0.7,
+			[]string{"Project has only " + string(rune(totalCodeFiles)) + " code files"},
+			"completeness_check")
+	}
+
+	// For Node.js projects, verify src/ or pages/ or components/ exist
+	if len(jsFiles) > 0 {
+		hasSrc := e.findFiles("src/*")
+		hasPages := e.findFiles("pages/*", "app/*")
+		hasComponents := e.findFiles("components/*")
+
+		if len(hasSrc) == 0 && len(hasPages) == 0 && len(hasComponents) == 0 {
+			// Only has config files, no actual code structure
+			e.signals.AddSignal(signals.SignalIncompleteProject, 0.8,
+				[]string{"No src/, pages/, or components/ directories found"},
+				"structure_check")
+		}
+	}
+
+	// For Go projects, verify cmd/ or internal/ structure exists
+	if len(goFiles) > 0 {
+		hasCmd := e.findFiles("cmd/*")
+		hasInternal := e.findFiles("internal/*")
+		hasPkg := e.findFiles("pkg/*")
+
+		// Check for main.go at minimum
+		hasMain := e.findFiles("main.go", "cmd/*/main.go")
+
+		if len(hasMain) == 0 && len(hasCmd) == 0 && len(hasInternal) == 0 && len(hasPkg) == 0 {
+			e.signals.AddSignal(signals.SignalIncompleteProject, 0.8,
+				[]string{"No main.go, cmd/, internal/, or pkg/ structure found"},
+				"structure_check")
+		}
+	}
 }
 
 // extractRootFileSignals checks for key files in root
@@ -281,23 +367,83 @@ func (e *InfraExtractor) analyzeGoMod() {
 	files := e.findFiles("go.mod")
 
 	depSignals := map[string]signals.InfraSignal{
-		"rabbitmq":      signals.SignalRabbitMQ,
-		"amqp":          signals.SignalRabbitMQ,
-		"kafka":         signals.SignalKafka,
-		"redis":         signals.SignalRedis,
-		"go-redis":      signals.SignalRedis,
-		"pgx":           signals.SignalPostgres,
-		"pq":            signals.SignalPostgres,
-		"gorm":          signals.SignalGORM,
-		"mongo-driver":  signals.SignalMongoDB,
-		"jwt-go":        signals.SignalJWT,
+		// Message Queues
+		"rabbitmq": signals.SignalRabbitMQ,
+		"amqp":     signals.SignalRabbitMQ,
+		"kafka":    signals.SignalKafka,
+		"redis":    signals.SignalRedis,
+		"go-redis": signals.SignalRedis,
+		"nats":     signals.SignalNATS,
+
+		// Databases
+		"pgx":          signals.SignalPostgres,
+		"pq":           signals.SignalPostgres,
+		"gorm":         signals.SignalGORM,
+		"mongo-driver": signals.SignalMongoDB,
+		"sqlx":         signals.SignalPostgres,
+		"ent/ent":      signals.SignalGORM,
+		"sqlc":         signals.SignalPostgres,
+		"mysql":        signals.SignalMySQL,
+
+		// Web Frameworks
+		"gin-gonic/gin":     signals.SignalHTTPFramework,
+		"labstack/echo":     signals.SignalHTTPFramework,
+		"gofiber/fiber":     signals.SignalHTTPFramework,
+		"go-chi/chi":        signals.SignalHTTPFramework,
+		"gorilla/mux":       signals.SignalHTTPFramework,
+		"gorilla/websocket": signals.SignalWebSocket,
+
+		// Security
+		"jwt-go":     signals.SignalJWT,
+		"golang-jwt": signals.SignalJWT,
+		"casbin":     signals.SignalRBAC,
+		"oauth2":     signals.SignalOAuth2,
+		"bcrypt":     signals.SignalPasswordHashing,
+		"argon2":     signals.SignalPasswordHashing,
+
+		// Observability
 		"prometheus":    signals.SignalPrometheus,
-		"opentelemetry": signals.SignalDistributedTracing,
+		"opentelemetry": signals.SignalOpenTelemetry,
 		"jaeger":        signals.SignalJaeger,
 		"zerolog":       signals.SignalStructuredLogging,
 		"zap":           signals.SignalStructuredLogging,
-		"testify":       signals.SignalUnitTests,
-		"aws-sdk-go":    signals.SignalAWS,
+		"logrus":        signals.SignalStructuredLogging,
+		"sentry-go":     signals.SignalSentry,
+
+		// Testing
+		"testify":           signals.SignalUnitTests,
+		"gomock":            signals.SignalMocking,
+		"go-sqlmock":        signals.SignalMocking,
+		"testcontainers-go": signals.SignalTestContainers,
+
+		// Cloud & Infrastructure
+		"aws-sdk-go":   signals.SignalAWS,
+		"google-cloud": signals.SignalGCP,
+		"azure-sdk":    signals.SignalAzure,
+
+		// gRPC & APIs
+		"grpc-go":      signals.SignalGRPC,
+		"protobuf":     signals.SignalProtobuf,
+		"grpc-gateway": signals.SignalAPIGatewayPattern,
+		"go-swagger":   signals.SignalOpenAPI,
+		"swaggo":       signals.SignalOpenAPI,
+
+		// Configuration
+		"viper":    signals.SignalConfigManagement,
+		"godotenv": signals.SignalConfigManagement,
+
+		// CLI & Tools
+		"cobra":      signals.SignalCodeDocumentation,
+		"urfave/cli": signals.SignalCodeDocumentation,
+
+		// Validation & Utilities
+		"validator":       signals.SignalInputValidation,
+		"ozzo-validation": signals.SignalInputValidation,
+		"uuid":            signals.SignalCodeDocumentation,
+
+		// Search
+		"elastic/go-elasticsearch": signals.SignalElasticsearch,
+		"olivere/elastic":          signals.SignalElasticsearch,
 	}
 
 	for _, file := range files {
@@ -311,6 +457,12 @@ func (e *InfraExtractor) analyzeGoMod() {
 			if strings.Contains(contentStr, pattern) {
 				e.signals.AddSignal(signal, 0.9, []string{file + " → " + pattern}, "go_mod")
 			}
+		}
+
+		// Check for multiple go.mod files (microservices indicator)
+		if len(files) > 1 {
+			e.signals.AddSignal(signals.SignalMultipleServices, 0.85, files, "multiple_go_modules")
+			e.signals.ServiceCount = len(files)
 		}
 	}
 }
@@ -535,6 +687,543 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 	// API versioning
 	if e.findCodePattern(`/v1/|/v2/|/api/v\d`) {
 		e.signals.AddSignal(signals.SignalAPIVersioning, 0.85, []string{"API versioning detected"}, "code")
+	}
+
+	// ===========================================
+	// EXTREME LEVEL PATTERN DETECTION
+	// ===========================================
+
+	// Advanced Architecture Patterns
+	if e.findCodePattern(`Repository\s*{|Repository\s*interface|IRepository|BaseRepository`) {
+		e.signals.AddSignal(signals.SignalRepositoryPattern, 0.85, []string{"Repository pattern implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`Factory\s*{|CreateFactory|AbstractFactory|IFactory`) {
+		e.signals.AddSignal(signals.SignalFactoryPattern, 0.85, []string{"Factory pattern implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`Singleton\s*{|getInstance|GetInstance|shared\s*=`) {
+		e.signals.AddSignal(signals.SignalSingletonPattern, 0.80, []string{"Singleton pattern detected"}, "code")
+	}
+
+	if e.findCodePattern(`Observer\s*{|EventEmitter|addEventListener|Subscribe|Notify`) {
+		e.signals.AddSignal(signals.SignalObserverPattern, 0.80, []string{"Observer pattern detected"}, "code")
+	}
+
+	if e.findCodePattern(`Strategy\s*{|IStrategy|ExecuteStrategy|SetStrategy`) {
+		e.signals.AddSignal(signals.SignalStrategyPattern, 0.80, []string{"Strategy pattern detected"}, "code")
+	}
+
+	if e.findCodePattern(`Decorator\s*{|@.*\(|Wrap|Middleware`) {
+		e.signals.AddSignal(signals.SignalDecoratorPattern, 0.75, []string{"Decorator pattern detected"}, "code")
+	}
+
+	// Clean Architecture / DDD Detection
+	if e.findCodePattern(`domain/|Domain/|entities/|Entities/|valueObjects|ValueObjects`) {
+		e.signals.AddSignal(signals.SignalDDDPattern, 0.80, []string{"Domain-Driven Design structure detected"}, "code")
+	}
+
+	if e.findCodePattern(`usecase/|usecases/|application/|Application/|services/.*Service`) {
+		e.signals.AddSignal(signals.SignalCleanArchitecture, 0.80, []string{"Clean Architecture layers detected"}, "code")
+	}
+
+	if e.findCodePattern(`interface.*Repository|port/|ports/|adapter/|adapters/`) {
+		e.signals.AddSignal(signals.SignalHexagonalArchitecture, 0.75, []string{"Hexagonal Architecture (Ports & Adapters) detected"}, "code")
+	}
+
+	// SOLID Principles Detection
+	if e.findCodePattern(`interface\s+\w+\s*{.*\n\s*\w+\(`) {
+		e.signals.AddSignal(signals.SignalSOLID, 0.70, []string{"Interface segregation patterns detected"}, "code")
+	}
+
+	// Dependency Injection
+	if e.findCodePattern(`@Inject|@Injectable|inject\(|Provide|Container\.resolve|wire\.Build`) {
+		e.signals.AddSignal(signals.SignalDependencyInjection, 0.85, []string{"Dependency injection framework detected"}, "code")
+	}
+
+	// Security Patterns
+	if e.findCodePattern(`X-Content-Type-Options|X-Frame-Options|X-XSS-Protection|Content-Security-Policy`) {
+		e.signals.AddSignal(signals.SignalOWASP, 0.85, []string{"OWASP security headers detected"}, "code")
+	}
+
+	if e.findCodePattern(`bcrypt|argon2|scrypt|pbkdf2|hash.*password|Password.*Hash`) {
+		e.signals.AddSignal(signals.SignalPasswordHashing, 0.90, []string{"Secure password hashing detected"}, "code")
+	}
+
+	if e.findCodePattern(`AES|RSA|HMAC|encrypt|Encrypt|Cipher|crypto\.`) {
+		e.signals.AddSignal(signals.SignalEncryption, 0.85, []string{"Encryption implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`MFA|2FA|TwoFactor|TOTP|authenticator`) {
+		e.signals.AddSignal(signals.SignalMFA, 0.90, []string{"Multi-factor authentication detected"}, "code")
+	}
+
+	if e.findCodePattern(`audit.*log|AuditLog|logAudit|createAuditEntry`) {
+		e.signals.AddSignal(signals.SignalAuditLogging, 0.85, []string{"Audit logging implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`RBAC|role.*permission|hasPermission|checkAccess|authorize`) {
+		e.signals.AddSignal(signals.SignalRBAC, 0.85, []string{"Role-Based Access Control detected"}, "code")
+	}
+
+	if e.findCodePattern(`sanitize|escape|DOMPurify|xss.*filter|htmlspecialchars`) {
+		e.signals.AddSignal(signals.SignalInputSanitization, 0.85, []string{"Input sanitization detected"}, "code")
+	}
+
+	if e.findCodePattern(`SqlParameter|PreparedStatement|parameterized|Prepare\(`) {
+		e.signals.AddSignal(signals.SignalSQLInjectionPrevention, 0.85, []string{"SQL injection prevention detected"}, "code")
+	}
+
+	// API & Protocol Patterns
+	if e.findCodePattern(`openapi|swagger|@ApiOperation|@ApiResponse`) {
+		e.signals.AddSignal(signals.SignalOpenAPI, 0.90, []string{"OpenAPI/Swagger documentation detected"}, "code")
+	}
+
+	if e.findCodePattern(`\.proto|protobuf|Protocol Buffers|grpc\.`) {
+		e.signals.AddSignal(signals.SignalProtobuf, 0.90, []string{"Protocol Buffers detected"}, "code")
+	}
+
+	if e.findCodePattern(`graphql|GraphQL|@Query|@Mutation|@Resolver|gql\x60`) {
+		e.signals.AddSignal(signals.SignalGraphQL, 0.90, []string{"GraphQL implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`federation|@key|@external|@requires|subgraph`) {
+		e.signals.AddSignal(signals.SignalGraphQLFederation, 0.85, []string{"GraphQL Federation detected"}, "code")
+	}
+
+	if e.findCodePattern(`WebSocket|ws://|wss://|socket\.io|Socket\.IO`) {
+		e.signals.AddSignal(signals.SignalWebSocket, 0.90, []string{"WebSocket implementation detected"}, "code")
+	}
+
+	// Performance Patterns
+	if e.findCodePattern(`@Cacheable|Cache-Control|redis\.get|memcached|cache\.Set`) {
+		e.signals.AddSignal(signals.SignalCaching, 0.85, []string{"Caching implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`ConnectionPool|pool\.acquire|maxPoolSize|minPoolSize`) {
+		e.signals.AddSignal(signals.SignalConnectionPooling, 0.85, []string{"Connection pooling detected"}, "code")
+	}
+
+	if e.findCodePattern(`LazyLoad|lazy\s*=|@Lazy|defer|Suspense`) {
+		e.signals.AddSignal(signals.SignalLazyLoading, 0.80, []string{"Lazy loading pattern detected"}, "code")
+	}
+
+	if e.findCodePattern(`pagination|Paginate|pageSize|offset|cursor|nextPage`) {
+		e.signals.AddSignal(signals.SignalPagination, 0.85, []string{"Pagination implementation detected"}, "code")
+	}
+
+	// Feature Management
+	if e.findCodePattern(`featureFlag|FeatureToggle|isEnabled|LaunchDarkly|unleash`) {
+		e.signals.AddSignal(signals.SignalFeatureFlags, 0.85, []string{"Feature flags implementation detected"}, "code")
+	}
+
+	if e.findCodePattern(`A/B.*test|abTest|experiment|variant`) {
+		e.signals.AddSignal(signals.SignalABTesting, 0.80, []string{"A/B testing detected"}, "code")
+	}
+
+	// Data Processing Patterns
+	if e.findCodePattern(`batch.*process|BatchJob|@Scheduled|cron|Quartz`) {
+		e.signals.AddSignal(signals.SignalBatchProcessing, 0.85, []string{"Batch processing detected"}, "code")
+	}
+
+	if e.findCodePattern(`Stream\.|stream\(|Observable|Flux|pipeline|pipe\(`) {
+		e.signals.AddSignal(signals.SignalStreamProcessing, 0.80, []string{"Stream processing detected"}, "code")
+	}
+
+	if e.findCodePattern(`ETL|Extract.*Transform.*Load|DataPipeline|Airflow`) {
+		e.signals.AddSignal(signals.SignalETL, 0.85, []string{"ETL pipeline detected"}, "code")
+	}
+
+	// Compliance & Data Privacy
+	if e.findCodePattern(`GDPR|gdpr|dataRetention|rightToDelete|anonymize`) {
+		e.signals.AddSignal(signals.SignalGDPR, 0.85, []string{"GDPR compliance patterns detected"}, "code")
+	}
+
+	if e.findCodePattern(`PCI.*DSS|pci.*compliance|cardholder`) {
+		e.signals.AddSignal(signals.SignalPCIDSS, 0.85, []string{"PCI-DSS compliance patterns detected"}, "code")
+	}
+
+	if e.findCodePattern(`anonymize|pseudonymize|mask.*data|redact`) {
+		e.signals.AddSignal(signals.SignalDataAnonymization, 0.85, []string{"Data anonymization detected"}, "code")
+	}
+
+	// Error Handling & Resilience
+	if e.findCodePattern(`ErrorBoundary|catch\s*\(|try\s*{|recover\(\)|panic\(`) {
+		e.signals.AddSignal(signals.SignalErrorHandling, 0.80, []string{"Error handling patterns detected"}, "code")
+	}
+
+	if e.findCodePattern(`retry|Retry|backoff|exponential.*delay|maxRetries`) {
+		e.signals.AddSignal(signals.SignalRetryLogic, 0.85, []string{"Retry logic with backoff detected"}, "code")
+	}
+
+	if e.findCodePattern(`timeout|Timeout|context\.WithTimeout|setTimeout`) {
+		e.signals.AddSignal(signals.SignalTimeout, 0.80, []string{"Timeout handling detected"}, "code")
+	}
+
+	// Internationalization
+	if e.findCodePattern(`i18n|intl|locale|translation|getMessage|formatMessage`) {
+		e.signals.AddSignal(signals.SignalI18n, 0.85, []string{"Internationalization detected"}, "code")
+	}
+
+	// Documentation
+	if e.findCodePattern(`@param|@returns|@example|@deprecated|\/\*\*`) {
+		e.signals.AddSignal(signals.SignalCodeDocumentation, 0.75, []string{"Code documentation detected"}, "code")
+	}
+
+	// Async Patterns
+	if e.findCodePattern(`async\s+function|await\s+|Promise\.|goroutine|go\s+func`) {
+		e.signals.AddSignal(signals.SignalAsyncPatterns, 0.85, []string{"Async/concurrent programming patterns detected"}, "code")
+	}
+
+	if e.findCodePattern(`Mutex|RWMutex|sync\.Lock|synchronized|semaphore`) {
+		e.signals.AddSignal(signals.SignalConcurrencyControl, 0.85, []string{"Concurrency control patterns detected"}, "code")
+	}
+}
+
+// extractCloudNativeSignals detects cloud-native patterns
+func (e *InfraExtractor) extractCloudNativeSignals() {
+	// Infrastructure as Code files
+	terraformFiles := e.findFiles("*.tf", "*.tfvars")
+	if len(terraformFiles) > 0 {
+		e.signals.AddSignal(signals.SignalTerraform, 0.95, []string{"Terraform configuration detected"}, "config")
+		e.signals.AddSignal(signals.SignalIaC, 0.90, []string{"Infrastructure as Code detected"}, "config")
+	}
+
+	pulumiFiles := e.findFiles("Pulumi.yaml", "Pulumi.yml")
+	if len(pulumiFiles) > 0 {
+		e.signals.AddSignal(signals.SignalPulumi, 0.95, []string{"Pulumi configuration detected"}, "config")
+		e.signals.AddSignal(signals.SignalIaC, 0.90, []string{"Infrastructure as Code detected"}, "config")
+	}
+
+	cloudFormationFiles := e.findFiles("template.yaml", "cloudformation.yaml", "sam.yaml")
+	if len(cloudFormationFiles) > 0 {
+		e.signals.AddSignal(signals.SignalCloudFormation, 0.95, []string{"CloudFormation/SAM template detected"}, "config")
+		e.signals.AddSignal(signals.SignalIaC, 0.90, []string{"Infrastructure as Code detected"}, "config")
+	}
+
+	ansibleFiles := e.findFiles("playbook.yml", "ansible.cfg", "*.playbook.yml")
+	if len(ansibleFiles) > 0 {
+		e.signals.AddSignal(signals.SignalAnsible, 0.95, []string{"Ansible playbooks detected"}, "config")
+		e.signals.AddSignal(signals.SignalIaC, 0.90, []string{"Infrastructure as Code detected"}, "config")
+	}
+
+	// Serverless configurations
+	serverlessFiles := e.findFiles("serverless.yml", "serverless.yaml", "sam.yaml")
+	if len(serverlessFiles) > 0 {
+		e.signals.AddSignal(signals.SignalServerless, 0.95, []string{"Serverless framework detected"}, "config")
+	}
+
+	// Check for Lambda/Cloud Functions patterns in code
+	if e.findCodePattern(`exports\.handler|lambda_handler|def handler\(event|@cloud_function`) {
+		e.signals.AddSignal(signals.SignalLambda, 0.90, []string{"Lambda/Cloud Function handler detected"}, "code")
+		e.signals.AddSignal(signals.SignalServerless, 0.85, []string{"Serverless function pattern detected"}, "code")
+	}
+
+	// Service Mesh configurations
+	istioFiles := e.findFiles("istio*.yaml", "virtualservice*.yaml", "destinationrule*.yaml")
+	if len(istioFiles) > 0 {
+		e.signals.AddSignal(signals.SignalIstio, 0.95, []string{"Istio service mesh configuration detected"}, "config")
+		e.signals.AddSignal(signals.SignalServiceMesh, 0.90, []string{"Service mesh detected"}, "config")
+	}
+
+	// Linkerd
+	if e.findCodePattern(`linkerd\.io|linkerd-proxy|@linkerd`) {
+		e.signals.AddSignal(signals.SignalLinkerd, 0.90, []string{"Linkerd service mesh detected"}, "code")
+		e.signals.AddSignal(signals.SignalServiceMesh, 0.85, []string{"Service mesh detected"}, "code")
+	}
+
+	// Consul service discovery
+	if e.findCodePattern(`consul\.|Consul|consul\.d|service.*discovery`) {
+		e.signals.AddSignal(signals.SignalConsul, 0.85, []string{"Consul service discovery detected"}, "code")
+	}
+
+	// Vault secrets management
+	vaultFiles := e.findFiles("vault*.hcl", "vault-policy*.hcl")
+	if len(vaultFiles) > 0 || e.findCodePattern(`vault\.hashicorp|Vault|hvac\.Client`) {
+		e.signals.AddSignal(signals.SignalVault, 0.90, []string{"HashiCorp Vault secrets management detected"}, "code")
+	}
+
+	// AWS Services
+	if e.findCodePattern(`aws-sdk|@aws-sdk|boto3|AWS\.`) {
+		e.signals.AddSignal(signals.SignalAWS, 0.90, []string{"AWS SDK usage detected"}, "code")
+	}
+
+	if e.findCodePattern(`S3Client|s3\.put|s3\.get|bucket.*s3`) {
+		e.signals.AddSignal(signals.SignalS3, 0.90, []string{"AWS S3 usage detected"}, "code")
+	}
+
+	if e.findCodePattern(`SQSClient|sqs\.send|sqs\.receive|Queue.*sqs`) {
+		e.signals.AddSignal(signals.SignalSQS, 0.90, []string{"AWS SQS usage detected"}, "code")
+	}
+
+	if e.findCodePattern(`SNSClient|sns\.publish|Topic.*sns`) {
+		e.signals.AddSignal(signals.SignalSNS, 0.90, []string{"AWS SNS usage detected"}, "code")
+	}
+
+	if e.findCodePattern(`DynamoDBClient|dynamodb\.|Table.*dynamodb`) {
+		e.signals.AddSignal(signals.SignalDynamoDB, 0.90, []string{"AWS DynamoDB usage detected"}, "code")
+	}
+
+	// GCP Services
+	if e.findCodePattern(`@google-cloud|google\.cloud|from google\.cloud`) {
+		e.signals.AddSignal(signals.SignalGCP, 0.90, []string{"Google Cloud SDK usage detected"}, "code")
+	}
+
+	// Azure Services
+	if e.findCodePattern(`@azure|azure-sdk|from azure\.`) {
+		e.signals.AddSignal(signals.SignalAzure, 0.90, []string{"Azure SDK usage detected"}, "code")
+	}
+
+	// CDN
+	if e.findCodePattern(`CloudFront|cloudflare|Fastly|cdn\.`) {
+		e.signals.AddSignal(signals.SignalCDN, 0.85, []string{"CDN configuration detected"}, "code")
+	}
+}
+
+// extractMLSignals detects machine learning and AI patterns
+func (e *InfraExtractor) extractMLSignals() {
+	// Python ML frameworks
+	if e.findCodePattern(`import tensorflow|from tensorflow|tf\.keras`) {
+		e.signals.AddSignal(signals.SignalTensorFlow, 0.95, []string{"TensorFlow framework detected"}, "code")
+		e.signals.AddSignal(signals.SignalML, 0.90, []string{"Machine learning detected"}, "code")
+	}
+
+	if e.findCodePattern(`import torch|from torch|torch\.nn`) {
+		e.signals.AddSignal(signals.SignalPyTorch, 0.95, []string{"PyTorch framework detected"}, "code")
+		e.signals.AddSignal(signals.SignalML, 0.90, []string{"Machine learning detected"}, "code")
+	}
+
+	if e.findCodePattern(`import sklearn|from sklearn|scikit-learn`) {
+		e.signals.AddSignal(signals.SignalScikitLearn, 0.95, []string{"Scikit-learn framework detected"}, "code")
+		e.signals.AddSignal(signals.SignalML, 0.90, []string{"Machine learning detected"}, "code")
+	}
+
+	if e.findCodePattern(`import pandas|from pandas|pd\.DataFrame`) {
+		e.signals.AddSignal(signals.SignalPandas, 0.90, []string{"Pandas data analysis detected"}, "code")
+	}
+
+	if e.findCodePattern(`import numpy|from numpy|np\.array`) {
+		e.signals.AddSignal(signals.SignalNumpy, 0.90, []string{"NumPy numerical computing detected"}, "code")
+	}
+
+	// MLOps tools
+	if e.findCodePattern(`mlflow|MLflow|mlflow\.`) {
+		e.signals.AddSignal(signals.SignalMLflow, 0.90, []string{"MLflow MLOps platform detected"}, "code")
+		e.signals.AddSignal(signals.SignalMLOps, 0.85, []string{"MLOps practices detected"}, "code")
+	}
+
+	if e.findCodePattern(`kubeflow|Kubeflow|KFP`) {
+		e.signals.AddSignal(signals.SignalKubeflow, 0.90, []string{"Kubeflow ML platform detected"}, "code")
+		e.signals.AddSignal(signals.SignalMLOps, 0.85, []string{"MLOps practices detected"}, "code")
+	}
+
+	// Model serving
+	if e.findCodePattern(`model\.predict|inference|serving|ModelServer`) {
+		e.signals.AddSignal(signals.SignalModelServing, 0.80, []string{"Model serving pattern detected"}, "code")
+	}
+
+	// LLM/AI patterns
+	if e.findCodePattern(`openai\.|OpenAI|ChatGPT|GPT-|langchain|LangChain`) {
+		e.signals.AddSignal(signals.SignalLLM, 0.90, []string{"LLM/AI integration detected"}, "code")
+	}
+
+	// Vector databases
+	if e.findCodePattern(`pinecone|weaviate|milvus|qdrant|chroma`) {
+		e.signals.AddSignal(signals.SignalVectorDB, 0.90, []string{"Vector database detected"}, "code")
+	}
+
+	// Jupyter notebooks
+	notebooks := e.findFiles("*.ipynb")
+	if len(notebooks) > 0 {
+		e.signals.AddSignal(signals.SignalJupyter, 0.95, []string{"Jupyter notebooks detected"}, "code")
+	}
+}
+
+// extractSearchSignals detects search and analytics patterns
+func (e *InfraExtractor) extractSearchSignals() {
+	// Elasticsearch
+	if e.findCodePattern(`elasticsearch|@elastic/elasticsearch|Elasticsearch`) {
+		e.signals.AddSignal(signals.SignalElasticsearch, 0.90, []string{"Elasticsearch integration detected"}, "code")
+	}
+
+	// OpenSearch
+	if e.findCodePattern(`opensearch|OpenSearch`) {
+		e.signals.AddSignal(signals.SignalOpenSearch, 0.90, []string{"OpenSearch integration detected"}, "code")
+	}
+
+	// MeiliSearch
+	if e.findCodePattern(`meilisearch|MeiliSearch`) {
+		e.signals.AddSignal(signals.SignalMeiliSearch, 0.90, []string{"MeiliSearch integration detected"}, "code")
+	}
+
+	// Algolia
+	if e.findCodePattern(`algolia|Algolia|algoliasearch`) {
+		e.signals.AddSignal(signals.SignalAlgolia, 0.90, []string{"Algolia search integration detected"}, "code")
+	}
+
+	// Analytics
+	if e.findCodePattern(`ClickHouse|clickhouse`) {
+		e.signals.AddSignal(signals.SignalClickHouse, 0.90, []string{"ClickHouse analytics database detected"}, "code")
+	}
+
+	// TimescaleDB
+	if e.findCodePattern(`timescale|TimescaleDB|hypertable`) {
+		e.signals.AddSignal(signals.SignalTimescaleDB, 0.90, []string{"TimescaleDB time-series database detected"}, "code")
+	}
+
+	// InfluxDB
+	if e.findCodePattern(`influxdb|InfluxDB|influx`) {
+		e.signals.AddSignal(signals.SignalInfluxDB, 0.90, []string{"InfluxDB time-series database detected"}, "code")
+	}
+}
+
+// extractTestingSignals detects advanced testing patterns
+func (e *InfraExtractor) extractTestingSignals() {
+	// Test containers
+	if e.findCodePattern(`testcontainers|TestContainers|@Testcontainers`) {
+		e.signals.AddSignal(signals.SignalTestContainers, 0.90, []string{"Testcontainers integration detected"}, "code")
+	}
+
+	// Contract testing
+	if e.findCodePattern(`pact|Pact|contract.*test|@PactVerify`) {
+		e.signals.AddSignal(signals.SignalContractTesting, 0.90, []string{"Contract testing (Pact) detected"}, "code")
+	}
+
+	// Load testing
+	if e.findCodePattern(`k6|artillery|locust|JMeter|gatling`) {
+		e.signals.AddSignal(signals.SignalLoadTesting, 0.90, []string{"Load testing framework detected"}, "code")
+	}
+
+	// Mutation testing
+	if e.findCodePattern(`stryker|pitest|mutant|mutation.*test`) {
+		e.signals.AddSignal(signals.SignalMutationTesting, 0.90, []string{"Mutation testing detected"}, "code")
+	}
+
+	// Chaos engineering
+	if e.findCodePattern(`chaos.*monkey|chaos.*engineering|litmus|chaoskube|gremlin`) {
+		e.signals.AddSignal(signals.SignalChaosEngineering, 0.90, []string{"Chaos engineering practices detected"}, "code")
+	}
+
+	// Static analysis
+	if e.findCodePattern(`eslint|prettier|golangci-lint|mypy|pylint|sonarqube`) {
+		e.signals.AddSignal(signals.SignalStaticAnalysis, 0.85, []string{"Static code analysis detected"}, "code")
+	}
+
+	// Property-based testing
+	if e.findCodePattern(`property.*test|quickcheck|hypothesis|fast-check`) {
+		e.signals.AddSignal(signals.SignalPropertyTesting, 0.85, []string{"Property-based testing detected"}, "code")
+	}
+
+	// Snapshot testing
+	if e.findCodePattern(`toMatchSnapshot|snapshot.*test|__snapshots__`) {
+		e.signals.AddSignal(signals.SignalSnapshotTesting, 0.85, []string{"Snapshot testing detected"}, "code")
+	}
+
+	// Visual regression testing
+	if e.findCodePattern(`percy|chromatic|backstopjs|visual.*regression`) {
+		e.signals.AddSignal(signals.SignalVisualRegression, 0.85, []string{"Visual regression testing detected"}, "code")
+	}
+
+	// API testing tools
+	if e.findCodePattern(`supertest|httptest|newman|postman`) {
+		e.signals.AddSignal(signals.SignalAPITesting, 0.85, []string{"API testing tools detected"}, "code")
+	}
+
+	// BDD/Cucumber
+	if e.findCodePattern(`cucumber|gherkin|Given.*When.*Then|@given|@when|@then`) {
+		e.signals.AddSignal(signals.SignalBDD, 0.85, []string{"BDD/Cucumber testing detected"}, "code")
+	}
+
+	// TDD patterns
+	if e.findCodePattern(`describe\s*\(|it\s*\(|test\s*\(|func Test`) {
+		e.signals.AddSignal(signals.SignalTDD, 0.75, []string{"Test-Driven Development patterns detected"}, "code")
+	}
+}
+
+// extractObservabilitySignals detects advanced observability patterns
+func (e *InfraExtractor) extractObservabilitySignals() {
+	// OpenTelemetry
+	if e.findCodePattern(`opentelemetry|OpenTelemetry|@opentelemetry|otel`) {
+		e.signals.AddSignal(signals.SignalOpenTelemetry, 0.90, []string{"OpenTelemetry instrumentation detected"}, "code")
+		e.signals.AddSignal(signals.SignalDistributedTracing, 0.85, []string{"Distributed tracing detected"}, "code")
+	}
+
+	// Datadog
+	if e.findCodePattern(`datadog|dd-trace|ddtrace`) {
+		e.signals.AddSignal(signals.SignalDatadog, 0.90, []string{"Datadog APM detected"}, "code")
+	}
+
+	// New Relic
+	if e.findCodePattern(`newrelic|New Relic|@newrelic`) {
+		e.signals.AddSignal(signals.SignalNewRelic, 0.90, []string{"New Relic APM detected"}, "code")
+	}
+
+	// ELK Stack
+	if e.findCodePattern(`logstash|kibana|filebeat|elastic.*apm`) {
+		e.signals.AddSignal(signals.SignalELKStack, 0.85, []string{"ELK Stack observability detected"}, "code")
+	}
+
+	// Loki
+	if e.findCodePattern(`loki|promtail|grafana.*loki`) {
+		e.signals.AddSignal(signals.SignalLoki, 0.90, []string{"Grafana Loki logging detected"}, "code")
+	}
+
+	// Custom metrics
+	if e.findCodePattern(`Counter\(|Histogram\(|Gauge\(|metrics\.New`) {
+		e.signals.AddSignal(signals.SignalMetricsCollection, 0.85, []string{"Custom metrics collection detected"}, "code")
+	}
+
+	// Alerting
+	if e.findCodePattern(`alertmanager|PagerDuty|opsgenie|alert.*rule`) {
+		e.signals.AddSignal(signals.SignalAlerting, 0.85, []string{"Alerting configuration detected"}, "code")
+	}
+
+	// SLO/SLI
+	if e.findCodePattern(`SLO|SLI|error.*budget|availability.*target`) {
+		e.signals.AddSignal(signals.SignalSLO, 0.85, []string{"SLO/SLI implementation detected"}, "code")
+	}
+}
+
+// extractDeploymentSignals detects deployment and release patterns
+func (e *InfraExtractor) extractDeploymentSignals() {
+	// Blue-Green deployment
+	if e.findCodePattern(`blue.*green|green.*blue|deployment.*strategy`) {
+		e.signals.AddSignal(signals.SignalBlueGreen, 0.80, []string{"Blue-Green deployment pattern detected"}, "code")
+	}
+
+	// Canary deployment
+	if e.findCodePattern(`canary|traffic.*split|weighted.*routing`) {
+		e.signals.AddSignal(signals.SignalCanaryDeployment, 0.80, []string{"Canary deployment pattern detected"}, "code")
+	}
+
+	// Rolling updates
+	if e.findCodePattern(`rolling.*update|maxSurge|maxUnavailable`) {
+		e.signals.AddSignal(signals.SignalRollingUpdate, 0.80, []string{"Rolling update strategy detected"}, "code")
+	}
+
+	// ArgoCD GitOps
+	if e.findCodePattern(`argocd|ArgoCD|Application.*apiVersion.*argoproj`) {
+		e.signals.AddSignal(signals.SignalArgoCD, 0.90, []string{"ArgoCD GitOps detected"}, "code")
+	}
+
+	// Flux GitOps
+	if e.findCodePattern(`flux|Flux|Kustomization.*fluxcd`) {
+		e.signals.AddSignal(signals.SignalFlux, 0.90, []string{"Flux GitOps detected"}, "code")
+	}
+
+	// Feature branch deployments
+	if e.findCodePattern(`preview.*environment|ephemeral.*environment|pr.*deployment`) {
+		e.signals.AddSignal(signals.SignalPreviewEnvironments, 0.80, []string{"Preview/ephemeral environments detected"}, "code")
+	}
+
+	// Database migrations
+	if e.findCodePattern(`migrate|Migration|flyway|liquibase|knex.*migrate|prisma.*migrate`) {
+		e.signals.AddSignal(signals.SignalDatabaseMigrations, 0.85, []string{"Database migrations detected"}, "code")
+	}
+
+	// Rollback mechanisms
+	if e.findCodePattern(`rollback|revert|undo.*deploy`) {
+		e.signals.AddSignal(signals.SignalRollback, 0.80, []string{"Rollback mechanisms detected"}, "code")
 	}
 }
 

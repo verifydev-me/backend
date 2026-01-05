@@ -11,10 +11,21 @@ export const apiClient = axios.create({
   withCredentials: true,
 })
 
+import { useRecruiterStore } from '@/store/recruiter-store'
+
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().accessToken
+    // Determine which store to use based on URL
+    const isRecruiterPath = config.url?.includes('/recruiters')
+    
+    let token = null
+    if (isRecruiterPath) {
+      token = useRecruiterStore.getState().accessToken
+    } else {
+      token = useAuthStore.getState().accessToken
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -31,9 +42,25 @@ apiClient.interceptors.response.use(
 
     // If 401 and not already retrying, attempt token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Prevent infinite loops for auth endpoints
+      if (originalRequest.url?.includes('/auth/refresh') || 
+          originalRequest.url?.includes('/auth/logout') ||
+          originalRequest.url?.includes('/recruiters/logout')) {
+        return Promise.reject(error)
+      }
+
       originalRequest._retry = true
+      const isRecruiterPath = originalRequest.url?.includes('/recruiters')
 
       try {
+        if (isRecruiterPath) {
+          // For now, if recruiter token is invalid, just logout
+          // In future, you can implement recruiter refresh token here
+          const { logout } = useRecruiterStore.getState()
+          logout()
+          return Promise.reject(error)
+        }
+
         const { refreshToken, setTokens, logout } = useAuthStore.getState()
         
         if (!refreshToken) {
@@ -54,7 +81,11 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest)
       } catch (refreshError) {
-        useAuthStore.getState().logout()
+        if (isRecruiterPath) {
+          useRecruiterStore.getState().logout()
+        } else {
+          useAuthStore.getState().logout()
+        }
         return Promise.reject(refreshError)
       }
     }

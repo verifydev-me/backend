@@ -44,10 +44,10 @@ export const useAuthStore = create<AuthState>()(
         }
 
         try {
-          const response = await apiClient.get<{ data: User }>('/v1/auth/me')
+          const response = await apiClient.get<{ data: { user: User } }>('/v1/auth/me')
           set({
-            user: response.data.data,
-            isAuthenticated: true,
+            user: response.data.data?.user ?? null,
+            isAuthenticated: !!response.data.data?.user,
             isLoading: false,
           })
         } catch {
@@ -65,10 +65,22 @@ export const useAuthStore = create<AuthState>()(
         // Redirect directly to gateway - browser redirects don't go through Vite proxy
         // In production, this should be the actual API domain
         const gatewayUrl = import.meta.env.VITE_GATEWAY_URL || 'http://localhost'
-        window.location.href = `${gatewayUrl}/api/v1/auth/github`
+          window.location.href = `${gatewayUrl}/api/v1/auth/github`
       },
 
       logout: async () => {
+        const { accessToken } = get()
+        if (!accessToken) {
+          set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            isAuthenticated: false,
+            error: null,
+          })
+          return
+        }
+
         try {
           await apiClient.post('/v1/auth/logout')
         } catch {

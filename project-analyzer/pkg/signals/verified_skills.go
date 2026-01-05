@@ -22,6 +22,8 @@ const (
 	CategoryFramework      SkillCategory = "framework"
 	CategoryCloud          SkillCategory = "cloud"
 	CategoryPerformance    SkillCategory = "performance"
+	CategoryML             SkillCategory = "ml"           
+	CategoryDataScience    SkillCategory = "data_science" 
 )
 
 // SkillLevel - Proficiency level

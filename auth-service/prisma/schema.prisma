@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String  @id @default(uuid())
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
   githubId      String  @unique @map("github_id")
   username      String  @unique
   email         String? @unique
@@ -43,8 +43,8 @@ model User {
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  userId       String   @map("user_id")
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @map("user_id") @db.ObjectId
   refreshToken String   @unique @map("refresh_token")
   userAgent    String?  @map("user_agent")
   ipAddress    String?  @map("ip_address")
@@ -59,8 +59,8 @@ model Session {
 }
 
 model Skill {
-  id                String        @id @default(uuid())
-  userId            String        @map("user_id")
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String        @map("user_id") @db.ObjectId
   name              String
   category          SkillCategory @default(OTHER)
   isVerified        Boolean       @default(false) @map("is_verified")
@@ -96,8 +96,8 @@ enum SkillLevel {
 }
 
 model Project {
-  id     String @id @default(uuid())
-  userId String @map("user_id")
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
 
   // GitHub info
   githubRepoUrl    String         @map("github_repo_url")
@@ -108,6 +108,7 @@ model Project {
   language         String? // Primary language
   analysisStatus   AnalysisStatus @default(PENDING) @map("analysis_status")
   analysisId       String?        @map("analysis_id") // MongoDB ObjectId
+  fullAnalysis     Json?          @map("full_analysis")
   analyzedAt       DateTime?      @map("analyzed_at")
   codeQualityScore Int            @default(0) @map("code_quality_score")
   structureScore   Int            @default(0) @map("structure_score")
@@ -135,8 +136,8 @@ enum AnalysisStatus {
 }
 
 model Experience {
-  id     String @id @default(uuid())
-  userId String @map("user_id")
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
 
   type         ExperienceType
   title        String
@@ -165,8 +166,8 @@ enum ExperienceType {
 }
 
 model SocialLink {
-  id       String         @id @default(uuid())
-  userId   String         @map("user_id")
+  id       String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String         @map("user_id") @db.ObjectId
   platform SocialPlatform
   url      String
   username String?
@@ -192,8 +193,8 @@ enum SocialPlatform {
 }
 
 model Activity {
-  id          String       @id @default(uuid())
-  userId      String       @map("user_id")
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @map("user_id") @db.ObjectId
   type        ActivityType
   description String?
 

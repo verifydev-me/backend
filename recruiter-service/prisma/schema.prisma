@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== RECRUITER MODELS ====================
+
+model Recruiter {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Auth
+  email        String @unique
+  passwordHash String @map("password_hash")
+
+  // Profile
+  name      String
+  title     String?
+  phone     String?
+  avatarUrl String? @map("avatar_url")
+
+  // Organization
+  organizationId String        @map("organization_id")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           RecruiterRole @default(RECRUITER)
+
+  // Status
+  isActive      Boolean @default(true) @map("is_active")
+  isVerified    Boolean @default(false) @map("is_verified")
+  emailVerified Boolean @default(false) @map("email_verified")
+
+  // Sessions
+  sessions RecruiterSession[]
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  @@index([organizationId])
+  @@map("recruiters")
+}
+
+model RecruiterSession {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String    @map("recruiter_id")
+  recruiter   Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  refreshToken String  @unique @map("refresh_token")
+  userAgent    String? @map("user_agent")
+  ipAddress    String? @map("ip_address")
+  isValid      Boolean @default(true) @map("is_valid")
+
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([recruiterId])
+  @@map("recruiter_sessions")
+}
+
+model Organization {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Basic Info
+  name        String
+  slug        String  @unique
+  logo        String?
+  website     String?
+  description String?
+
+  // Location
+  headquarters String?
+  country      String?
+
+  // Company Details
+  industry    String?
+  size        CompanySize @default(SMALL)
+  foundedYear Int?        @map("founded_year")
+  linkedIn    String?     @map("linkedin")
+
+  // Verification
+  isVerified Boolean   @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+
+  // Stats
+  totalJobs  Int @default(0) @map("total_jobs")
+  activeJobs Int @default(0) @map("active_jobs")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  recruiters Recruiter[]
+
+  @@map("organizations")
+}
+
+// ==================== SAVED CANDIDATES ====================
+
+model SavedCandidate {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id")
+  candidateId String @map("candidate_id") // User ID from user-service
+
+  // Notes
+  notes  String?
+  tags   String[] @default([])
+  rating Int? // 1-5 stars
+
+  // Status
+  status CandidateStatus @default(SAVED)
+
+  // Timestamps
+  savedAt   DateTime @default(now()) @map("saved_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([recruiterId, candidateId])
+  @@index([recruiterId])
+  @@index([candidateId])
+  @@map("saved_candidates")
+}
+
+// ==================== ENUMS ====================
+
+enum RecruiterRole {
+  ADMIN // Full access - can manage org, invite recruiters
+  RECRUITER // Can post jobs, manage applications
+  VIEWER // Read-only access
+}
+
+enum CompanySize {
+  STARTUP // 1-10 employees
+  SMALL // 11-50
+  MEDIUM // 51-200
+  LARGE // 201-1000
+  ENTERPRISE // 1000+
+}
+
+enum CandidateStatus {
+  SAVED // Just bookmarked
+  CONTACTED // Reached out
+  INTERESTED // Showed interest
+  NOT_FIT // Not a match
+}
