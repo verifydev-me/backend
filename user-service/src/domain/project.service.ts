@@ -176,12 +176,87 @@ export class ProjectService {
   }
 
   /**
-   * Get project by ID
+   * Get project by ID with full analysis and skills breakdown
    */
   static async getProject(projectId: string, userId: string) {
-    return prisma.project.findFirst({
+    // Get project with full analysis
+    const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
     });
+
+    if (!project) return null;
+
+    // Get user's skills that were detected from projects
+    const skills = await prisma.skill.findMany({
+      where: { 
+        userId,
+        source: 'ANALYSIS', // Only verified/analyzed skills
+      },
+      orderBy: { verifiedScore: 'desc' },
+    });
+
+    // Get user's technologies
+    const technologies = await prisma.technology.findMany({
+      where: { userId },
+      orderBy: { confidence: 'desc' },
+    });
+
+    // Build enriched response with all analysis data
+    const fullAnalysis = project.fullAnalysis as any || {};
+    
+    // Create skills breakdown with percentages
+    const skillsBreakdown = skills.map(skill => ({
+      name: skill.name,
+      category: skill.category.toLowerCase(),
+      level: getSkillLevel(skill.verifiedScore),
+      confidence: skill.verifiedScore / 100, // Convert to 0-1
+      score: skill.verifiedScore,
+      verifiedScore: skill.verifiedScore,
+      isVerified: skill.isVerified,
+      evidence: skill.evidence || [],
+      resumeReady: skill.verifiedScore >= 70,
+      projectCount: skill.projectCount,
+    }));
+
+    // Create technologies breakdown
+    const techBreakdown = technologies.map(tech => ({
+      name: tech.name,
+      category: tech.category.toLowerCase(),
+      confidence: tech.confidence / 100,
+      score: tech.confidence,
+      detectedFrom: tech.detectedFrom,
+      resumeReady: tech.confidence >= 60,
+    }));
+
+    // Calculate industry analysis summary
+    const industryAnalysis = {
+      verifiedSkills: skillsBreakdown,
+      skillsByCategory: groupSkillsByCategory(skillsBreakdown),
+      totalSkills: skillsBreakdown.length,
+      highConfidenceSkills: skillsBreakdown.filter(s => s.score >= 70).length,
+      resumeReadySkills: skillsBreakdown.filter(s => s.resumeReady).length,
+      overallScore: project.overallScore || project.auraContribution || 0,
+      engineeringLevel: getEngineeringLevel(project.overallScore),
+      technologies: techBreakdown,
+    };
+
+    return {
+      ...project,
+      // Add computed fields for frontend
+      repoUrl: project.githubRepoUrl,
+      analysisStatus: project.analysisStatus.toLowerCase(),
+      // Include detailed analysis
+      fullAnalysis: fullAnalysis,
+      industryAnalysis,
+      metrics: {
+        codeQuality: project.codeQualityScore,
+        documentation: fullAnalysis.codeQuality?.hasDockerfile ? 80 : Math.min(project.structureScore * 2, 60),
+        testCoverage: fullAnalysis.codeQuality?.testFilesCount ? Math.min(fullAnalysis.codeQuality.testFilesCount * 15, 80) : 0,
+        maintainability: project.structureScore,
+        complexity: fullAnalysis.folderStructure?.maxDepth ? Math.min(fullAnalysis.folderStructure.maxDepth * 10, 100) : 30,
+        activityScore: project.overallScore,
+      },
+    };
   }
 
   /**
@@ -286,6 +361,32 @@ export class ProjectService {
       defaultBranch: defaultBranch || 'main',
     });
   }
+}
+
+// Helper function to get skill level based on score
+function getSkillLevel(score: number): string {
+  if (score >= 90) return 'expert';
+  if (score >= 70) return 'advanced';
+  if (score >= 50) return 'intermediate';
+  return 'basic';
+}
+
+// Helper function to group skills by category
+function groupSkillsByCategory(skills: any[]): Record<string, any[]> {
+  return skills.reduce((acc, skill) => {
+    const category = skill.category || 'other';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(skill);
+    return acc;
+  }, {} as Record<string, any[]>);
+}
+
+// Helper function to determine engineering level based on score
+function getEngineeringLevel(score: number): string {
+  if (score >= 80) return 'Senior Engineer';
+  if (score >= 60) return 'Mid-Level Engineer';
+  if (score >= 40) return 'Junior Engineer';
+  return 'Beginner';
 }
 
 export default ProjectService;

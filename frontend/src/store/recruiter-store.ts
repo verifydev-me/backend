@@ -186,7 +186,11 @@ export const useRecruiterStore = create<RecruiterState>()(
             isSearching: false 
           })
         } catch (error: any) {
+          console.log('Search candidates error:', error)
+          // Set empty results instead of showing error to prevent blank screen
           set({ 
+            searchResults: [],
+            searchTotal: 0,
             error: error.response?.data?.message || 'Search failed', 
             isSearching: false 
           })

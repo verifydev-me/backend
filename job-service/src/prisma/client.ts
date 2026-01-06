@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../node_modules/.prisma/job-client/index.js';
 import { logger } from '../utils/logger.js';
 
 export const prisma = new PrismaClient({
@@ -8,9 +8,9 @@ export const prisma = new PrismaClient({
 export async function connectDatabase(): Promise<void> {
   try {
     await prisma.$connect();
-    logger.info('✅ PostgreSQL connected');
+    logger.info('✅ MongoDB connected (Job Service)');
   } catch (error) {
-    logger.error({ error }, '❌ Failed to connect to PostgreSQL');
+    logger.error({ error }, '❌ Failed to connect to MongoDB');
     throw error;
   }
 }

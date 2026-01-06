@@ -161,6 +161,7 @@ export interface Job {
   salaryCurrency: string
   description: string
   requirements: string[]
+  requiredSkills: string[]
   skills: string[]
   minAuraScore?: number
   status: JobStatus
@@ -418,4 +419,10 @@ export interface ExperiencesGrouped {
   volunteer: Experience[]
   all: Experience[]
 }
+
+// Re-export enhanced types
+export * from './interview'
+export * from './message'
+export * from './application'
+export * from './job'
 

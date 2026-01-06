@@ -109,6 +109,9 @@ export class AuraCalculator {
         case 'event_driven':
           bonus += 3;
           break;
+        case 'monorepo':   
+          bonus += 2;
+          break;
         case 'clean_architecture':
         case 'hexagonal':
           bonus += 2;
@@ -146,6 +149,9 @@ export class AuraCalculator {
     switch (signals.projectType) {
       case 'microservice':
         bonus += 5;
+        break;
+      case 'monorepo':
+        bonus += 4; // Monorepo is valuable - organized fullstack structure
         break;
       case 'fullstack':
         bonus += 4;

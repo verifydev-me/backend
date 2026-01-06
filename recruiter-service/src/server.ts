@@ -10,6 +10,7 @@ import { connectDatabase, disconnectDatabase } from './prisma/client.js';
 import { RecruiterAuthService } from './domain/auth.service.js';
 import recruiterRoutes from './api/v1/routes/recruiter.routes.js';
 import authRoutes from './api/v1/routes/auth.routes.js';
+import communicationRoutes from './api/v1/routes/communication.routes.js';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.get('/health', (_req, res) => {
 // Routes
 app.use('/api/v1/recruiters', authRoutes);  // Auth routes: /api/v1/recruiters/login, /register, /me
 app.use('/api/v1/recruiters', recruiterRoutes);  // Recruiter routes
+app.use('/api/v1', communicationRoutes);  // Communication routes: /api/v1/messages, /interviews, /templates
 
 // 404
 app.use((req, res) => {
@@ -73,6 +75,13 @@ async function startServer() {
 ║   • GET  /api/v1/recruiters/candidates/:id/full           ║
 ║   • POST /api/v1/recruiters/candidates/:id/shortlist      ║
 ║   • GET  /api/v1/recruiters/shortlist                     ║
+║                                                           ║
+║   Communication Endpoints:                                ║
+║   • POST /api/v1/messages              - Send message     ║
+║   • GET  /api/v1/messages              - Get messages     ║
+║   • POST /api/v1/interviews            - Schedule         ║
+║   • GET  /api/v1/interviews            - Get interviews   ║
+║   • GET  /api/v1/templates             - Get templates    ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
       `);

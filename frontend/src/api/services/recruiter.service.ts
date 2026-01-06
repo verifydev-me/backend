@@ -273,29 +273,52 @@ export const getRecruiterDashboard = () => {
 /**
  * Search for candidates by filters
  */
-export const searchCandidates = (filters: CandidateSearchFilters) => {
+export const searchCandidates = async (filters: CandidateSearchFilters) => {
   const params = new URLSearchParams()
   
   if (filters.q) params.append('q', filters.q)
   if (filters.skills?.length) params.append('skills', filters.skills.join(','))
-  if (filters.minAuraScore) params.append('minAuraScore', String(filters.minAuraScore))
-  if (filters.maxAuraScore) params.append('maxAuraScore', String(filters.maxAuraScore))
-  if (filters.minExperience) params.append('minExperience', String(filters.minExperience))
-  if (filters.maxExperience) params.append('maxExperience', String(filters.maxExperience))
+  if (filters.minAuraScore !== undefined && filters.minAuraScore > 0) {
+    params.append('minAuraScore', String(filters.minAuraScore))
+  }
+  if (filters.maxAuraScore !== undefined && filters.maxAuraScore > 0) {
+    params.append('maxAuraScore', String(filters.maxAuraScore))
+  }
+  if (filters.minExperience !== undefined && filters.minExperience > 0) {
+    params.append('minExperience', String(filters.minExperience))
+  }
+  if (filters.maxExperience !== undefined && filters.maxExperience > 0) {
+    params.append('maxExperience', String(filters.maxExperience))
+  }
   if (filters.location) params.append('location', filters.location)
   if (filters.isOpenToWork !== undefined) params.append('isOpenToWork', String(filters.isOpenToWork))
-  if (filters.page) params.append('page', String(filters.page))
-  if (filters.limit) params.append('limit', String(filters.limit))
+  params.append('page', String(filters.page || 1))
+  params.append('limit', String(filters.limit || 20))
 
-  return get<{
-    data: Candidate[]
-    meta: {
-      total: number
-      page: number
-      limit: number
-      totalPages: number
+  try {
+    const response = await get<{
+      data: Candidate[]
+      meta: {
+        total: number
+        page: number
+        limit: number
+        totalPages: number
+      }
+    }>(`/v1/recruiters/candidates/search?${params.toString()}`)
+    return response
+  } catch (error: any) {
+    console.error('Search candidates error:', error)
+    // Return empty results on error
+    return {
+      data: [],
+      meta: {
+        total: 0,
+        page: filters.page || 1,
+        limit: filters.limit || 20,
+        totalPages: 0
+      }
     }
-  }>(`/v1/recruiters/candidates/search?${params.toString()}`)
+  }
 }
 
 /**
@@ -347,8 +370,18 @@ export const shortlistCandidate = (data: ShortlistCandidate) => {
 /**
  * Get shortlisted candidates
  */
-export const getShortlist = () => {
-  return get<Candidate[]>('/v1/recruiters/shortlist')
+export const getShortlist = async (): Promise<Candidate[]> => {
+  try {
+    const response = await get<{ candidates: Candidate[] } | Candidate[]>('/v1/recruiters/shortlist')
+    // Handle both response formats
+    if (Array.isArray(response)) {
+      return response
+    }
+    return response.candidates || []
+  } catch (error) {
+    console.error('Failed to fetch shortlist:', error)
+    return []
+  }
 }
 
 // ============================================

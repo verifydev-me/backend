@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from "../../../types/index.js";
 import { Router } from 'express';
 import { JobController } from '../controllers/job.controller.js';
 import { authenticate, optionalAuth } from '../../../middlewares/authenticate.js';
@@ -12,6 +13,13 @@ const router = Router();
  * @access  Public
  */
 router.get('/', JobController.listJobs);
+
+/**
+ * @route   POST /api/v1/jobs
+ * @desc    Create a new job posting (recruiter only)
+ * @access  Private (Recruiter)
+ */
+router.post('/', authenticate, JobController.createJob);
 
 /**
  * @route   GET /api/v1/jobs/search
@@ -87,5 +95,35 @@ router.get('/applications/:applicationId', authenticate, JobController.getApplic
  * @access  Private
  */
 router.delete('/applications/:applicationId', authenticate, JobController.withdrawApplication);
+
+// ==================== RECRUITER ROUTES ====================
+
+/**
+ * @route   GET /api/v1/recruiter/jobs
+ * @desc    Get all jobs posted by the recruiter
+ * @access  Private (Recruiter)
+ */
+router.get('/recruiter/jobs', authenticate, JobController.getRecruiterJobs);
+
+/**
+ * @route   GET /api/v1/recruiter/jobs/:jobId
+ * @desc    Get single job details (recruiter view)
+ * @access  Private (Recruiter)
+ */
+router.get('/recruiter/jobs/:jobId', authenticate, JobController.getRecruiterJobDetails);
+
+/**
+ * @route   GET /api/v1/recruiter/jobs/:jobId/analytics
+ * @desc    Get job analytics
+ * @access  Private (Recruiter)
+ */
+router.get('/recruiter/jobs/:jobId/analytics', authenticate, JobController.getJobAnalytics);
+
+/**
+ * @route   GET /api/v1/recruiter/jobs/:jobId/applicants
+ * @desc    Get all applicants for a job
+ * @access  Private (Recruiter)
+ */
+router.get('/recruiter/jobs/:jobId/applicants', authenticate, JobController.getJobApplicants);
 
 export default router;

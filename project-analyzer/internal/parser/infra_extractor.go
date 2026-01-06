@@ -501,11 +501,16 @@ func (e *InfraExtractor) analyzePythonDeps() {
 	}
 }
 
-// extractServiceStructureSignals detects microservice patterns
+// extractServiceStructureSignals detects microservice patterns vs monorepo
 func (e *InfraExtractor) extractServiceStructureSignals() {
 	entries, err := os.ReadDir(e.repoPath)
 	if err != nil {
 		return
+	}
+
+	// First, check if this is a monorepo
+	if e.isMonorepo() {
+		e.signals.AddSignal(signals.SignalMonorepo, 0.95, []string{"Monorepo configuration detected (workspaces/lerna/nx/turbo)"}, "config")
 	}
 
 	servicePatterns := []string{
@@ -513,42 +518,107 @@ func (e *InfraExtractor) extractServiceStructureSignals() {
 	}
 
 	var potentialServices []string
+	var frontendFolders []string
+	var backendFolders []string
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		name := strings.ToLower(entry.Name())
+		name := entry.Name()
+		nameLower := strings.ToLower(name)
 
-		// Check for service pattern names
+		// Skip hidden directories
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		// Categorize folders
+		if isFrontendFolder(name) {
+			frontendFolders = append(frontendFolders, name)
+			continue // Don't count frontend as a service
+		}
+
+		if isBackendFolder(name) {
+			backendFolders = append(backendFolders, name)
+		}
+
+		// Check for service pattern names (excluding frontend folders)
 		for _, pattern := range servicePatterns {
-			if strings.Contains(name, pattern) {
-				potentialServices = append(potentialServices, entry.Name())
+			if strings.Contains(nameLower, pattern) {
+				potentialServices = append(potentialServices, name)
 				break
 			}
 		}
 
-		// Check if directory has its own package.json or go.mod (independent service)
-		servicePath := filepath.Join(e.repoPath, entry.Name())
-		if fileExists(filepath.Join(servicePath, "package.json")) ||
+		// Check if directory has its own package.json or go.mod (independent module)
+		// But NOT if it's a frontend folder
+		servicePath := filepath.Join(e.repoPath, name)
+		hasIndependentPackage := fileExists(filepath.Join(servicePath, "package.json")) ||
 			fileExists(filepath.Join(servicePath, "go.mod")) ||
-			fileExists(filepath.Join(servicePath, "Dockerfile")) {
-			if !contains(potentialServices, entry.Name()) {
-				potentialServices = append(potentialServices, entry.Name())
+			fileExists(filepath.Join(servicePath, "Dockerfile"))
+
+		if hasIndependentPackage && !isFrontendFolder(name) {
+			if !contains(potentialServices, name) {
+				potentialServices = append(potentialServices, name)
 			}
 		}
 	}
 
-	if len(potentialServices) >= 2 {
-		e.signals.AddSignal(signals.SignalMultipleServices, 0.9, potentialServices, "service_dirs")
-		e.signals.AddSignal(signals.SignalServiceIsolation, 0.85, potentialServices, "independent_services")
-		e.signals.ServiceCount = len(potentialServices)
-		e.signals.ServiceNames = potentialServices
+	// Mark if frontend exists
+	if len(frontendFolders) > 0 {
+		e.signals.AddSignal(signals.SignalFrontendOnly, 0.85, frontendFolders, "frontend_detection")
 	}
 
-	// Check for specific patterns
+	// Mark if backend exists
+	if len(backendFolders) > 0 {
+		e.signals.AddSignal(signals.SignalBackendOnly, 0.85, backendFolders, "backend_detection")
+	}
+
+	// CRITICAL LOGIC: Distinguish between Monorepo and Microservices
+	//
+	// MONOREPO: 1 frontend + 1 backend folder (like frontend/ + backend/)
+	// MICROSERVICES: 2+ BACKEND services (like auth-service/ + user-service/ + job-service/)
+
+	// Filter out frontend folders from potential services
+	var actualBackendServices []string
 	for _, svc := range potentialServices {
+		if !isFrontendFolder(svc) {
+			actualBackendServices = append(actualBackendServices, svc)
+		}
+	}
+
+	// Case 1: It's a monorepo (has frontend + 1 backend, or workspaces config)
+	if len(frontendFolders) > 0 && len(actualBackendServices) == 1 {
+		e.signals.AddSignal(signals.SignalMonorepo, 0.90,
+			append(frontendFolders, actualBackendServices...),
+			"monorepo_structure")
+		e.signals.ServiceCount = 1 // Only 1 actual backend service
+		e.signals.ServiceNames = actualBackendServices
+		return // Exit early - this is NOT microservices
+	}
+
+	// Case 2: Has workspaces but multiple packages (still monorepo, not microservices)
+	if e.isMonorepo() && len(actualBackendServices) <= 2 {
+		e.signals.AddSignal(signals.SignalMonorepo, 0.90,
+			actualBackendServices,
+			"workspace_monorepo")
+		e.signals.ServiceCount = len(actualBackendServices)
+		e.signals.ServiceNames = actualBackendServices
+		return // Exit early - workspaces = monorepo
+	}
+
+	// Case 3: Actual microservices - 2+ independent backend services
+	if len(actualBackendServices) >= 2 {
+		e.signals.AddSignal(signals.SignalMultipleServices, 0.9, actualBackendServices, "service_dirs")
+		e.signals.AddSignal(signals.SignalServiceIsolation, 0.85, actualBackendServices, "independent_services")
+		e.signals.ServiceCount = len(actualBackendServices)
+		e.signals.ServiceNames = actualBackendServices
+	}
+
+	// Check for specific service patterns in backend services
+	for _, svc := range actualBackendServices {
 		svcLower := strings.ToLower(svc)
 		if strings.Contains(svcLower, "auth") {
 			e.signals.AddSignal(signals.SignalAuthMicroservice, 0.9, []string{svc}, "auth_service")
@@ -572,20 +642,46 @@ func (e *InfraExtractor) extractDockerComposeSignals() {
 		contentStr := string(content)
 		contentLower := strings.ToLower(contentStr)
 
-		// Service detection
+		// Service detection - improved regex to handle different formats
 		serviceRegex := regexp.MustCompile(`(?m)^  (\w[\w-]*):$`)
 		matches := serviceRegex.FindAllStringSubmatch(contentStr, -1)
-		var services []string
+
+		var allServices []string
+		var appServices []string   // Actual application services
+		var infraServices []string // Database, queue, etc.
+
 		for _, m := range matches {
 			if len(m) > 1 {
-				services = append(services, m[1])
+				serviceName := m[1]
+				allServices = append(allServices, serviceName)
+
+				// Categorize as infra or app service
+				if isInfraService(serviceName) {
+					infraServices = append(infraServices, serviceName)
+				} else if !isFrontendFolder(serviceName) {
+					// It's an application service (and not frontend)
+					appServices = append(appServices, serviceName)
+				}
 			}
 		}
 
-		if len(services) > 1 {
-			e.signals.AddSignal(signals.SignalMultipleServices, 0.95, services, "docker_compose_services")
-			e.signals.ServiceCount = len(services)
-			e.signals.ServiceNames = services
+		// CRITICAL: Only mark as microservices if there are 2+ APPLICATION services
+		// Not if there's 1 app + multiple infra (postgres, redis, etc.)
+		if len(appServices) >= 2 {
+			e.signals.AddSignal(signals.SignalMultipleServices, 0.95, appServices, "docker_compose_app_services")
+			// Update service count only for app services
+			if len(appServices) > e.signals.ServiceCount {
+				e.signals.ServiceCount = len(appServices)
+				e.signals.ServiceNames = appServices
+			}
+		} else if len(appServices) == 1 && len(allServices) > 1 {
+			// 1 app service + infrastructure = single service app with infra
+			// This is NOT microservices
+			if e.hasFrontendFolder() {
+				e.signals.AddSignal(signals.SignalMonorepo, 0.85,
+					[]string{"Single backend with frontend + infrastructure"},
+					"docker_compose_monorepo")
+			}
 		}
 
 		// Database detection
@@ -1313,6 +1409,112 @@ func fileExists(path string) bool {
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// isFrontendFolder checks if a folder name indicates a frontend module
+func isFrontendFolder(name string) bool {
+	frontendIndicators := []string{
+		"frontend", "client", "web", "webapp", "web-app", "ui", "dashboard",
+		"admin", "portal", "app", "mobile", "react-app", "vue-app", "angular-app",
+	}
+	nameLower := strings.ToLower(name)
+	for _, indicator := range frontendIndicators {
+		if nameLower == indicator || strings.HasSuffix(nameLower, "-"+indicator) {
+			return true
+		}
+	}
+	return false
+}
+
+// isBackendFolder checks if a folder name indicates a backend service
+func isBackendFolder(name string) bool {
+	backendIndicators := []string{
+		"backend", "server", "api", "api-server", "service", "svc",
+		"worker", "processor", "consumer", "producer", "gateway", "core",
+	}
+	nameLower := strings.ToLower(name)
+	for _, indicator := range backendIndicators {
+		if nameLower == indicator || strings.HasPrefix(nameLower, indicator+"-") ||
+			strings.HasSuffix(nameLower, "-"+indicator) || strings.Contains(nameLower, "-"+indicator+"-") {
+			return true
+		}
+	}
+	return false
+}
+
+// isInfraService checks if a service name is an infrastructure component (not an application service)
+func isInfraService(serviceName string) bool {
+	infraServices := []string{
+		"postgres", "postgresql", "mysql", "mariadb", "mongo", "mongodb",
+		"redis", "rabbitmq", "kafka", "zookeeper", "elasticsearch", "opensearch",
+		"nginx", "traefik", "envoy", "haproxy", "mailhog", "localstack",
+		"minio", "vault", "consul", "etcd", "adminer", "pgadmin",
+	}
+	nameLower := strings.ToLower(serviceName)
+	for _, infra := range infraServices {
+		if nameLower == infra || strings.Contains(nameLower, infra) {
+			return true
+		}
+	}
+	return false
+}
+
+// isMonorepoFile checks if any monorepo configuration files exist
+func (e *InfraExtractor) isMonorepo() bool {
+	monorepoFiles := []string{
+		"lerna.json",
+		"nx.json",
+		"turbo.json",
+		"rush.json",
+		"pnpm-workspace.yaml",
+	}
+
+	for _, file := range monorepoFiles {
+		if fileExists(filepath.Join(e.repoPath, file)) {
+			return true
+		}
+	}
+
+	// Check package.json for workspaces
+	pkgPath := filepath.Join(e.repoPath, "package.json")
+	if content, err := os.ReadFile(pkgPath); err == nil {
+		contentStr := string(content)
+		if strings.Contains(contentStr, "\"workspaces\"") || strings.Contains(contentStr, "'workspaces'") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasFrontendFolder checks if the repo has a frontend folder
+func (e *InfraExtractor) hasFrontendFolder() bool {
+	entries, err := os.ReadDir(e.repoPath)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && isFrontendFolder(entry.Name()) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasBackendFolder checks if the repo has a backend folder
+func (e *InfraExtractor) hasBackendFolder() bool {
+	entries, err := os.ReadDir(e.repoPath)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && isBackendFolder(entry.Name()) {
 			return true
 		}
 	}

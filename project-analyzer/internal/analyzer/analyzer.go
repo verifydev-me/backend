@@ -157,8 +157,23 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	result.Databases = a.detectDatabases(repoPath)
 	result.Tools = a.detectTools(repoPath)
 
-	// Framework-specific analysis
-	if primaryLang == "JavaScript" || primaryLang == "TypeScript" {
+	// Check which languages are present (not just primary)
+	hasJSTS := false
+	hasGo := false
+	hasPython := false
+	for _, lang := range langStats {
+		if lang.Name == "JavaScript" || lang.Name == "TypeScript" {
+			hasJSTS = true
+		}
+		if lang.Name == "Go" {
+			hasGo = true
+		}
+		if lang.Name == "Python" {
+			hasPython = true
+		}
+	}
+
+	if hasJSTS {
 		// React detection
 		reactSignals := fileParser.AnalyzeReact()
 		if reactSignals != nil {
@@ -172,7 +187,7 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	}
 
 	// Go-specific analysis
-	if primaryLang == "Go" {
+	if hasGo {
 		goSignals := fileParser.AnalyzeGo()
 		if goSignals != nil {
 			result.GoSignals = goSignals
@@ -180,7 +195,7 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	}
 
 	// Python-specific analysis
-	if primaryLang == "Python" {
+	if hasPython {
 		pythonSignals := fileParser.AnalyzePython()
 		if pythonSignals != nil {
 			result.PythonSignals = pythonSignals

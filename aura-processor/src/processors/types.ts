@@ -4,6 +4,7 @@
 export type ProjectType = 
   | 'microservice'
   | 'monolith'
+  | 'monorepo'   
   | 'library'
   | 'cli'
   | 'api'
@@ -326,6 +327,7 @@ export type SkillLevel = 'basic' | 'intermediate' | 'advanced' | 'expert';
 export type ArchitectureType = 
   | 'monolith'
   | 'microservices'
+  | 'monorepo'       // Frontend + Backend in one repo
   | 'serverless'
   | 'event_driven'
   | 'modular_monolith'

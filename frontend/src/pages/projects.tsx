@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,7 @@ import {
   BarChart3,
   Github,
   Check,
+  Eye,
 } from 'lucide-react'
 
 // GitHub repo type from available endpoint
@@ -85,28 +86,62 @@ type ViewMode = 'grid' | 'list'
 type SortField = 'updatedAt' | 'stars' | 'auraContribution' | 'name'
 type SortOrder = 'asc' | 'desc'
 
+// ============================================
+// CIRCULAR PROGRESS - Dashboard Component
+// ============================================
+function CircularProgress({ value, size = 56 }: { value: number, size?: number }) {
+  const strokeWidth = 4
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90" width={size} height={size}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="hsl(var(--primary))"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-500"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-sm font-bold text-foreground">{value}</span>
+      </div>
+    </div>
+  )
+}
+
 // Skeleton components
 function ProjectCardSkeleton() {
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="pt-6">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="h-12 w-12 rounded-xl bg-muted animate-pulse" />
+    <Card className="overflow-hidden rounded-2xl border-border/50 bg-card/50">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="h-14 w-14 rounded-full bg-muted animate-pulse" />
           <div className="flex-1 space-y-2">
             <div className="h-5 w-32 bg-muted rounded animate-pulse" />
-            <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
           </div>
         </div>
-        <div className="space-y-2 mb-4">
-          <div className="h-4 w-full bg-muted rounded animate-pulse" />
-          <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+        <div className="flex gap-4 mb-2">
+          <div className="h-6 w-16 bg-muted rounded-full animate-pulse" />
+          <div className="h-6 w-16 bg-muted rounded-full animate-pulse" />
         </div>
-        <div className="flex gap-4 mb-4">
-          <div className="h-4 w-12 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-12 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-16 bg-muted rounded animate-pulse" />
-        </div>
-        <div className="h-6 w-20 bg-muted rounded animate-pulse" />
       </CardContent>
     </Card>
   )
@@ -116,7 +151,7 @@ function StatsSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <Card key={i}>
+        <Card key={i} className="rounded-2xl border-border/50 bg-card/50">
           <CardContent className="p-4">
             <div className="h-4 w-20 bg-muted rounded animate-pulse mb-2" />
             <div className="h-8 w-16 bg-muted rounded animate-pulse" />
@@ -128,6 +163,7 @@ function StatsSkeleton() {
 }
 
 export default function Projects() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [repoSearch, setRepoSearch] = useState('')
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set())
@@ -146,18 +182,13 @@ export default function Projects() {
     queryFn: () => get<{ projects: Project[]; total: number }>('/v1/projects'),
   })
 
-  // Fetch available GitHub repos when modal is open
+  // Fetch available GitHub repos
   const { data: availableReposData, isLoading: isLoadingRepos, error: reposError } = useQuery({
     queryKey: ['available-repos'],
     queryFn: () => get<{ repos: GitHubRepo[] }>('/v1/projects/available'),
     enabled: showAddModal,
     retry: 1,
   })
-
-  // Log error for debugging
-  if (reposError) {
-    console.error('Failed to fetch repos:', reposError);
-  }
 
   // Filter available repos based on search
   const filteredRepos = useMemo(() => {
@@ -232,7 +263,7 @@ export default function Projects() {
     return projects.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0))
   }, [data?.projects, search, languageFilter, statusFilter, sortField, sortOrder])
 
-  // Add selected repos from GitHub list
+  // Mutations
   const addSelectedReposMutation = useMutation({
     mutationFn: async (repos: GitHubRepo[]) => {
       const results = await Promise.allSettled(
@@ -240,7 +271,6 @@ export default function Projects() {
           post('/v1/projects', { 
             githubRepoUrl: repo.url, 
             repoName: repo.name,
-            // Convert null to undefined to pass Zod validation
             description: repo.description || undefined,
             defaultBranch: repo.defaultBranch
           })
@@ -258,19 +288,10 @@ export default function Projects() {
       setSelectedRepos(new Set())
       setRepoSearch('')
       setShowAddModal(false)
-      toast({ 
-        title: 'Projects added', 
-        description: `${selectedRepos.size} project(s) are being analyzed.` 
-      })
+      toast({ title: 'Projects added', description: `${selectedRepos.size} project(s) are being analyzed.` })
     },
     onError: (error: Error) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['available-repos'] })
-      toast({ 
-        variant: 'destructive', 
-        title: 'Some projects failed',
-        description: error.message
-      })
+      toast({ variant: 'destructive', title: 'Some projects failed', description: error.message })
     },
   })
 
@@ -342,51 +363,6 @@ export default function Projects() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusLower = status?.toLowerCase()
-    switch (statusLower) {
-      case 'completed':
-        return (
-          <Badge variant="success" className="gap-1">
-            <CheckCircle2 className="h-3 w-3" />
-            Analyzed
-          </Badge>
-        )
-      case 'processing':
-      case 'analyzing':
-        return (
-          <Badge variant="info" className="gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Analyzing
-          </Badge>
-        )
-      case 'pending':
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <Clock className="h-3 w-3" />
-            Pending
-          </Badge>
-        )
-      case 'failed':
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <AlertCircle className="h-3 w-3" />
-            Failed
-          </Badge>
-        )
-      default:
-        return <Badge variant="secondary">{status || 'Unknown'}</Badge>
-    }
-  }
-
-  const getAuraLevel = (aura: number) => {
-    if (aura >= 50) return { level: 'Legendary', color: 'text-yellow-500' }
-    if (aura >= 30) return { level: 'Epic', color: 'text-purple-500' }
-    if (aura >= 15) return { level: 'Great', color: 'text-blue-500' }
-    if (aura >= 5) return { level: 'Good', color: 'text-green-500' }
-    return { level: 'Basic', color: 'text-muted-foreground' }
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -426,50 +402,50 @@ export default function Projects() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4"
         >
-          <Card className="relative overflow-hidden">
+          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent" />
-            <CardContent className="p-4 relative">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <CardContent className="p-5 relative">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
                 <FolderGit2 className="h-4 w-4" />
                 Total Projects
               </div>
-              <p className="text-2xl font-bold mt-1">{stats.total}</p>
+              <p className="text-3xl font-bold mt-2">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card className="relative overflow-hidden">
+          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
-            <CardContent className="p-4 relative">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <CardContent className="p-5 relative">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
                 <CheckCircle2 className="h-4 w-4" />
                 Analyzed
               </div>
-              <p className="text-2xl font-bold mt-1">{stats.analyzed}</p>
+              <p className="text-3xl font-bold mt-2">{stats.analyzed}</p>
               {stats.total > 0 && (
                 <Progress 
                   value={(stats.analyzed / stats.total) * 100} 
-                  className="h-1 mt-2" 
+                  className="h-1 mt-3" 
                 />
               )}
             </CardContent>
           </Card>
-          <Card className="relative overflow-hidden">
+          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent" />
-            <CardContent className="p-4 relative">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <CardContent className="p-5 relative">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
                 <Star className="h-4 w-4" />
                 Total Stars
               </div>
-              <p className="text-2xl font-bold mt-1">{formatNumber(stats.totalStars)}</p>
+              <p className="text-3xl font-bold mt-2">{formatNumber(stats.totalStars)}</p>
             </CardContent>
           </Card>
-          <Card className="relative overflow-hidden">
+          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent" />
-            <CardContent className="p-4 relative">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <CardContent className="p-5 relative">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
                 <Zap className="h-4 w-4" />
                 Aura Earned
               </div>
-              <p className="text-2xl font-bold mt-1 text-primary">+{formatNumber(stats.totalAura)}</p>
+              <p className="text-3xl font-bold mt-2 text-primary">+{formatNumber(stats.totalAura)}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -482,7 +458,7 @@ export default function Projects() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={() => {
               setShowAddModal(false)
               setSelectedRepos(new Set())
@@ -494,10 +470,10 @@ export default function Projects() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-card border rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+              className="bg-card border border-border/50 rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
+                <h2 className="text-xl font-bold flex items-center gap-2">
                   <Github className="h-5 w-5 text-primary" />
                   Select Repositories
                 </h2>
@@ -530,7 +506,7 @@ export default function Projects() {
               </div>
 
               {/* Repo list */}
-              <div className="flex-1 overflow-y-auto border rounded-lg min-h-[300px] max-h-[400px]">
+              <div className="flex-1 overflow-y-auto border border-border/50 rounded-xl min-h-[300px] max-h-[400px] bg-muted/20">
                 {isLoadingRepos ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -552,7 +528,7 @@ export default function Projects() {
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y">
+                  <div className="divide-y divide-border/50">
                     {filteredRepos.map((repo) => {
                       const isSelected = selectedRepos.has(repo.url)
                       const isDisabled = repo.isAdded
@@ -632,7 +608,7 @@ export default function Projects() {
               </div>
 
               {/* Selection count and actions */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
                 <div className="text-sm text-muted-foreground">
                   {selectedRepos.size > 0 ? (
                     <span className="text-primary font-medium">
@@ -865,206 +841,202 @@ export default function Projects() {
                 : 'space-y-3'
             )}
           >
-            {filteredProjects.map((project) => (
-              viewMode === 'grid' ? (
-                // Grid View Card
+            {filteredProjects.map((project) => {
+              const score = project.auraContribution || 0
+              const isAnalyzed = project.analysisStatus?.toLowerCase() === 'completed'
+              const repoName = project.repoName || project.name || 'Untitled'
+              const topTechs = (project.technologies || []).slice(0, 3)
+
+              return viewMode === 'grid' ? (
+                // GRID VIEW - Premium Dashboard Style
                 <motion.div key={project.id} variants={itemVariants}>
-                  <Card className={cn(
-                    "group relative overflow-hidden transition-all duration-300",
-                    "hover:shadow-lg hover:border-primary/30",
-                    selectedProjects.has(project.id) && "border-primary bg-primary/5"
-                  )}>
-                    {/* Selection checkbox */}
-                    <div className="absolute top-3 left-3 z-10">
+                  <div 
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                    className={cn(
+                      "group relative cursor-pointer rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card/90 to-card/80 backdrop-blur-xl p-5 transition-all duration-300",
+                      "hover:border-primary/40 hover:shadow-xl hover:shadow-primary/15 hover:scale-[1.01]",
+                      selectedProjects.has(project.id) && "border-primary bg-primary/5"
+                    )}
+                  >
+                    {/* Checkbox for selection (absolute) */}
+                    <div 
+                      className="absolute top-4 right-4 z-20"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
                         checked={selectedProjects.has(project.id)}
                         onChange={() => toggleProjectSelection(project.id)}
-                        className="rounded border-muted-foreground/30"
+                        className="rounded border-muted-foreground/30 accent-primary w-4 h-4 cursor-pointer"
                       />
                     </div>
                     
-                    {/* Pin indicator */}
+                    {/* Pin Indicator */}
                     {project.isPinned && (
-                      <div className="absolute top-3 right-3 z-10">
-                        <Pin className="h-4 w-4 text-primary fill-primary" />
+                      <div className="absolute top-4 right-10 z-10 text-primary">
+                        <Pin className="h-4 w-4 fill-current" />
                       </div>
                     )}
-                    
-                    {/* Aura glow effect for high aura projects */}
-                    {(project.auraContribution || 0) >= 30 && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5" />
-                    )}
-                    
-                    <CardContent className="pt-8 pb-6 relative">
-                      <div className="flex items-start gap-3 mb-4">
+
+                    <div className="flex items-start gap-4">
+                      {/* Circular Score with Glow */}
+                      <div className="relative shrink-0">
                         <div className={cn(
-                          "h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
-                          "bg-primary/10 group-hover:bg-primary/20"
-                        )}>
-                          <FolderGit2 className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <Link
-                            to={`/projects/${project.id}`}
-                            className="font-semibold text-lg hover:text-primary transition-colors truncate block"
-                          >
-                            {project.name}
-                          </Link>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span
-                              className="h-3 w-3 rounded-full"
-                              style={{ backgroundColor: getLanguageColor(project.language) }}
-                            />
-                            {project.language || 'Unknown'}
+                          "absolute inset-0 rounded-full blur-lg opacity-30 transition-opacity group-hover:opacity-50",
+                          score >= 80 ? "bg-emerald-500" : score >= 50 ? "bg-primary" : "bg-amber-500"
+                        )} />
+                        <CircularProgress value={score > 100 ? 100 : score} />
+                      </div>
+                      
+                      {/* Project Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-muted/80 to-muted/40 border border-border/50 shrink-0">
+                            <Github className="w-3.5 h-3.5 text-foreground" />
                           </div>
+                          <h3 className="font-bold text-foreground group-hover:text-primary transition-colors truncate text-base">
+                            {repoName}
+                          </h3>
                         </div>
-                      </div>
-
-                      {project.description && (
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                          {project.description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                        <span className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-yellow-500" />
-                          {formatNumber(project.stars)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <GitFork className="h-4 w-4" />
-                          {formatNumber(project.forks)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {formatRelativeTime(project.updatedAt)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        {getStatusBadge(project.analysisStatus)}
                         
-                        {project.analysisStatus?.toLowerCase() === 'completed' && (project.auraContribution || 0) > 0 && (
-                          <span className={cn(
-                            "text-sm font-semibold flex items-center gap-1",
-                            getAuraLevel(project.auraContribution || 0).color
-                          )}>
-                            <Zap className="h-4 w-4" />
-                            +{formatNumber(project.auraContribution)} Aura
-                          </span>
+                        {project.description && (
+                          <p className="text-xs text-muted-foreground/80 truncate mb-3">
+                            {project.description}
+                          </p>
                         )}
-                      </div>
-
-                      {/* Action buttons - visible on hover */}
-                      <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-card via-card to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => togglePinMutation.mutate({ id: project.id, isPinned: project.isPinned })}
-                          className="gap-1"
-                        >
-                          <Pin className={cn("h-4 w-4", project.isPinned && "fill-current")} />
-                          {project.isPinned ? 'Unpin' : 'Pin'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => analyzeProjectMutation.mutate(project.id)}
-                          disabled={project.analysisStatus === 'analyzing'}
-                          className="gap-1"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                          Analyze
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild className="gap-1">
-                          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
-                            View
-                          </a>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteProjectMutation.mutate(project.id)}
-                          className="gap-1 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ) : (
-                // List View Card
-                <motion.div key={project.id} variants={itemVariants}>
-                  <Card className={cn(
-                    "group transition-all duration-300",
-                    "hover:shadow-md hover:border-primary/30",
-                    selectedProjects.has(project.id) && "border-primary bg-primary/5"
-                  )}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedProjects.has(project.id)}
-                          onChange={() => toggleProjectSelection(project.id)}
-                          className="rounded border-muted-foreground/30"
-                        />
                         
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FolderGit2 className="h-5 w-5 text-primary" />
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {project.isPinned && (
-                              <Pin className="h-4 w-4 text-primary fill-primary flex-shrink-0" />
-                            )}
-                            <Link
-                              to={`/projects/${project.id}`}
-                              className="font-semibold hover:text-primary transition-colors truncate"
-                            >
-                              {project.name}
-                            </Link>
-                            <span
-                              className="h-2 w-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: getLanguageColor(project.language) }}
-                            />
-                            <span className="text-sm text-muted-foreground">{project.language}</span>
-                          </div>
-                          {project.description && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {project.description}
-                            </p>
+                        {/* Tags */}
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          {project.language && (
+                            <span className="flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <span 
+                                className="w-1.5 h-1.5 rounded-full" 
+                                style={{ backgroundColor: getLanguageColor(project.language) }}
+                              />
+                              {project.language}
+                            </span>
                           )}
+                          {topTechs.map((tech, i) => (
+                            <span 
+                              key={i}
+                              className="text-xs px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground border border-border/30"
+                            >
+                              {tech}
+                            </span>
+                          ))}
                         </div>
                         
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                        {/* Stats Row */}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <Star className="h-4 w-4 text-yellow-500" />
-                            {formatNumber(project.stars)}
+                            <Star className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="font-medium text-foreground">{formatNumber(project.stars)}</span>
                           </span>
                           <span className="flex items-center gap-1">
-                            <GitFork className="h-4 w-4" />
-                            {formatNumber(project.forks)}
+                            <GitFork className="w-3.5 h-3.5" />
+                            <span className="font-medium text-foreground">{formatNumber(project.forks)}</span>
                           </span>
-                          {getStatusBadge(project.analysisStatus)}
-                          {(project.auraContribution || 0) > 0 && (
-                            <span className={cn(
-                              "font-semibold flex items-center gap-1",
-                              getAuraLevel(project.auraContribution || 0).color
-                            )}>
-                              <Zap className="h-4 w-4" />
-                              +{formatNumber(project.auraContribution)}
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{formatRelativeTime(project.updatedAt)}</span>
+                          </span>
+                          
+                          {/* Aura Badge */}
+                          {score > 0 && (
+                            <span className="ml-auto flex items-center gap-1 text-primary font-bold">
+                              <Zap className="w-3.5 h-3.5" />
+                              +{score}
                             </span>
                           )}
                         </div>
-                        
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
+                      </div>
+                    </div>
+                    
+                    {/* View Details Hint & Actions - Appear on Hover */}
+                    <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between opacity-80 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>View details</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => togglePinMutation.mutate({ id: project.id, isPinned: project.isPinned })}
+                        >
+                          <Pin className={cn("h-3.5 w-3.5", project.isPinned && "fill-current text-primary")} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => analyzeProjectMutation.mutate(project.id)}
+                          disabled={project.analysisStatus === 'analyzing'}
+                        >
+                          <RefreshCw className={cn("h-3.5 w-3.5", project.analysisStatus === 'analyzing' && "animate-spin")} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => deleteProjectMutation.mutate(project.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                // LIST VIEW - Simplified
+                <motion.div key={project.id} variants={itemVariants}>
+                  <Card 
+                    className={cn(
+                      "group transition-all duration-300 hover:shadow-md hover:border-primary/30",
+                      selectedProjects.has(project.id) && "border-primary bg-primary/5"
+                    )}
+                  >
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedProjects.has(project.id)}
+                        onChange={() => toggleProjectSelection(project.id)}
+                        className="rounded border-muted-foreground/30 accent-primary cursor-pointer"
+                      />
+                      
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        {isAnalyzed ? (
+                          <div className="font-bold text-primary">{score}</div>
+                        ) : (
+                          <FolderGit2 className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
+                         <div className="flex items-center gap-2">
+                            {project.isPinned && <Pin className="h-3.5 w-3.5 text-primary fill-primary" />}
+                            <h3 className="font-semibold hover:text-primary transition-colors truncate">
+                              {repoName}
+                            </h3>
+                            <Badge variant="outline" className="text-xs font-normal">
+                              {project.language || 'Unknown'}
+                            </Badge>
+                         </div>
+                         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                              <Star className="h-3 w-3" /> {formatNumber(project.stars)}
+                            </span>
+                            <span>Updated {formatRelativeTime(project.updatedAt)}</span>
+                         </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => togglePinMutation.mutate({ id: project.id, isPinned: project.isPinned })}
                           >
                             <Pin className={cn("h-4 w-4", project.isPinned && "fill-current")} />
@@ -1072,36 +1044,22 @@ export default function Projects() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => analyzeProjectMutation.mutate(project.id)}
-                            disabled={project.analysisStatus === 'analyzing'}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" asChild>
-                            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={() => deleteProjectMutation.mutate(project.id)}
-                            className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                           <Link to={`/projects/${project.id}`}>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <ChevronRight className="h-4 w-4" />
                             </Button>
                           </Link>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 </motion.div>
               )
-            ))}
+            })}
           </motion.div>
         </>
       ) : (
@@ -1109,12 +1067,12 @@ export default function Projects() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
         >
-          <Card className="border-dashed">
+          <Card className="border-dashed border-border/50 bg-card/50">
             <CardContent className="py-16 text-center">
               <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <FolderGit2 className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+              <h3 className="text-xl font-bold mb-2">
                 {search || languageFilter !== 'all' || statusFilter !== 'all'
                   ? 'No matching projects'
                   : 'No projects yet'}

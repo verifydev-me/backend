@@ -33,8 +33,11 @@ router.get('/candidates/search', async (req: Request, res: Response<ApiResponse>
     const limitNum = Math.min(parseInt(limit as string) || 20, 50);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause
-    const where: any = {};
+    // Build where clause - respect visibility settings
+    const where: any = {
+      // Only show candidates with PUBLIC or RECRUITERS_ONLY visibility
+      visibilityLevel: { in: ['PUBLIC', 'RECRUITERS_ONLY'] },
+    };
 
     if (isOpenToWork === 'true') {
       where.isOpenToWork = true;
@@ -49,20 +52,25 @@ router.get('/candidates/search', async (req: Request, res: Response<ApiResponse>
     }
 
     if (location) {
-      where.location = { contains: location as string, mode: 'insensitive' };
+      where.OR = [
+        { location: { contains: location as string, mode: 'insensitive' } },
+        { preferredLocations: { has: location as string } },
+      ];
     }
 
-    // Get users with skills and projects
+    // Get users with skills and projects (only visible ones)
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
         include: {
           skills: {
-            orderBy: { verifiedScore: 'desc' },
+            where: { showToRecruiters: true },
+            orderBy: [{ isHighlighted: 'desc' }, { verifiedScore: 'desc' }],
             take: 10,
           },
           projects: {
-            orderBy: { overallScore: 'desc' },
+            where: { showToRecruiters: true },
+            orderBy: [{ isPinned: 'desc' }, { overallScore: 'desc' }],
             take: 5,
           },
         },
@@ -94,7 +102,7 @@ router.get('/candidates/search', async (req: Request, res: Response<ApiResponse>
       }
     }
 
-    // Transform to candidate format
+    // Transform to candidate format with visibility-aware data
     const candidates = filteredUsers.map(user => ({
       id: user.id,
       username: user.username,
@@ -106,15 +114,25 @@ router.get('/candidates/search', async (req: Request, res: Response<ApiResponse>
       coreCount: user.coreCount,
       isOpenToWork: user.isOpenToWork,
       isVerified: user.isVerified,
+      // Job preferences for matching
+      preferredRoles: user.preferredRoles,
+      preferredLocations: user.preferredLocations,
+      preferredJobTypes: user.preferredJobTypes,
+      remotePreference: user.remotePreference,
+      availableFrom: user.availableFrom,
+      // Skills (highlighted first)
       topSkills: user.skills.slice(0, 5).map((s) => ({
         name: s.name,
         score: s.verifiedScore,
         isVerified: s.isVerified,
+        isHighlighted: s.isHighlighted,
       })),
+      // Projects (pinned first)
       topProjects: user.projects.slice(0, 3).map((p) => ({
         name: p.repoName,
         score: p.overallScore || 0,
         language: p.language || 'Unknown',
+        isPinned: p.isPinned,
       })),
     }));
 

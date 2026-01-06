@@ -396,7 +396,7 @@ export default function Resume() {
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative overflow-hidden rounded-3xl bg-card border border-border p-8 shadow-2xl backdrop-blur-md"
+        className="relative overflow-hidden rounded-2xl bg-card border border-border p-8"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5" />
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
@@ -428,7 +428,7 @@ export default function Resume() {
               <Card 
                 key={template.value}
                 className={`cursor-pointer transition-all border-2 overflow-hidden ${
-                  resumeData.template === template.value ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20 scale-105' : 'border-border hover:border-primary/50'
+                  resumeData.template === template.value ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border hover:border-primary/50'
                 }`}
                 onClick={() => setResumeData({ ...resumeData, template: template.value as any })}
               >
@@ -498,7 +498,7 @@ export default function Resume() {
 
         {/* Skills Selection */}
         <TabsContent value="skills" className="space-y-6">
-          <Card className="border-border bg-card/50 backdrop-blur-md shadow-xl">
+          <Card className="border-border bg-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold flex items-center gap-2">
                 <Code className="h-5 w-5 text-primary" />
@@ -512,22 +512,26 @@ export default function Resume() {
               <TooltipProvider>
                 <div className="flex flex-wrap gap-2">
                   {resumeData.skills.length > 0 ? (
-                    resumeData.skills.map((skill) => (
+                    resumeData.skills.map((skill, idx) => (
                       <Tooltip key={skill.name}>
                         <TooltipTrigger asChild>
                           <button
                             onClick={() => toggleSkill(skill.name)}
                             className={`group relative flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 text-sm font-medium ${
                               selectedSkills.has(skill.name)
-                                ? 'border-primary/50 bg-primary/10 text-primary shadow-lg shadow-primary/20'
-                                : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-primary/30 hover:bg-primary/5'
+                                ? 'border-primary/50 bg-primary/10 text-primary'
+                                : 'border-border bg-card hover:border-primary/30 hover:bg-primary/5'
                             }`}
+                            style={!selectedSkills.has(skill.name) ? {
+                              backgroundColor: `hsl(${(idx * 137.5) % 360} 40% ${15}%)`,
+                              borderColor: `hsl(${(idx * 137.5) % 360} 40% 25%)`
+                            } : undefined}
                           >
                             <span>{skill.name}</span>
                             <Badge 
                               variant="secondary" 
                               className={`h-5 min-w-[20px] px-1 text-[10px] rounded-full flex items-center justify-center transition-colors ${
-                                selectedSkills.has(skill.name) ? 'bg-primary text-primary-foreground' : 'bg-muted py-0'
+                                selectedSkills.has(skill.name) ? 'bg-primary text-primary-foreground' : 'bg-background/50'
                               }`}
                             >
                               {skill.verifiedScore}%
@@ -544,7 +548,7 @@ export default function Resume() {
                             )}
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent className="p-3 max-w-[250px] bg-popover/90 backdrop-blur-md border-primary/20 shadow-xl">
+                        <TooltipContent className="p-3 max-w-[250px] bg-popover border-primary/20">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-4">
                               <span className="font-bold text-primary">{skill.name}</span>
@@ -597,7 +601,7 @@ export default function Resume() {
                     onClick={() => toggleProject(project.repoName)}
                     className={`w-full p-4 rounded-xl border transition-all duration-300 text-left ${
                       selectedProjects.has(project.repoName)
-                        ? 'border-primary/50 bg-primary/10 shadow-lg shadow-primary/10'
+                        ? 'border-primary/50 bg-primary/10'
                         : 'border-border bg-card/50 hover:border-primary/30'
                     }`}
                   >
@@ -632,7 +636,7 @@ export default function Resume() {
 
         {/* Experience Management */}
         <TabsContent value="experiences" className="space-y-6">
-          <Card className="border-border bg-card/50 backdrop-blur-md shadow-xl">
+          <Card className="border-border bg-card">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Work & Education</CardTitle>
               <Dialog open={isAddingExperience} onOpenChange={setIsAddingExperience}>

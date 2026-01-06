@@ -571,8 +571,41 @@ func (p *FileParser) AnalyzeNode() *signals.NodeSignals {
 
 // DetectProjectType determines the type of project
 func (p *FileParser) DetectProjectType(folderAnalysis signals.FolderAnalysis, codeSignals signals.CodeSignals) signals.ProjectType {
-	// Check for microservice indicators
-	if codeSignals.HasDockerfile && codeSignals.HasDockerCompose {
+	// Get top level folders
+	topFolders := folderAnalysis.TopLevelFolders
+
+	// Check for monorepo indicators first
+	if p.isMonorepo() {
+		return signals.ProjectTypeMonorepo
+	}
+
+	// Check if it looks like frontend + backend structure (monorepo)
+	hasFrontend := false
+	hasBackend := false
+	serviceCount := 0
+
+	for _, folder := range topFolders {
+		folderLower := strings.ToLower(folder)
+		if folderLower == "frontend" || folderLower == "client" || folderLower == "web" || folderLower == "ui" {
+			hasFrontend = true
+		}
+		if folderLower == "backend" || folderLower == "server" || folderLower == "api" {
+			hasBackend = true
+		}
+		// Count service-like folders (excluding frontend)
+		if strings.Contains(folderLower, "service") || strings.Contains(folderLower, "svc") {
+			serviceCount++
+		}
+	}
+
+	// If has frontend + backend folder (not multiple services), it's a monorepo
+	if hasFrontend && hasBackend && serviceCount == 0 {
+		return signals.ProjectTypeMonorepo
+	}
+
+	// FIXED: Microservice detection - need multiple BACKEND services
+	// Docker + DockerCompose alone is NOT enough!
+	if serviceCount >= 2 {
 		return signals.ProjectTypeMicroservice
 	}
 
@@ -610,6 +643,30 @@ func (p *FileParser) DetectProjectType(folderAnalysis signals.FolderAnalysis, co
 	}
 
 	return signals.ProjectTypeUnknown
+}
+
+// isMonorepo checks if the project uses monorepo tools
+func (p *FileParser) isMonorepo() bool {
+	monorepoFiles := []string{
+		"lerna.json",
+		"nx.json",
+		"turbo.json",
+		"rush.json",
+		"pnpm-workspace.yaml",
+	}
+
+	for _, file := range monorepoFiles {
+		if p.fileExists(file) {
+			return true
+		}
+	}
+
+	// Check package.json for workspaces
+	if p.fileContains("package.json", "workspaces") {
+		return true
+	}
+
+	return false
 }
 
 // Helper functions

@@ -1504,7 +1504,13 @@ func (e *InferenceEngine) inferArchitecture(sigs *signals.InfrastructureSignals,
 	}
 
 	// Determine architecture type
-	if sigs.HasSignal(signals.SignalMultipleServices) && sigs.ServiceCount >= 2 {
+	// PRIORITY ORDER: Monorepo > Microservices > Event-Driven > Monolith
+
+	// Check for Monorepo first (frontend + backend in one repo)
+	if sigs.HasSignal(signals.SignalMonorepo) {
+		arch.Type = signals.ArchMonorepo
+	} else if sigs.HasSignal(signals.SignalMultipleServices) && sigs.ServiceCount >= 2 {
+		// Only mark as microservices if there are 2+ ACTUAL services (not infra)
 		arch.Type = signals.ArchMicroservice
 	} else if sigs.HasSignal(signals.SignalEventSourcing) || sigs.HasSignal(signals.SignalCQRS) {
 		arch.Type = signals.ArchEventDriven

@@ -220,5 +220,7 @@ export const useShortlist = () => {
   return useQuery({
     queryKey: recruiterKeys.shortlist(),
     queryFn: recruiterService.getShortlist,
+    initialData: [],
+    select: (data) => Array.isArray(data) ? data : [],
   })
 }

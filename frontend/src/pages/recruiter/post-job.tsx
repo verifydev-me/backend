@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import * as z from 'zod'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { toast } from '@/hooks/use-toast'
-import { post } from '@/api/client'
+import { createJob } from '@/api/services/recruiter-job.service'
 import {
   ArrowLeft,
   Briefcase,
@@ -151,13 +151,20 @@ export default function JobPostingPage() {
 
     setIsSubmitting(true)
     try {
-      await post('/v1/recruiter/jobs', {
-        ...data,
-        requiredSkills,
-        preferredSkills,
-        responsibilities: responsibilities.filter((r: string) => r.trim()),
-        qualifications: qualifications.filter((q: string) => q.trim()),
-        benefits: benefits.filter((b: string) => b.trim()),
+      await createJob({
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        isRemote: data.isRemote,
+        type: data.type,
+        level: data.level,
+        salaryMin: data.salaryMin,
+        salaryMax: data.salaryMax,
+        salaryCurrency: data.currency,
+        requiredSkills: requiredSkills.map(skill => ({ skillName: skill, minScore: 0, isRequired: true })),
+        preferredSkills: preferredSkills,
+        responsibilities: responsibilities.filter((r: string) => r.trim()).join('\n'),
+        requirements: qualifications.filter((q: string) => q.trim()).join('\n'),
       })
 
       toast({
@@ -168,7 +175,7 @@ export default function JobPostingPage() {
     } catch (error: any) {
       toast({
         title: 'Failed to post job',
-        description: error?.response?.data?.message || 'Please try again',
+        description: error?.response?.data?.message || error?.message || 'Please try again',
         variant: 'destructive',
       })
     } finally {

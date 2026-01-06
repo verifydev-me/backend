@@ -16,14 +16,21 @@ import { useRecruiterStore } from '@/store/recruiter-store'
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // Determine which store to use based on URL
+    // Determine which store to use based on URL and available tokens
     const isRecruiterPath = config.url?.includes('/recruiters')
+    const recruiterToken = useRecruiterStore.getState().accessToken
+    const userToken = useAuthStore.getState().accessToken
     
     let token = null
     if (isRecruiterPath) {
-      token = useRecruiterStore.getState().accessToken
+      // Explicitly recruiter endpoint - use recruiter token
+      token = recruiterToken
+    } else if (recruiterToken) {
+      // If recruiter is logged in, use recruiter token for all other endpoints
+      token = recruiterToken
     } else {
-      token = useAuthStore.getState().accessToken
+      // Otherwise use user token
+      token = userToken
     }
 
     if (token) {

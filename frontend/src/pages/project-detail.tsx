@@ -1,3 +1,9 @@
+/**
+ * Project Detail Page - Premium Analytics Edition
+ * Shows comprehensive project analysis with detailed skill breakdown
+ * Skills displayed with percentages (Redis 80%, TypeScript 95%, etc.)
+ */
+
 import { useParams, Link } from 'react-router-dom'
 import { AnalysisResults } from '@/components/features/project/AnalysisResults'
 import { useQuery } from '@tanstack/react-query'
@@ -5,8 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { get } from '@/api/client'
-import { formatNumber, formatDate, getLanguageColor } from '@/lib/utils'
-import type { Project } from '@/types'
+import { formatNumber, getLanguageColor, cn } from '@/lib/utils'
 import {
   ArrowLeft,
   ExternalLink,
@@ -14,13 +19,31 @@ import {
   GitFork,
   Users,
   GitCommit,
-  Clock,
   Loader2,
   Code,
   FileText,
   TestTube,
   Gauge,
   Activity,
+  Github,
+  Sparkles,
+  Zap,
+  CheckCircle2,
+  TrendingUp,
+  Server,
+  Database,
+  Shield,
+  Box,
+  Cloud,
+  AlertTriangle,
+  Lightbulb,
+  Target,
+  Layers,
+  Building2,
+  Network,
+  BookOpen,
+  Cpu,
+  Lock,
 } from 'lucide-react'
 import {
   RadarChart,
@@ -34,29 +57,704 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts'
 
+// Skill category icons
+const categoryIcons: Record<string, typeof Code> = {
+  language: Code,
+  framework: Box,
+  database: Database,
+  infrastructure: Server,
+  security: Shield,
+  devops: GitCommit,
+  tool: Gauge,
+  architecture: Building2,
+  cloud: Cloud,
+  testing: TestTube,
+  messaging: Network,
+  observability: Activity,
+  performance: Zap,
+}
+
+// Skill category colors
+const categoryColors: Record<string, string> = {
+  language: 'from-indigo-500 to-purple-500',
+  framework: 'from-emerald-500 to-teal-500',
+  database: 'from-blue-500 to-cyan-500',
+  infrastructure: 'from-orange-500 to-amber-500',
+  security: 'from-red-500 to-pink-500',
+  devops: 'from-violet-500 to-purple-500',
+  tool: 'from-gray-500 to-slate-500',
+  architecture: 'from-purple-500 to-indigo-500',
+  cloud: 'from-sky-500 to-blue-500',
+  testing: 'from-green-500 to-emerald-500',
+  messaging: 'from-pink-500 to-rose-500',
+  observability: 'from-yellow-500 to-orange-500',
+  performance: 'from-amber-500 to-yellow-500',
+}
+
+// Priority colors for optimizations
+const priorityColors: Record<string, { bg: string; text: string; border: string }> = {
+  high: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
+  medium: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+  low: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
+}
+
+// ============================================
+// SKILL BREAKDOWN CARD - Shows skill with %
+// ============================================
+interface SkillData {
+  name: string
+  category?: string
+  level?: string
+  confidence?: number
+  score?: number
+  verifiedScore?: number
+  evidence?: string[]
+  resumeReady?: boolean
+  keywords?: string[]
+  weight?: number
+}
+
+function SkillBreakdownCard({ skill }: { skill: SkillData }) {
+  // Calculate percentage (confidence is 0-1, score is 0-100)
+  const percentage = skill.confidence 
+    ? Math.round(skill.confidence * 100) 
+    : skill.score || skill.verifiedScore || 0
+  
+  const category = skill.category || 'tool'
+  const Icon = categoryIcons[category] || Code
+  const colorClass = categoryColors[category] || 'from-primary to-primary/70'
+  
+  return (
+    <div className="group rounded-xl border border-border/50 bg-card/50 backdrop-blur p-4 hover:border-primary/30 hover:shadow-lg transition-all">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br",
+            colorClass
+          )}>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="font-bold text-foreground group-hover:text-primary transition-colors">
+              {skill.name}
+            </h4>
+            <p className="text-xs text-muted-foreground capitalize">
+              {category} • {skill.level || 'Detected'}
+            </p>
+          </div>
+        </div>
+        
+        {/* Percentage Badge */}
+        <div className={cn(
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold",
+          percentage >= 80 
+            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" 
+            : percentage >= 60 
+              ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+              : percentage >= 40
+                ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                : "bg-muted text-muted-foreground border border-border"
+        )}>
+          {percentage}%
+        </div>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+        <div 
+          className={cn(
+            "h-full rounded-full transition-all duration-700 bg-gradient-to-r",
+            colorClass
+          )}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      
+      {/* Evidence/Details */}
+      {skill.evidence && skill.evidence.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/30">
+          <p className="text-xs text-muted-foreground mb-2">Evidence:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {skill.evidence.slice(0, 3).map((e: string, i: number) => (
+              <span 
+                key={i}
+                className="text-xs px-2 py-0.5 rounded-md bg-muted/50 text-muted-foreground"
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Resume Ready Badge */}
+      {skill.resumeReady && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Resume Ready
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// CIRCULAR SCORE
+// ============================================
+function CircularScore({ value, size = 120, label }: { value: number, size?: number, label?: string }) {
+  const safeValue = isNaN(value) ? 0 : Math.min(100, Math.max(0, value))
+  const strokeWidth = 8
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (safeValue / 100) * circumference
+
+  const getColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-500'
+    if (score >= 60) return 'text-blue-500'
+    if (score >= 40) return 'text-amber-500'
+    return 'text-muted-foreground'
+  }
+
+  return (
+    <div className="relative flex flex-col items-center" style={{ width: size }}>
+      <svg className="transform -rotate-90" width={size} height={size}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={cn("transition-all duration-1000", getColor(safeValue))}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={cn("text-3xl font-bold", getColor(safeValue))}>{Math.round(safeValue)}</span>
+        {label && <span className="text-xs text-muted-foreground">{label}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// ARCHITECTURE DISPLAY
+// ============================================
+interface ArchitectureData {
+  type?: string
+  communication?: string[]
+  serviceCount?: number
+  services?: string[]
+  patterns?: string[]
+  engineeringLevel?: string
+}
+
+function ArchitectureCard({ architecture }: { architecture: ArchitectureData }) {
+  if (!architecture) return null
+  
+  const archTypeLabels: Record<string, string> = {
+    microservices: 'Microservices',
+    monolith: 'Monolithic',
+    serverless: 'Serverless',
+    event_driven: 'Event-Driven',
+    modular_monolith: 'Modular Monolith',
+    layered: 'Layered',
+    hexagonal: 'Hexagonal',
+    clean_architecture: 'Clean Architecture',
+  }
+  
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur overflow-hidden">
+      <CardHeader className="border-b border-border/30">
+        <CardTitle className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-purple-500" />
+          System Architecture
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid gap-4">
+          {/* Architecture Type */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Architecture Type</p>
+              <p className="text-lg font-bold text-purple-400">
+                {archTypeLabels[architecture.type || ''] || architecture.type || 'Standard'}
+              </p>
+            </div>
+            <Building2 className="h-8 w-8 text-purple-500/50" />
+          </div>
+          
+          {/* Service Count */}
+          {architecture.serviceCount && architecture.serviceCount > 0 && (
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Services</p>
+                <p className="text-lg font-bold text-blue-400">{architecture.serviceCount} Services</p>
+              </div>
+              <Server className="h-8 w-8 text-blue-500/50" />
+            </div>
+          )}
+          
+          {/* Services List */}
+          {architecture.services && architecture.services.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Service Names</p>
+              <div className="flex flex-wrap gap-2">
+                {architecture.services.map((service, i) => (
+                  <Badge key={i} variant="outline" className="bg-muted/50">
+                    {service}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Communication */}
+          {architecture.communication && architecture.communication.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Communication Protocols</p>
+              <div className="flex flex-wrap gap-2">
+                {architecture.communication.map((comm, i) => (
+                  <Badge key={i} className="bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
+                    {comm.toUpperCase()}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Patterns */}
+          {architecture.patterns && architecture.patterns.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Detected Patterns</p>
+              <div className="flex flex-wrap gap-2">
+                {architecture.patterns.map((pattern, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {pattern}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Engineering Level */}
+          {architecture.engineeringLevel && (
+            <div className="flex items-center gap-2 mt-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Engineering Level:</span>
+              <Badge className={cn(
+                architecture.engineeringLevel === 'Production-grade' 
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : architecture.engineeringLevel === 'Advanced'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'bg-amber-500/20 text-amber-400'
+              )}>
+                {architecture.engineeringLevel}
+              </Badge>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// TECH STACK DISPLAY
+// ============================================
+interface TechStackData {
+  languages?: { name: string; percentage: number }[]
+  frameworks?: string[]
+  databases?: string[]
+  tools?: string[]
+}
+
+function TechStackCard({ techStack }: { techStack: TechStackData }) {
+  if (!techStack) return null
+  
+  const languages = techStack.languages || []
+  const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
+  
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Cpu className="h-5 w-5 text-cyan-500" />
+          Technology Stack
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {/* Languages Pie Chart */}
+        {languages.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm font-medium mb-4">Language Distribution</p>
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width={150} height={150}>
+                <PieChart>
+                  <Pie
+                    data={languages}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={2}
+                    dataKey="percentage"
+                  >
+                    {languages.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-2">
+                {languages.slice(0, 5).map((lang, i) => (
+                  <div key={lang.name} className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                    />
+                    <span className="text-sm flex-1">{lang.name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {lang.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Frameworks, Databases, Tools */}
+        <div className="space-y-4">
+          {techStack.frameworks && techStack.frameworks.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Frameworks</p>
+              <div className="flex flex-wrap gap-2">
+                {techStack.frameworks.map((fw, i) => (
+                  <Badge key={i} className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                    {fw}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {techStack.databases && techStack.databases.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Databases</p>
+              <div className="flex flex-wrap gap-2">
+                {techStack.databases.map((db, i) => (
+                  <Badge key={i} className="bg-blue-500/15 text-blue-400 border-blue-500/30">
+                    {db}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {techStack.tools && techStack.tools.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Tools</p>
+              <div className="flex flex-wrap gap-2">
+                {techStack.tools.map((tool, i) => (
+                  <Badge key={i} variant="outline">
+                    {tool}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// OPTIMIZATIONS CARD
+// ============================================
+interface OptimizationData {
+  category: string
+  priority: string
+  title: string
+  description: string
+  impact: string
+}
+
+function OptimizationsCard({ optimizations }: { optimizations: OptimizationData[] }) {
+  if (!optimizations || optimizations.length === 0) return null
+  
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'performance': return Zap
+      case 'security': return Lock
+      case 'testing': return TestTube
+      case 'documentation': return BookOpen
+      default: return Lightbulb
+    }
+  }
+  
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-amber-500" />
+          Optimization Suggestions
+          <Badge variant="secondary" className="ml-auto">{optimizations.length}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {optimizations.map((opt, i) => {
+          const colors = priorityColors[opt.priority] || priorityColors.low
+          const Icon = getCategoryIcon(opt.category)
+          
+          return (
+            <div 
+              key={i}
+              className={cn(
+                "p-4 rounded-xl border",
+                colors.bg,
+                colors.border
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div className={cn("p-2 rounded-lg", colors.bg)}>
+                  <Icon className={cn("h-4 w-4", colors.text)} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold text-sm">{opt.title}</h4>
+                    <Badge className={cn("text-xs", colors.bg, colors.text, colors.border)}>
+                      {opt.priority}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">{opt.description}</p>
+                  <p className="text-xs flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3 text-emerald-500" />
+                    <span className="text-emerald-400">{opt.impact}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// BEST PRACTICES CARD
+// ============================================
+interface BestPracticesData {
+  followed: string[]
+  missing: string[]
+  score: number
+}
+
+function BestPracticesCard({ bestPractices }: { bestPractices: BestPracticesData }) {
+  if (!bestPractices) return null
+  
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+            Best Practices
+          </div>
+          <CircularScore value={bestPractices.score} size={60} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Followed */}
+        {bestPractices.followed && bestPractices.followed.length > 0 && (
+          <div>
+            <p className="text-sm font-medium text-emerald-400 mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Following ({bestPractices.followed.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {bestPractices.followed.map((practice, i) => (
+                <Badge key={i} className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                  {practice}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Missing */}
+        {bestPractices.missing && bestPractices.missing.length > 0 && (
+          <div>
+            <p className="text-sm font-medium text-amber-400 mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Missing ({bestPractices.missing.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {bestPractices.missing.map((practice, i) => (
+                <Badge key={i} variant="outline" className="text-amber-400 border-amber-500/30">
+                  {practice}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// FRAMEWORK ANALYSIS CARD
+// ============================================
+interface FrameworkAnalysisData {
+  framework: string
+  patternsDetected: string[]
+  suggestions: string[]
+  advancedUsage?: string[]
+}
+
+function FrameworkAnalysisCard({ frameworkAnalysis }: { frameworkAnalysis: FrameworkAnalysisData }) {
+  if (!frameworkAnalysis) return null
+  
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Box className="h-5 w-5 text-emerald-500" />
+          Framework Analysis
+          <Badge className="ml-2 bg-emerald-500/20 text-emerald-400">
+            {frameworkAnalysis.framework}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Patterns Detected */}
+        {frameworkAnalysis.patternsDetected && frameworkAnalysis.patternsDetected.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Patterns Detected</p>
+            <div className="flex flex-wrap gap-2">
+              {frameworkAnalysis.patternsDetected.map((pattern, i) => (
+                <Badge key={i} variant="secondary">
+                  {pattern}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Advanced Usage */}
+        {frameworkAnalysis.advancedUsage && frameworkAnalysis.advancedUsage.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Advanced Usage</p>
+            <div className="flex flex-wrap gap-2">
+              {frameworkAnalysis.advancedUsage.map((usage, i) => (
+                <Badge key={i} className="bg-purple-500/15 text-purple-400 border-purple-500/30">
+                  {usage}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Suggestions */}
+        {frameworkAnalysis.suggestions && frameworkAnalysis.suggestions.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Suggestions</p>
+            <ul className="space-y-2">
+              {frameworkAnalysis.suggestions.map((suggestion, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  {suggestion}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
 
-  const { data: project, isLoading } = useQuery({
+  const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', id],
-    queryFn: () => get<Project>(`/v1/projects/${id}`),
+    queryFn: async () => {
+      const response = await get<{ project: any }>(`/v1/projects/${id}`)
+      const raw = response.project
+      
+      // Map backend fields to frontend expected fields
+      // Handle the nested fullAnalysis.industryAnalysis structure
+      const fullAnalysis = raw.fullAnalysis || {}
+      const industryAnalysisFromFull = fullAnalysis.industryAnalysis || {}
+      const topLevelIndustry = raw.industryAnalysis || {}
+      
+      // Merge industry analysis - prefer fullAnalysis version as it has more data
+      const mergedIndustryAnalysis = {
+        ...topLevelIndustry,
+        ...industryAnalysisFromFull,
+        verifiedSkills: industryAnalysisFromFull.verifiedSkills || topLevelIndustry.verifiedSkills || [],
+        skillsByCategory: industryAnalysisFromFull.skillsByCategory || topLevelIndustry.skillsByCategory || {},
+      }
+      
+      return {
+        ...raw,
+        repoUrl: raw.githubRepoUrl || raw.repoUrl,
+        analysisStatus: (raw.analysisStatus || '').toLowerCase(),
+        stars: raw.stars || 0,
+        forks: raw.forks || 0,
+        commits: raw.commits || 0,
+        contributors: raw.contributors || 0,
+        languages: raw.languages || {},
+        auraContribution: raw.auraContribution || raw.overallScore || 0,
+        fullAnalysis: fullAnalysis,
+        industryAnalysis: mergedIndustryAnalysis,
+        metrics: raw.metrics || null,
+      }
+    },
     enabled: !!id,
   })
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading project details...</p>
+        </div>
       </div>
     )
   }
 
-  if (!project) {
+  if (error || !project) {
     return (
       <div className="text-center py-24">
+        <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+          <Github className="w-10 h-10 text-muted-foreground" />
+        </div>
         <h2 className="text-2xl font-bold mb-2">Project not found</h2>
+        <p className="text-muted-foreground mb-6">The project you're looking for doesn't exist or failed to load.</p>
         <Button asChild>
           <Link to="/projects">Back to Projects</Link>
         </Button>
@@ -64,13 +762,24 @@ export default function ProjectDetail() {
     )
   }
 
-  const metricsData = project.metrics
+  // Extract data from fullAnalysis
+  const fullAnalysis = project.fullAnalysis || {}
+  const industryAnalysis = project.industryAnalysis || {}
+  
+  // Get verified skills from industry analysis (fullAnalysis has the complete data)
+  const verifiedSkills = industryAnalysis.verifiedSkills || []
+  const skillsByCategory = industryAnalysis.skillsByCategory || {}
+  const overallScore = industryAnalysis.overallScore || project.auraContribution || 0
+  
+  // Metrics for radar chart
+  const metrics = project.metrics
+  const metricsData = metrics
     ? [
-        { metric: 'Code Quality', value: project.metrics.codeQuality },
-        { metric: 'Documentation', value: project.metrics.documentation },
-        { metric: 'Test Coverage', value: project.metrics.testCoverage },
-        { metric: 'Maintainability', value: project.metrics.maintainability },
-        { metric: 'Activity', value: project.metrics.activityScore },
+        { metric: 'Code Quality', value: metrics.codeQuality || 0 },
+        { metric: 'Documentation', value: metrics.documentation || 0 },
+        { metric: 'Test Coverage', value: metrics.testCoverage || 0 },
+        { metric: 'Maintainability', value: metrics.maintainability || 0 },
+        { metric: 'Activity', value: metrics.activityScore || 0 },
       ]
     : []
 
@@ -82,133 +791,298 @@ export default function ProjectDetail() {
     })
   )
 
+  // Count skills by category
+  const categorySkillCounts = Object.entries(skillsByCategory).map(([category, skills]) => ({
+    category,
+    count: Array.isArray(skills) ? skills.length : 0,
+  })).filter(c => c.count > 0)
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/projects">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-            <Badge
-              variant={
-                project.analysisStatus === 'completed' ? 'success' : 'secondary'
-              }
-            >
-              {project.analysisStatus === 'completed'
-                ? 'Analyzed'
-                : project.analysisStatus}
-            </Badge>
+    <div className="space-y-8 pb-12">
+      {/* ===== HERO HEADER ===== */}
+      <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-card via-card/80 to-card/60 backdrop-blur-xl p-6 md:p-8">
+        <div className="flex items-start gap-4 mb-6">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link to="/projects">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              {/* GitHub Icon */}
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-muted to-muted/50 border border-border/50 flex items-center justify-center">
+                <Github className="w-6 h-6" />
+              </div>
+              
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                  {project.repoName || project.name}
+                </h1>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                  {project.language && (
+                    <Badge variant="secondary" className="gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-primary" />
+                      {project.language}
+                    </Badge>
+                  )}
+                  <Badge
+                    variant={project.analysisStatus === 'completed' ? 'default' : 'secondary'}
+                    className={project.analysisStatus === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}
+                  >
+                    {project.analysisStatus === 'completed' ? '✓ Analyzed' : project.analysisStatus}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            
+            {project.description && (
+              <p className="text-muted-foreground mt-3 max-w-2xl">{project.description}</p>
+            )}
           </div>
-          {project.description && (
-            <p className="text-muted-foreground mt-1">{project.description}</p>
+          
+          <Button variant="outline" asChild className="shrink-0">
+            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View on GitHub
+            </a>
+          </Button>
+        </div>
+        
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20 p-4">
+            <div className="flex items-center gap-2 text-amber-500 mb-1">
+              <Star className="h-4 w-4" />
+              <span className="text-xs font-medium">Stars</span>
+            </div>
+            <p className="text-2xl font-bold">{formatNumber(project.stars)}</p>
+          </div>
+          
+          <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 p-4">
+            <div className="flex items-center gap-2 text-blue-500 mb-1">
+              <GitFork className="h-4 w-4" />
+              <span className="text-xs font-medium">Forks</span>
+            </div>
+            <p className="text-2xl font-bold">{formatNumber(project.forks)}</p>
+          </div>
+          
+          <div className="rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 p-4">
+            <div className="flex items-center gap-2 text-green-500 mb-1">
+              <GitCommit className="h-4 w-4" />
+              <span className="text-xs font-medium">Commits</span>
+            </div>
+            <p className="text-2xl font-bold">{formatNumber(project.commits)}</p>
+          </div>
+          
+          <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 p-4">
+            <div className="flex items-center gap-2 text-purple-500 mb-1">
+              <Users className="h-4 w-4" />
+              <span className="text-xs font-medium">Contributors</span>
+            </div>
+            <p className="text-2xl font-bold">{project.contributors}</p>
+          </div>
+          
+          <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4">
+            <div className="flex items-center gap-2 text-primary mb-1">
+              <Zap className="h-4 w-4" />
+              <span className="text-xs font-medium">Aura Points</span>
+            </div>
+            <p className="text-2xl font-bold text-primary">+{formatNumber(project.auraContribution)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== OVERALL SCORE & SUMMARY ===== */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Overall Score */}
+        <Card className="border-border/50 bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur">
+          <CardContent className="p-6 flex flex-col items-center justify-center">
+            <CircularScore value={Math.round(overallScore)} size={140} label="Overall Score" />
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              Industry-grade analysis score based on architecture, patterns, and best practices
+            </p>
+          </CardContent>
+        </Card>
+        
+        {/* Skills Summary */}
+        <Card className="border-border/50 bg-card/50 backdrop-blur md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Analysis Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/30 text-center">
+                <p className="text-3xl font-bold text-primary">{verifiedSkills.length}</p>
+                <p className="text-xs text-muted-foreground">Skills Detected</p>
+              </div>
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/30 text-center">
+                <p className="text-3xl font-bold text-emerald-400">
+                  {industryAnalysis.resumeReadySkills || verifiedSkills.filter((s: SkillData) => s.resumeReady).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Resume Ready</p>
+              </div>
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/30 text-center">
+                <p className="text-3xl font-bold text-blue-400">
+                  {industryAnalysis.highConfidenceSkills || verifiedSkills.filter((s: SkillData) => (s.confidence || 0) >= 0.8).length}
+                </p>
+                <p className="text-xs text-muted-foreground">High Confidence</p>
+              </div>
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/30 text-center">
+                <p className="text-3xl font-bold text-purple-400">{categorySkillCounts.length}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+            </div>
+            
+            {/* Engineering Level */}
+            {industryAnalysis.engineeringLevel && (
+              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-purple-500" />
+                  <span className="font-medium">Engineering Level</span>
+                </div>
+                <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-sm">
+                  {industryAnalysis.engineeringLevel}
+                </Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ===== SKILLS BREAKDOWN SECTION ===== */}
+      {verifiedSkills.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Verified Skills</h2>
+              <p className="text-sm text-muted-foreground">
+                {verifiedSkills.length} skills detected • Confidence shown as %
+              </p>
+            </div>
+          </div>
+          
+          {/* Skills Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {verifiedSkills
+              .sort((a: SkillData, b: SkillData) => {
+                const aScore = a.confidence ? a.confidence * 100 : (a.score || a.verifiedScore || 0)
+                const bScore = b.confidence ? b.confidence * 100 : (b.score || b.verifiedScore || 0)
+                return bScore - aScore
+              })
+              .slice(0, 12)
+              .map((skill: SkillData, index: number) => (
+                <SkillBreakdownCard key={`${skill.name}-${index}`} skill={skill} />
+              ))}
+          </div>
+          
+          {verifiedSkills.length > 12 && (
+            <p className="text-sm text-muted-foreground text-center">
+              Showing top 12 of {verifiedSkills.length} skills
+            </p>
           )}
         </div>
-        <Button variant="outline" asChild>
-          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View on GitHub
-          </a>
-        </Button>
-      </div>
+      )}
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <div>
-                <p className="text-2xl font-bold">{formatNumber(project.stars)}</p>
-                <p className="text-sm text-muted-foreground">Stars</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ===== SKILLS BY CATEGORY ===== */}
+      {Object.keys(skillsByCategory).length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Layers className="w-5 h-5 text-primary" />
+            Skills by Category
+          </h2>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {Object.entries(skillsByCategory).map(([category, skills]) => {
+              if (!Array.isArray(skills) || skills.length === 0) return null
+              const Icon = categoryIcons[category] || Code
+              const colorClass = categoryColors[category] || 'from-primary to-primary/70'
+              
+              return (
+                <Card key={category} className="border-border/50 bg-card/50 backdrop-blur">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg capitalize">
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br", colorClass)}>
+                        <Icon className="w-4 h-4 text-white" />
+                      </div>
+                      {category}
+                      <Badge variant="secondary" className="ml-auto">{skills.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {skills.slice(0, 4).map((skill: SkillData, i: number) => {
+                        const percentage = skill.confidence 
+                          ? Math.round(skill.confidence * 100) 
+                          : skill.score || skill.verifiedScore || 0
+                        
+                        return (
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="text-sm flex-1 truncate">{skill.name}</span>
+                            <div className="w-24 h-2 rounded-full bg-muted/50 overflow-hidden">
+                              <div 
+                                className={cn("h-full rounded-full bg-gradient-to-r", colorClass)}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-10 text-right">
+                              {percentage}%
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <GitFork className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">{formatNumber(project.forks)}</p>
-                <p className="text-sm text-muted-foreground">Forks</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ===== ARCHITECTURE & TECH STACK ===== */}
+      {fullAnalysis.industryAnalysis?.architecture && (
+        <div className="grid md:grid-cols-2 gap-6">
+          <ArchitectureCard architecture={fullAnalysis.industryAnalysis.architecture} />
+          {fullAnalysis.techStack && <TechStackCard techStack={fullAnalysis.techStack} />}
+        </div>
+      )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <GitCommit className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {formatNumber(project.commits)}
-                </p>
-                <p className="text-sm text-muted-foreground">Commits</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Users className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{project.contributors}</p>
-                <p className="text-sm text-muted-foreground">Contributors</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-primary/10 border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Activity className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-2xl font-bold text-primary">
-                  +{formatNumber(project.auraContribution)}
-                </p>
-                <p className="text-sm text-muted-foreground">Aura Points</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Metrics & Languages */}
+      {/* ===== METRICS & LANGUAGES ===== */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Metrics Radar */}
-        {project.metrics && (
-          <Card>
+        {metrics && metricsData.length > 0 && (
+          <Card className="border-border/50 bg-card/50 backdrop-blur">
             <CardHeader>
-              <CardTitle>Code Metrics</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Code Metrics
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={metricsData}>
-                  <PolarGrid stroke="#27272a" />
+                  <PolarGrid stroke="hsl(var(--border))" />
                   <PolarAngleAxis
                     dataKey="metric"
-                    tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
                   <PolarRadiusAxis
                     angle={30}
                     domain={[0, 100]}
-                    tick={{ fill: '#a1a1aa', fontSize: 10 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                   />
                   <Radar
                     name="Score"
                     dataKey="value"
-                    stroke="#8b5cf6"
-                    fill="#8b5cf6"
+                    stroke="hsl(var(--primary))"
+                    fill="hsl(var(--primary))"
                     fillOpacity={0.3}
                   />
                 </RadarChart>
@@ -216,32 +1090,32 @@ export default function ProjectDetail() {
 
               {/* Metric Details */}
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                   <Code className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Code Quality</span>
-                  <span className="ml-auto font-medium">
-                    {project.metrics.codeQuality}%
+                  <span className="ml-auto font-bold text-primary">
+                    {metrics.codeQuality}%
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Documentation</span>
-                  <span className="ml-auto font-medium">
-                    {project.metrics.documentation}%
+                  <span className="ml-auto font-bold text-blue-400">
+                    {metrics.documentation}%
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                   <TestTube className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Test Coverage</span>
-                  <span className="ml-auto font-medium">
-                    {project.metrics.testCoverage}%
+                  <span className="ml-auto font-bold text-emerald-400">
+                    {metrics.testCoverage}%
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                   <Gauge className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Complexity</span>
-                  <span className="ml-auto font-medium">
-                    {project.metrics.complexity}
+                  <span className="ml-auto font-bold text-amber-400">
+                    {metrics.complexity}
                   </span>
                 </div>
               </div>
@@ -250,9 +1124,12 @@ export default function ProjectDetail() {
         )}
 
         {/* Languages */}
-        <Card>
+        <Card className="border-border/50 bg-card/50 backdrop-blur">
           <CardHeader>
-            <CardTitle>Languages</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Code className="h-5 w-5 text-primary" />
+              Languages
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {languagesData.length > 0 ? (
@@ -263,14 +1140,14 @@ export default function ProjectDetail() {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                       width={80}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#18181b',
-                        border: '1px solid #27272a',
-                        borderRadius: '8px',
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '12px',
                       }}
                       formatter={(value: number) =>
                         `${(value / 1024).toFixed(1)} KB`
@@ -278,7 +1155,7 @@ export default function ProjectDetail() {
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {languagesData.map((entry, index) => (
-                        <rect key={index} fill={entry.color} />
+                        <Cell key={index} fill={entry.color} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -290,10 +1167,10 @@ export default function ProjectDetail() {
                     <Badge
                       key={lang.name}
                       variant="outline"
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1.5 px-3 py-1.5"
                     >
                       <span
-                        className="h-2 w-2 rounded-full"
+                        className="h-2.5 w-2.5 rounded-full"
                         style={{ backgroundColor: lang.color }}
                       />
                       {lang.name}
@@ -301,6 +1178,24 @@ export default function ProjectDetail() {
                   ))}
                 </div>
               </>
+            ) : fullAnalysis.techStack?.languages && fullAnalysis.techStack.languages.length > 0 ? (
+              // Use techStack languages if project.languages is empty
+              <div className="space-y-3">
+                {fullAnalysis.techStack.languages.map((lang: { name: string; percentage: number }, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-sm flex-1">{lang.name}</span>
+                    <div className="w-32 h-2 rounded-full bg-muted/50 overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                        style={{ width: `${lang.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-12 text-right">
+                      {lang.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-muted-foreground text-center py-8">
                 No language data available
@@ -310,34 +1205,72 @@ export default function ProjectDetail() {
         </Card>
       </div>
 
-      {/* Detailed Analysis */}
-      {project.fullAnalysis ? (
-        <div className="mt-8">
-           <h2 className="text-2xl font-bold mb-4">Deep Analysis</h2>
-           <AnalysisResults analysis={project.fullAnalysis} />
-        </div>
-      ) : (
-         <div className="mt-8 p-6 border border-dashed border-zinc-700 rounded-lg text-center bg-zinc-900/20">
-            <Code className="h-10 w-10 text-zinc-500 mx-auto mb-3" />
-            <h3 className="text-lg font-medium">Deep analysis pending</h3>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto mt-2">
-              Detailed code structure, optimization tips, and framework analysis will appear here once the deep scan is complete.
-            </p>
-         </div>
+      {/* ===== BEST PRACTICES & OPTIMIZATIONS ===== */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {fullAnalysis.bestPractices && (
+          <BestPracticesCard bestPractices={fullAnalysis.bestPractices} />
+        )}
+        {fullAnalysis.optimizations && (
+          <OptimizationsCard optimizations={fullAnalysis.optimizations} />
+        )}
+      </div>
+
+      {/* ===== FRAMEWORK ANALYSIS ===== */}
+      {fullAnalysis.frameworkAnalysis && (
+        <FrameworkAnalysisCard frameworkAnalysis={fullAnalysis.frameworkAnalysis} />
       )}
 
-      {/* Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            Last commit: {formatDate(project.lastCommitAt)}
+      {/* ===== DETAILED ANALYSIS ===== */}
+      {fullAnalysis && Object.keys(fullAnalysis).length > 0 ? (
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-cyan-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Deep Analysis</h2>
+              <p className="text-sm text-muted-foreground">
+                Folder structure, code quality indicators, and configuration analysis
+              </p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <AnalysisResults analysis={fullAnalysis} />
+        </div>
+      ) : (
+        <div className="p-8 border border-dashed border-border rounded-2xl text-center bg-muted/5">
+          <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+            <Code className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-bold mb-2">Deep analysis pending</h3>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">
+            Detailed code structure, optimization tips, and framework analysis will appear here once the deep scan is complete.
+          </p>
+        </div>
+      )}
+
+      {/* ===== INFRASTRUCTURE SIGNALS (Debug/Advanced) ===== */}
+      {industryAnalysis.infraSignals && industryAnalysis.infraSignals.signals && industryAnalysis.infraSignals.signals.length > 0 && (
+        <Card className="border-border/50 bg-card/50 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5 text-orange-500" />
+              Infrastructure Signals
+              <Badge variant="secondary" className="ml-auto">
+                {industryAnalysis.infraSignals.signals.length} signals
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {industryAnalysis.infraSignals.signals.map((signal: string, i: number) => (
+                <Badge key={i} variant="outline" className="text-xs">
+                  {signal.replace(/_/g, ' ')}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

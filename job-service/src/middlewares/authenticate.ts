@@ -4,14 +4,27 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import type { AuthenticatedRequest, ApiResponse } from '../types/index.js';
 
-interface JwtPayload {
+interface UserJwtPayload {
   userId: string;
   sessionId: string;
   type: 'access';
 }
 
+interface RecruiterJwtPayload {
+  recruiterId: string;
+  organizationId: string;
+  role: string;
+}
+
+type JwtPayload = UserJwtPayload | RecruiterJwtPayload;
+
+function isRecruiterPayload(payload: any): payload is RecruiterJwtPayload {
+  return 'recruiterId' in payload;
+}
+
 /**
  * Authentication middleware - verifies JWT token
+ * Supports both user and recruiter tokens
  * Adds user object to request if valid
  */
 export async function authenticate(
@@ -36,10 +49,20 @@ export async function authenticate(
     try {
       const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
 
-      req.user = {
-        userId: decoded.userId,
-        sessionId: decoded.sessionId,
-      };
+      // Handle both user and recruiter tokens
+      if (isRecruiterPayload(decoded)) {
+        // Recruiter token - map recruiterId to userId for compatibility
+        req.user = {
+          userId: decoded.recruiterId,
+          sessionId: decoded.organizationId, // Use organizationId as sessionId
+        };
+      } else {
+        // User token
+        req.user = {
+          userId: decoded.userId,
+          sessionId: decoded.sessionId,
+        };
+      }
 
       next();
     } catch (error: any) {
@@ -70,6 +93,7 @@ export async function authenticate(
 
 /**
  * Optional authentication - doesn't require token but parses it if present
+ * Supports both user and recruiter tokens
  */
 export async function optionalAuth(
   req: AuthenticatedRequest,
@@ -85,10 +109,18 @@ export async function optionalAuth(
       try {
         const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
 
-        req.user = {
-          userId: decoded.userId,
-          sessionId: decoded.sessionId,
-        };
+        // Handle both user and recruiter tokens
+        if (isRecruiterPayload(decoded)) {
+          req.user = {
+            userId: decoded.recruiterId,
+            sessionId: decoded.organizationId,
+          };
+        } else {
+          req.user = {
+            userId: decoded.userId,
+            sessionId: decoded.sessionId,
+          };
+        }
       } catch {
         // Token invalid but that's okay for optional auth
         req.user = undefined;

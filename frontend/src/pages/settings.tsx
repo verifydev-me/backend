@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/store/auth-store'
+import { useRecruiterStore } from '@/store/recruiter-store'
 import { useUIStore } from '@/store/ui-store'
 import { get, put, del } from '@/api/client'
 import { toast } from '@/hooks/use-toast'
@@ -49,13 +51,25 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
+    transition: { 
+      staggerChildren: 0.08,
+      delayChildren: 0.1
+    }
   }
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0 }
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 260,
+      damping: 20
+    }
+  }
 }
 
 // Section types
@@ -71,43 +85,52 @@ interface UserSettings {
 }
 
 export default function Settings() {
-  const { user, logout, checkAuth } = useAuthStore()
+  const location = useLocation()
+  const isRecruiter = location.pathname.startsWith('/recruiter')
+  
+  const { user, logout: userLogout, checkAuth } = useAuthStore()
+  const { recruiter, logout: recruiterLogout } = useRecruiterStore()
   const { theme, setTheme, accentColor } = useUIStore()
   const queryClient = useQueryClient()
+  
+  // Use appropriate user data based on role
+  const currentUser = isRecruiter ? recruiter : user
+  const logout = isRecruiter ? recruiterLogout : userLogout
   
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
   
   // Profile form state
   const [profile, setProfile] = useState({
-    name: user?.name || '',
-    bio: user?.bio || '',
-    location: user?.location || '',
-    website: user?.website || '',
-    company: user?.company || '',
-    twitter: user?.twitterUsername || user?.twitter || '',
-    linkedin: user?.linkedin || '',
+    name: currentUser?.name || '',
+    bio: (currentUser as any)?.bio || '',
+    location: (currentUser as any)?.location || '',
+    website: (currentUser as any)?.website || '',
+    company: currentUser?.company || (currentUser as any)?.companyName || '',
+    twitter: (currentUser as any)?.twitterUsername || (currentUser as any)?.twitter || '',
+    linkedin: (currentUser as any)?.linkedin || '',
   })
 
   // Update profile when user changes
   useEffect(() => {
-    if (user) {
+    if (currentUser) {
       setProfile({
-        name: user.name || '',
-        bio: user.bio || '',
-        location: user.location || '',
-        website: user.website || '',
-        company: user.company || '',
-        twitter: user.twitterUsername || user.twitter || '',
-        linkedin: user.linkedin || '',
+        name: currentUser.name || '',
+        bio: (currentUser as any).bio || '',
+        location: (currentUser as any).location || '',
+        website: (currentUser as any).website || '',
+        company: currentUser.company || (currentUser as any).companyName || '',
+        twitter: (currentUser as any).twitterUsername || (currentUser as any).twitter || '',
+        linkedin: (currentUser as any).linkedin || '',
       })
     }
-  }, [user])
+  }, [currentUser])
   
-  // Fetch settings from backend
+  // Fetch settings from backend (skip for recruiters for now)
   const { data: settingsData } = useQuery({
     queryKey: ['settings'],
     queryFn: () => get<{ settings: UserSettings }>('/v1/users/settings'),
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !isRecruiter, // Only fetch for regular users
   })
 
   // Notification settings (local for now, can be extended)
@@ -145,9 +168,16 @@ export default function Settings() {
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: (data: typeof profile) => put('/v1/users/me', data),
+    mutationFn: (data: typeof profile) => {
+      if (isRecruiter) {
+        return put('/v1/recruiters/profile', data)
+      }
+      return put('/v1/users/me', data)
+    },
     onSuccess: async () => {
-      await checkAuth() // Refresh user data from backend
+      if (!isRecruiter) {
+        await checkAuth() // Refresh user data from backend
+      }
       queryClient.invalidateQueries({ queryKey: ['user'] })
       queryClient.invalidateQueries({ queryKey: ['settings'] })
       toast({ title: 'Profile updated! ✅', description: 'Your changes have been saved successfully.' })
@@ -159,7 +189,7 @@ export default function Settings() {
     },
   })
 
-  // Update settings mutation (privacy/visibility)
+  // Update settings mutation (privacy/visibility) - skip for recruiters
   const updateSettingsMutation = useMutation({
     mutationFn: (data: { isPublic?: boolean; isOpenToWork?: boolean }) => 
       put('/v1/users/settings', data),
@@ -261,14 +291,21 @@ export default function Settings() {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative"
       >
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <SettingsIcon className="h-8 w-8 text-primary" />
-          Settings
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your account, privacy, and preferences
-        </p>
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl blur-3xl" />
+        <div className="relative bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-lg">
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-lg">
+              <SettingsIcon className="h-6 w-6 text-primary-foreground" />
+            </div>
+            Settings
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Manage your account, privacy, and preferences
+          </p>
+        </div>
       </motion.div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -276,44 +313,66 @@ export default function Settings() {
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
           className="lg:w-64 flex-shrink-0"
         >
-          <Card>
-            <CardContent className="p-2">
-              <nav className="space-y-1">
-                {sections.map((section) => (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                      activeSection === section.id
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-muted-foreground hover:text-foreground",
-                      section.id === 'danger' && "text-destructive hover:text-destructive"
-                    )}
-                  >
-                    <section.icon className="h-4 w-4" />
-                    {section.label}
-                  </button>
-                ))}
-              </nav>
-            </CardContent>
-          </Card>
-          
-          {/* Profile Completion */}
-          <Card className="mt-4">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Profile Completion</span>
-              </div>
-              <Progress value={calculateProfileCompletion()} className="h-2 mb-2" />
-              <p className="text-xs text-muted-foreground">
-                {calculateProfileCompletion()}% complete - {calculateProfileCompletion() < 100 ? 'Add more details to increase visibility' : 'Great job!'}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="sticky top-6 space-y-4">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-xl shadow-lg">
+              <CardContent className="p-2">
+                <nav className="space-y-1">
+                  {sections.map((section, idx) => (
+                    <motion.button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      whileHover={{ x: 4, transition: { duration: 0.2 } }}
+                      whileTap={{ scale: 0.98 }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                        activeSection === section.id
+                          ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/30"
+                          : "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
+                        section.id === 'danger' && activeSection !== section.id && "text-destructive hover:text-destructive hover:bg-destructive/10"
+                      )}
+                    >
+                      <section.icon className="h-4 w-4" />
+                      {section.label}
+                    </motion.button>
+                  ))}
+                </nav>
+              </CardContent>
+            </Card>
+            
+            {/* Profile Completion */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 rounded-lg bg-primary/10">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm font-semibold">Profile Strength</span>
+                  </div>
+                  <Progress 
+                    value={calculateProfileCompletion()} 
+                    className="h-2.5 mb-2 bg-muted/30" 
+                  />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {calculateProfileCompletion()}% complete
+                    {calculateProfileCompletion() < 100 
+                      ? ' • Add more details to stand out' 
+                      : ' • Perfect! 🎉'}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </motion.div>
 
         {/* Main Content */}
@@ -326,17 +385,21 @@ export default function Settings() {
           {/* Profile Section */}
           {activeSection === 'profile' && (
             <motion.div variants={itemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-primary" />
+              <Card className="border-border/50 bg-card/80 backdrop-blur-xl shadow-xl overflow-hidden">
+                <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-gradient-to-br from-primary/5 via-transparent to-transparent blur-3xl" />
+                <CardHeader className="relative">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <div className="p-1.5 rounded-lg bg-primary/10">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
                     Profile Information
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-muted-foreground/80">
                     Update your personal information and how others see you
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 relative"
+>
                   {/* Avatar */}
                   <div className="flex items-center gap-4">
                     <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
@@ -463,18 +526,25 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={handleSaveProfile}
-                      disabled={updateProfileMutation.isPending}
+                  <div className="flex justify-end pt-4">
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
-                      {updateProfileMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Check className="h-4 w-4 mr-2" />
-                      )}
-                      Save Changes
-                    </Button>
+                      <Button 
+                        onClick={handleSaveProfile}
+                        disabled={updateProfileMutation.isPending}
+                        className="shadow-lg shadow-primary/30 bg-gradient-to-r from-primary to-primary/80 hover:shadow-xl hover:shadow-primary/40 transition-all duration-300"
+                        size="lg"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4 mr-2" />
+                        )}
+                        Save Changes
+                      </Button>
+                    </motion.div>
                   </div>
                 </CardContent>
               </Card>
@@ -484,74 +554,115 @@ export default function Settings() {
           {/* Appearance Section */}
           {activeSection === 'appearance' && (
             <motion.div variants={itemVariants}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Palette className="h-5 w-5 text-primary" />
+              <Card className="border-border/50 bg-card/80 backdrop-blur-xl shadow-xl overflow-hidden">
+                <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-gradient-to-br from-primary/5 via-transparent to-transparent blur-3xl" />
+                <CardHeader className="relative">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <div className="p-1.5 rounded-lg bg-primary/10">
+                      <Palette className="h-5 w-5 text-primary" />
+                    </div>
                     Appearance
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-muted-foreground/80">
                     Customize how VerifyDev looks for you
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-8 relative">
                   <div>
-                    <h3 className="font-medium mb-4">Theme</h3>
+                    <h3 className="font-semibold mb-5 text-base">Theme Preference</h3>
                     <div className="grid grid-cols-3 gap-4">
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.03, y: -4 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('light')}
                         className={cn(
-                          "p-4 rounded-xl border-2 transition-all",
+                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'light' 
-                            ? "border-primary bg-primary/5" 
-                            : "border-muted hover:border-primary/50"
+                            ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
+                            : "border-border/50 hover:border-primary/40 hover:shadow-md"
                         )}
                       >
-                        <div className="h-16 w-full rounded-lg bg-white border mb-3 flex items-center justify-center">
-                          <Sun className="h-8 w-8 text-yellow-500" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="h-20 w-full rounded-xl bg-gradient-to-br from-white to-gray-100 border border-gray-200 mb-4 flex items-center justify-center shadow-md relative overflow-hidden">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),transparent)]" />
+                          <Sun className="h-10 w-10 text-yellow-500 relative z-10" />
                         </div>
-                        <p className="font-medium text-sm">Light</p>
-                        <p className="text-xs text-muted-foreground">Clean & bright</p>
-                      </button>
-                      <button
+                        <p className="font-semibold text-sm">Light</p>
+                        <p className="text-xs text-muted-foreground mt-1">Clean & bright</p>
+                        {theme === 'light' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute top-3 right-3"
+                          >
+                            <Check className="h-5 w-5 text-primary" />
+                          </motion.div>
+                        )}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.03, y: -4 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('dark')}
                         className={cn(
-                          "p-4 rounded-xl border-2 transition-all",
+                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'dark' 
-                            ? "border-primary bg-primary/5" 
-                            : "border-muted hover:border-primary/50"
+                            ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
+                            : "border-border/50 hover:border-primary/40 hover:shadow-md"
                         )}
                       >
-                        <div className="h-16 w-full rounded-lg bg-zinc-900 border border-zinc-700 mb-3 flex items-center justify-center">
-                          <Moon className="h-8 w-8 text-blue-400" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="h-20 w-full rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700 mb-4 flex items-center justify-center shadow-md relative overflow-hidden">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),transparent)]" />
+                          <Moon className="h-10 w-10 text-blue-400 relative z-10" />
                         </div>
-                        <p className="font-medium text-sm">Dark</p>
-                        <p className="text-xs text-muted-foreground">Easy on eyes</p>
-                      </button>
-                      <button
+                        <p className="font-semibold text-sm">Dark</p>
+                        <p className="text-xs text-muted-foreground mt-1">Easy on eyes</p>
+                        {theme === 'dark' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute top-3 right-3"
+                          >
+                            <Check className="h-5 w-5 text-primary" />
+                          </motion.div>
+                        )}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.03, y: -4 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('system')}
                         className={cn(
-                          "p-4 rounded-xl border-2 transition-all",
+                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'system' 
-                            ? "border-primary bg-primary/5" 
-                            : "border-muted hover:border-primary/50"
+                            ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
+                            : "border-border/50 hover:border-primary/40 hover:shadow-md"
                         )}
                       >
-                        <div className="h-16 w-full rounded-lg bg-gradient-to-r from-white to-zinc-900 border mb-3 flex items-center justify-center">
-                          <Monitor className="h-8 w-8 text-muted-foreground" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="h-20 w-full rounded-xl bg-gradient-to-r from-white via-gray-400 to-zinc-900 border mb-4 flex items-center justify-center shadow-md relative overflow-hidden">
+                          <Monitor className="h-10 w-10 text-muted-foreground relative z-10 drop-shadow-lg" />
                         </div>
-                        <p className="font-medium text-sm">System</p>
-                        <p className="text-xs text-muted-foreground">Match device</p>
-                      </button>
+                        <p className="font-semibold text-sm">System</p>
+                        <p className="text-xs text-muted-foreground mt-1">Match device</p>
+                        {theme === 'system' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute top-3 right-3"
+                          >
+                            <Check className="h-5 w-5 text-primary" />
+                          </motion.div>
+                        )}
+                      </motion.button>
                     </div>
                   </div>
                   
-                  <Separator />
+                  <Separator className="bg-border/50" />
                   
                   <div>
-                    <h3 className="font-medium mb-4">Accent Color</h3>
-                    <p className="text-sm text-muted-foreground mb-6">Personalize the application's highlight color</p>
-                    <div className="flex flex-wrap gap-4">
+                    <h3 className="font-semibold mb-2 text-base">Accent Color</h3>
+                    <p className="text-sm text-muted-foreground/80 mb-6">Personalize the application's highlight color</p>
+                    <div className="flex flex-wrap gap-3">
                       {[
                         { name: 'Indigo', value: '239 84% 67%' },
                         { name: 'Violet', value: '258 89% 66%' },
@@ -569,20 +680,37 @@ export default function Settings() {
                         { name: 'Zinc', value: '240 5% 65%' },
                         { name: 'Slate', value: '215 16% 47%' },
                       ].map((c) => (
-                        <button
+                        <motion.button
                           key={c.value}
                           onClick={() => {
                             const { setAccentColor } = useUIStore.getState()
                             setAccentColor(c.value)
                             toast({ title: `${c.name} applied`, description: `Accent color updated to ${c.name}.` })
                           }}
+                          whileHover={{ scale: 1.15, y: -2 }}
+                          whileTap={{ scale: 0.95 }}
                           className={cn(
-                            "h-10 w-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 shadow-lg",
-                            accentColor === c.value ? "border-foreground ring-2 ring-primary ring-offset-2 ring-offset-background" : "border-transparent"
+                            "h-12 w-12 rounded-2xl border-2 transition-all duration-200 shadow-md hover:shadow-xl relative group",
+                            accentColor === c.value 
+                              ? "border-foreground ring-4 ring-primary/30 ring-offset-2 ring-offset-background scale-110" 
+                              : "border-transparent hover:border-foreground/20"
                           )}
                           style={{ backgroundColor: `hsl(${c.value})` }}
                           title={c.name}
-                        />
+                        >
+                          {accentColor === c.value && (
+                            <motion.div
+                              initial={{ scale: 0, rotate: -180 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <Check className="h-5 w-5 text-white drop-shadow-lg" />
+                            </motion.div>
+                          )}
+                          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            {c.name}
+                          </span>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -795,6 +923,29 @@ export default function Settings() {
                   Saving changes...
                 </div>
               )}
+
+              {/* Link to Advanced Privacy Settings */}
+              <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                        Advanced Privacy & Job Settings
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Control job preferences, highlight skills, and manage project visibility for recruiters
+                      </p>
+                    </div>
+                    <Link to="/settings/privacy">
+                      <Button>
+                        Open Settings
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           )}
 

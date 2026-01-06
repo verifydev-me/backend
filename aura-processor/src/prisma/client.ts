@@ -6,7 +6,7 @@ export const prisma = new PrismaClient({
 });
 
 prisma.$connect().then(() => {
-  logger.info('✅ PostgreSQL connected');
+  logger.info('✅ mongodb connected');
 });
 
 process.on('beforeExit', async () => {

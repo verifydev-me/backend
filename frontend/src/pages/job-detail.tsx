@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { get, post } from '@/api/client'
 import { formatSalary, formatDate } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import { ApplyJobModal } from '@/components/job/ApplyJobModal'
 import type { Job } from '@/types'
 import {
   ArrowLeft,
@@ -39,6 +41,7 @@ const experienceLevelLabels: Record<Job['experienceLevel'], string> = {
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const [showApplyModal, setShowApplyModal] = useState(false)
 
   const { data: job, isLoading } = useQuery({
     queryKey: ['job', id],
@@ -84,29 +87,26 @@ export default function JobDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/jobs">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">{job.title}</h1>
-          <p className="text-muted-foreground mt-1">{job.company}</p>
-        </div>
-        <Button onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-          {applyMutation.isPending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/jobs">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold">{job.title}</h1>
+            <p className="text-muted-foreground mt-1">{job.company}</p>
+          </div>
+          <Button onClick={() => setShowApplyModal(true)}>
             <CheckCircle className="h-4 w-4 mr-2" />
-          )}
-          Apply Now
-        </Button>
-      </div>
+            Apply Now
+          </Button>
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
@@ -278,5 +278,11 @@ export default function JobDetail() {
         </div>
       </div>
     </div>
+
+    {/* Apply Modal */}
+    {job && (
+      <ApplyJobModal job={job} open={showApplyModal} onOpenChange={setShowApplyModal} />
+    )}
+  </>
   )
 }

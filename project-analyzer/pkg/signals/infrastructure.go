@@ -321,6 +321,9 @@ const (
 
 	// Project Quality Signals
 	SignalIncompleteProject InfraSignal = "incomplete_project"
+	SignalMonorepo          InfraSignal = "monorepo"
+	SignalFrontendOnly      InfraSignal = "frontend_only"
+	SignalBackendOnly       InfraSignal = "backend_only"
 )
 
 // InfrastructureSignals - All extracted infrastructure facts

@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== USER MODEL ====================
+
 model User {
   id            String  @id @default(auto()) @map("_id") @db.ObjectId
   githubId      String  @unique @map("github_id")
@@ -33,11 +35,28 @@ model User {
   onboardingStep     Int     @default(0) @map("onboarding_step") // 0-4
 
   // ========== PROFILE VISIBILITY ==========
-  isPublic     Boolean @default(true) @map("is_public")
-  isOpenToWork Boolean @default(false) @map("is_open_to_work")
-  isVerified   Boolean @default(false) @map("is_verified")
-  showEmail    Boolean @default(false) @map("show_email")
-  showCgpa     Boolean @default(false) @map("show_cgpa")
+  isPublic        Boolean         @default(true) @map("is_public")
+  isOpenToWork    Boolean         @default(false) @map("is_open_to_work")
+  isVerified      Boolean         @default(false) @map("is_verified")
+  showEmail       Boolean         @default(false) @map("show_email")
+  showCgpa        Boolean         @default(false) @map("show_cgpa")
+  showPhone       Boolean         @default(false) @map("show_phone")
+  visibilityLevel VisibilityLevel @default(RECRUITERS_ONLY) @map("visibility_level")
+
+  // ========== JOB PREFERENCES ==========
+  preferredRoles     String[]         @default([]) @map("preferred_roles") // ["Backend Dev", "Full Stack"]
+  preferredLocations String[]         @default([]) @map("preferred_locations") // ["Remote", "Bangalore"]
+  preferredJobTypes  String[]         @default([]) @map("preferred_job_types") // ["FULL_TIME", "CONTRACT"]
+  expectedSalaryMin  Int?             @map("expected_salary_min") // In INR/USD
+  expectedSalaryMax  Int?             @map("expected_salary_max")
+  salaryCurrency     String?          @default("INR") @map("salary_currency")
+  availableFrom      DateTime?        @map("available_from")
+  noticePeriodDays   Int?             @default(0) @map("notice_period_days")
+  remotePreference   RemotePreference @default(FLEXIBLE) @map("remote_preference")
+
+  // ========== HIGHLIGHTED CONTENT ==========
+  highlightedSkills String[] @default([]) @map("highlighted_skills") // Top skills to show recruiters
+  phone             String?  @map("phone")
 
   // ========== AURA & STATS ==========
   auraScore           Int @default(0) @map("aura_score")
@@ -53,31 +72,47 @@ model User {
   githubAccessToken String?   @map("github_access_token")
 
   // ========== RELATIONS ==========
-  sessions    Session[]
-  skills      Skill[]
-  projects    Project[]
-  experiences Experience[]
-  socialLinks SocialLink[]
-  activities  Activity[]
+  sessions     Session[]
+  skills       Skill[]
+  technologies Technology[]
+  projects     Project[]
+  experiences  Experience[]
+  socialLinks  SocialLink[]
+  activities   Activity[]
+  applications Application[]
+  savedJobs    SavedJob[]
+  jobAlerts    JobAlert[]
 
+  @@index([auraScore])
+  @@index([isOpenToWork])
+  @@index([isStudent])
+  @@index([onboardingComplete])
+  @@index([createdAt])
   @@map("users")
 }
 
+// ==================== SESSION MODEL ====================
+
 model Session {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @map("user_id")
+  userId       String   @map("user_id") @db.ObjectId
   refreshToken String   @unique @map("refresh_token")
   userAgent    String?  @map("user_agent")
   ipAddress    String?  @map("ip_address")
   isValid      Boolean  @default(true) @map("is_valid")
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+  @@index([isValid])
   @@map("sessions")
 }
+
+// ==================== SKILL MODEL ====================
 
 model Skill {
   id       String        @id @default(auto()) @map("_id") @db.ObjectId
@@ -97,18 +132,26 @@ model Skill {
   // Self-declared for manual skills
   selfDeclaredLevel SkillLevel @default(BEGINNER) @map("self_declared_level")
 
-  // Stats
+  // ========== STATS ==========
   projectCount     Int @default(0) @map("project_count")
   linesOfCode      Int @default(0) @map("lines_of_code")
   auraContribution Int @default(0) @map("aura_contribution")
 
+  // ========== VISIBILITY ==========
+  isHighlighted    Boolean @default(false) @map("is_highlighted") // Show in top skills
+  showToRecruiters Boolean @default(true) @map("show_to_recruiters") // Show in recruiter view
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@index([userId])
   @@index([source])
+  @@index([category])
+  @@index([isVerified])
+  @@index([name])
   @@map("skills")
 }
 
@@ -136,27 +179,75 @@ enum SkillLevel {
   EXPERT
 }
 
+// ==================== TECHNOLOGY MODEL ====================
+
+model Technology {
+  id       String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String             @map("user_id") @db.ObjectId
+  name     String
+  category TechnologyCategory @default(OTHER)
+
+  // ========== DETECTION INFO ==========
+  detectedFrom String[] @default([]) @map("detected_from") // e.g., ["docker", "terraform", "ansible"]
+  confidence   Int      @default(0) // 0-100
+
+  // ========== USAGE STATS ==========
+  projectCount     Int @default(0) @map("project_count")
+  auraContribution Int @default(0) @map("aura_contribution")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([category])
+  @@index([name])
+  @@map("technologies")
+}
+
+enum TechnologyCategory {
+  INFRASTRUCTURE // Docker, K8s, Terraform
+  CICD // GitHub Actions, Jenkins, CircleCI
+  MONITORING // Prometheus, Grafana, DataDog
+  CLOUD // AWS, GCP, Azure
+  SECURITY // OAuth, JWT, SSL
+  OTHER
+}
+
+// ==================== PROJECT MODEL ====================
+
 model Project {
   id     String @id @default(auto()) @map("_id") @db.ObjectId
   userId String @map("user_id") @db.ObjectId
 
-  // GitHub info
-  githubRepoUrl    String         @map("github_repo_url")
-  repoName         String         @map("repo_name")
-  description      String?
-  stars            Int            @default(0)
-  forks            Int            @default(0)
-  language         String? // Primary language
-  analysisStatus   AnalysisStatus @default(PENDING) @map("analysis_status")
-  analysisId       String?        @map("analysis_id") // MongoDB ObjectId
-  analyzedAt       DateTime?      @map("analyzed_at")
-  codeQualityScore Int            @default(0) @map("code_quality_score")
-  structureScore   Int            @default(0) @map("structure_score")
-  overallScore     Int            @default(0) @map("overall_score")
-  auraContribution Int            @default(0) @map("aura_contribution")
-  isPublic         Boolean        @default(true) @map("is_public")
-  isPinned         Boolean        @default(false) @map("is_pinned")
-  displayOrder     Int            @default(0) @map("display_order")
+  // ========== GITHUB INFO ==========
+  githubRepoUrl String  @map("github_repo_url")
+  repoName      String  @map("repo_name")
+  description   String?
+  stars         Int     @default(0)
+  forks         Int     @default(0)
+  language      String? // Primary language
+
+  // ========== ANALYSIS ==========
+  analysisStatus AnalysisStatus @default(PENDING) @map("analysis_status")
+  analysisId     String?        @map("analysis_id") @db.ObjectId
+  fullAnalysis   Json?          @map("full_analysis")
+  analyzedAt     DateTime?      @map("analyzed_at")
+
+  // ========== SCORES ==========
+  codeQualityScore Int @default(0) @map("code_quality_score")
+  structureScore   Int @default(0) @map("structure_score")
+  overallScore     Int @default(0) @map("overall_score")
+  auraContribution Int @default(0) @map("aura_contribution")
+
+  // ========== VISIBILITY ==========
+  isPublic          Boolean @default(true) @map("is_public")
+  isPinned          Boolean @default(false) @map("is_pinned")
+  displayOrder      Int     @default(0) @map("display_order")
+  showToRecruiters  Boolean @default(true) @map("show_to_recruiters") // Show in recruiter search
+  customDescription String? @map("custom_description") // Override GitHub description
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -165,6 +256,10 @@ model Project {
 
   @@unique([userId, githubRepoUrl])
   @@index([userId])
+  @@index([analysisStatus])
+  @@index([isPinned])
+  @@index([createdAt])
+  @@index([overallScore])
   @@map("projects")
 }
 
@@ -174,6 +269,8 @@ enum AnalysisStatus {
   COMPLETED
   FAILED
 }
+
+// ==================== EXPERIENCE MODEL ====================
 
 model Experience {
   id     String @id @default(auto()) @map("_id") @db.ObjectId
@@ -189,12 +286,16 @@ model Experience {
   endDate   DateTime? @map("end_date")
   isCurrent Boolean   @default(false) @map("is_current")
   skills    String[]  @default([])
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([type])
+  @@index([isCurrent])
+  @@index([startDate])
   @@map("experiences")
 }
 
@@ -205,18 +306,23 @@ enum ExperienceType {
   VOLUNTEER
 }
 
+// ==================== SOCIAL LINK MODEL ====================
+
 model SocialLink {
   id       String         @id @default(auto()) @map("_id") @db.ObjectId
-  userId   String         @map("user_id")
+  userId   String         @map("user_id") @db.ObjectId
   platform SocialPlatform
   url      String
   username String?
 
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])
+  @@index([userId])
+  @@index([platform])
   @@map("social_links")
 }
 
@@ -232,9 +338,11 @@ enum SocialPlatform {
   OTHER
 }
 
+// ==================== ACTIVITY MODEL ====================
+
 model Activity {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String       @map("user_id")
+  userId      String       @map("user_id") @db.ObjectId
   type        ActivityType
   description String?
 
@@ -250,7 +358,9 @@ model Activity {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([createdAt])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("activities")
 }
 
@@ -262,4 +372,127 @@ enum ActivityType {
   LOGIN
   RESUME_GENERATED
   PROFILE_VIEWED
+}
+
+// ==================== JOB PORTAL ENUMS ====================
+
+enum VisibilityLevel {
+  PUBLIC // Anyone can see
+  RECRUITERS_ONLY // Only verified recruiters
+  INVITE_ONLY // Only recruiters user approves
+}
+
+enum RemotePreference {
+  REMOTE_ONLY // Only remote jobs
+  ONSITE_ONLY // Only onsite jobs
+  HYBRID // Prefers hybrid
+  FLEXIBLE // Open to all
+}
+
+// ==================== JOB APPLICATION MODELS ====================
+
+model Application {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+  jobId  String @map("job_id")
+
+  // Application Details
+  coverLetter String? @map("cover_letter")
+  resumeUrl   String? @map("resume_url")
+
+  // Status Tracking
+  status        ApplicationStatus @default(PENDING)
+  statusHistory Json              @default("[]") @map("status_history") // Array of {status, timestamp, note}
+  currentStage  String?           @default("applied") @map("current_stage")
+
+  // Matching
+  matchScore     Float?  @default(0) @map("match_score") // 0-100
+  auraMatch      Boolean @default(false) @map("aura_match")
+  skillsMatched  Int     @default(0) @map("skills_matched")
+  skillsRequired Int     @default(0) @map("skills_required")
+
+  // Recruiter Interaction
+  recruiterNotes String?   @map("recruiter_notes")
+  rating         Int? // 1-5 stars
+  isViewed       Boolean   @default(false) @map("is_viewed")
+  viewedAt       DateTime? @map("viewed_at")
+
+  // Timestamps
+  appliedAt  DateTime  @default(now()) @map("applied_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  reviewedAt DateTime? @map("reviewed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+  @@index([userId])
+  @@index([jobId])
+  @@index([status])
+  @@index([appliedAt(sort: Desc)])
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  SHORTLISTED
+  INTERVIEW_SCHEDULED
+  INTERVIEW_COMPLETED
+  OFFER_EXTENDED
+  OFFER_ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+// ==================== SAVED JOBS ====================
+
+model SavedJob {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+  jobId  String @map("job_id")
+
+  notes String? // Personal notes about the job
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("saved_jobs")
+}
+
+// ==================== JOB ALERTS ====================
+
+model JobAlert {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+
+  name String
+
+  // Alert Criteria
+  keywords     String[] @default([])
+  roles        String[] @default([])
+  locations    String[] @default([])
+  jobTypes     String[] @default([])
+  minSalary    Int?     @map("min_salary")
+  maxSalary    Int?     @map("max_salary")
+  remoteOnly   Boolean  @default(false) @map("remote_only")
+  minAuraScore Int?     @map("min_aura_score")
+
+  // Notification Settings
+  isActive       Boolean   @default(true) @map("is_active")
+  emailEnabled   Boolean   @default(true) @map("email_enabled")
+  frequency      String    @default("daily") // instant, daily, weekly
+  lastNotifiedAt DateTime? @map("last_notified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("job_alerts")
 }

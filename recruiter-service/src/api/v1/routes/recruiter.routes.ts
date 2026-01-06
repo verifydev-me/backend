@@ -53,4 +53,20 @@ router.post('/candidates/:userId/shortlist', authenticateRecruiter, RecruiterCon
  */
 router.get('/shortlist', authenticateRecruiter, RecruiterController.getShortlist);
 
+// ==================== SMART MATCHING ====================
+
+/**
+ * @route   POST /api/v1/jobs/:jobId/suggested-candidates
+ * @desc    Get candidates matching a job's requirements with match scores
+ * @access  Private (Recruiter)
+ */
+router.post('/jobs/:jobId/suggested-candidates', authenticateRecruiter, RecruiterController.getSuggestedCandidates);
+
+/**
+ * @route   POST /api/v1/candidates/:userId/match-score
+ * @desc    Calculate match score for a specific candidate against job requirements
+ * @access  Private (Recruiter)
+ */
+router.post('/candidates/:userId/match-score', authenticateRecruiter, RecruiterController.calculateCandidateMatch);
+
 export default router;

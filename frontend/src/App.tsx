@@ -8,6 +8,7 @@ import { useEffect, lazy, Suspense } from 'react'
 // Layouts
 import MainLayout from '@/components/layout/main-layout'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import RecruiterLayout from '@/components/layout/recruiter-layout'
 
 // Pages
 import Landing from '@/pages/landing'
@@ -17,6 +18,7 @@ import ProjectDetail from '@/pages/project-detail'
 import Profile from '@/pages/profile'
 import Resume from '@/pages/resume'
 import Settings from '@/pages/settings'
+import PrivacySettings from '@/pages/privacy-settings'
 import Jobs from '@/pages/jobs'
 import JobDetail from '@/pages/job-detail'
 import Applications from '@/pages/applications'
@@ -26,8 +28,10 @@ import AuthCallback from '@/pages/auth-callback'
 import AuthError from '@/pages/auth-error'
 import NotFound from '@/pages/not-found'
 import Onboarding from '@/pages/onboarding'
+import Login from '@/pages/login'
 
 // Recruiter Pages
+
 import RecruiterLogin from '@/pages/recruiter/login'
 import RecruiterDashboard from '@/pages/recruiter/dashboard'
 
@@ -95,81 +99,60 @@ function App() {
           <Route path="/auth/error" element={<AuthError />} />
         </Route>
 
-        {/* Recruiter Routes */}
+        {/* Developer Login Route (No layout) */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Recruiter Auth Routes (No layout) */}
+
         <Route path="/recruiter/login" element={<RecruiterLogin />} />
         <Route path="/recruiter/register" element={
           <Suspense fallback={<PageLoader />}>
             <RecruiterRegister />
           </Suspense>
         } />
+
+        {/* Recruiter Protected Routes (With sidebar layout) */}
         <Route
-          path="/recruiter/dashboard"
           element={
             <RecruiterProtectedRoute>
-              <RecruiterDashboard />
+              <RecruiterLayout />
             </RecruiterProtectedRoute>
           }
-        />
-        <Route
-          path="/recruiter/candidates"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterCandidates />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiter/candidates/:userId"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterCandidateProfile />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiter/post-job"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterPostJob />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiter/jobs/:jobId/applicants"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterApplicants />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiter/jobs"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterJobs />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
-        <Route
-          path="/recruiter/candidate/:userId"
-          element={
-            <RecruiterProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <RecruiterCandidateProfile />
-              </Suspense>
-            </RecruiterProtectedRoute>
-          }
-        />
+        >
+          <Route path="/recruiter/dashboard" element={<RecruiterDashboard />} />
+          <Route path="/recruiter/candidates" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterCandidates />
+            </Suspense>
+          } />
+          <Route path="/recruiter/candidates/:userId" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterCandidateProfile />
+            </Suspense>
+          } />
+          <Route path="/recruiter/candidate/:userId" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterCandidateProfile />
+            </Suspense>
+          } />
+          <Route path="/recruiter/post-job" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterPostJob />
+            </Suspense>
+          } />
+          <Route path="/recruiter/jobs" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterJobs />
+            </Suspense>
+          } />
+          <Route path="/recruiter/jobs/:jobId/applicants" element={
+            <Suspense fallback={<PageLoader />}>
+              <RecruiterApplicants />
+            </Suspense>
+          } />
+          <Route path="/recruiter/settings" element={<Settings />} />
+          <Route path="/recruiter/settings/privacy" element={<PrivacySettings />} />
+        </Route>
 
         {/* Onboarding Route */}
         <Route 
@@ -195,6 +178,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/resume" element={<Resume />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/privacy" element={<PrivacySettings />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<JobDetail />} />
           <Route path="/applications" element={<Applications />} />

@@ -12,7 +12,7 @@ COPY package*.json ./
 RUN npm ci && npm cache clean --force
 
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN npx prisma generate --schema=prisma/schema.prisma
 
 COPY tsconfig.json ./
 COPY src ./src
@@ -35,7 +35,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
 ENV NODE_ENV=production
 ENV PORT=3004
 
-RUN npx prisma generate
+RUN npx prisma generate --schema=prisma/job-schema.prisma
 
 USER nodejs
 

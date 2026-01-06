@@ -22,8 +22,8 @@ const (
 	CategoryFramework      SkillCategory = "framework"
 	CategoryCloud          SkillCategory = "cloud"
 	CategoryPerformance    SkillCategory = "performance"
-	CategoryML             SkillCategory = "ml"           
-	CategoryDataScience    SkillCategory = "data_science" 
+	CategoryML             SkillCategory = "ml"
+	CategoryDataScience    SkillCategory = "data_science"
 )
 
 // SkillLevel - Proficiency level
@@ -55,6 +55,7 @@ type ArchitectureType string
 const (
 	ArchMonolith     ArchitectureType = "monolith"
 	ArchMicroservice ArchitectureType = "microservices"
+	ArchMonorepo     ArchitectureType = "monorepo"
 	ArchServerless   ArchitectureType = "serverless"
 	ArchEventDriven  ArchitectureType = "event_driven"
 	ArchModular      ArchitectureType = "modular_monolith"

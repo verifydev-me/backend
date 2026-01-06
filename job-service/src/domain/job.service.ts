@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger.js';
 import type { CreateJobDto, JobFilters, Job, JobSkill } from '../types/index.js';
 import { prisma } from '../prisma/client.js';
-import { Job as PrismaJob, JobSkill as PrismaJobSkill, Prisma } from '@prisma/client';
+import { Job as PrismaJob, Prisma } from '../../node_modules/.prisma/job-client/index.js';
 import axios from 'axios';
 
 // ============================================
@@ -31,33 +31,23 @@ interface MatchResult {
 // ============================================
 
 // Transform Prisma Job to API Job format
-function transformJob(prismaJob: PrismaJob & { requiredSkills?: PrismaJobSkill[] }): Job {
+function transformJob(prismaJob: PrismaJob): Job {
   return {
     id: prismaJob.id,
-    organizationId: prismaJob.organizationId,
-    organization: prismaJob.organizationName ? {
-      id: prismaJob.organizationId,
-      name: prismaJob.organizationName,
-      slug: prismaJob.organizationName.toLowerCase().replace(/\s+/g, '-'),
-      size: 'MEDIUM',
-      isVerified: false,
-    } : undefined,
+    recruiterId: prismaJob.recruiterId,
     title: prismaJob.title,
     description: prismaJob.description,
-    requirements: prismaJob.requirements || '',
-    responsibilities: prismaJob.responsibilities || '',
-    type: prismaJob.jobType as Job['type'],
-    level: prismaJob.experienceLevel as Job['level'],
-    location: prismaJob.location || 'Remote',
-    isRemote: prismaJob.locationType === 'REMOTE' || prismaJob.locationType === 'HYBRID',
+    requirements: prismaJob.requirements,
+    responsibilities: prismaJob.responsibilities,
+    type: prismaJob.type as Job['type'],
+    level: prismaJob.level as Job['level'],
+    location: prismaJob.location,
+    isRemote: prismaJob.isRemote,
     salaryMin: prismaJob.salaryMin || undefined,
     salaryMax: prismaJob.salaryMax || undefined,
     salaryCurrency: prismaJob.salaryCurrency,
-    requiredSkills: (prismaJob.requiredSkills || []).map(skill => ({
-      skillName: skill.skillName,
-      minScore: skill.minScore,
-      isRequired: skill.isRequired,
-    })),
+    requiredSkills: prismaJob.requiredSkills || [],
+    preferredSkills: prismaJob.preferredSkills || undefined,
     minAuraScore: prismaJob.minAuraScore,
     minCoreCount: prismaJob.minCoreCount,
     status: prismaJob.status as Job['status'],
@@ -76,22 +66,20 @@ export class JobService {
   /**
    * Create a new job posting
    */
-  static async createJob(organizationId: string, recruiterId: string, data: CreateJobDto): Promise<Job> {
-    logger.info({ organizationId, title: data.title }, 'Creating job');
+  async createJob(data: CreateJobDto & { recruiterId: string }): Promise<Job> {
+    logger.info({ recruiterId: data.recruiterId, title: data.title }, 'Creating job');
 
     const job = await prisma.job.create({
       data: {
-        organizationId,
-        recruiterId,
+        recruiterId: data.recruiterId,
         title: data.title,
         description: data.description,
-        shortDescription: data.description.substring(0, 200),
         requirements: data.requirements,
         responsibilities: data.responsibilities,
-        jobType: data.type,
-        experienceLevel: data.level,
+        type: data.type,
+        level: data.level,
         location: data.location,
-        locationType: data.isRemote ? 'REMOTE' : 'ONSITE',
+        isRemote: data.isRemote,
         salaryMin: data.salaryMin,
         salaryMax: data.salaryMax,
         salaryCurrency: data.salaryCurrency || 'INR',
@@ -99,16 +87,8 @@ export class JobService {
         minCoreCount: data.minCoreCount || 1,
         status: 'ACTIVE',
         expiresAt: data.expiresAt,
-        requiredSkills: {
-          create: data.requiredSkills.map(skill => ({
-            skillName: skill.skillName,
-            minScore: skill.minScore,
-            isRequired: skill.isRequired,
-          })),
-        },
-      },
-      include: {
-        requiredSkills: true,
+        requiredSkills: data.requiredSkills || [],
+        preferredSkills: data.preferredSkills || [],
       },
     });
 
@@ -118,7 +98,7 @@ export class JobService {
   /**
    * Get jobs with filters and pagination
    */
-  static async getJobs(filters: JobFilters, page = 1, limit = 20): Promise<{ jobs: Job[]; total: number }> {
+  async getJobs(filters: JobFilters, page = 1, limit = 20): Promise<{ jobs: Job[]; total: number }> {
     logger.debug({ filters, page, limit }, 'Fetching jobs');
 
     const where: Prisma.JobWhereInput = {
@@ -127,13 +107,13 @@ export class JobService {
 
     // Apply filters
     if (filters.type) {
-      where.jobType = filters.type;
+      where.type = filters.type;
     }
     if (filters.level) {
-      where.experienceLevel = filters.level;
+      where.level = filters.level;
     }
     if (filters.isRemote !== undefined) {
-      where.locationType = filters.isRemote ? { in: ['REMOTE', 'HYBRID'] } : 'ONSITE';
+      where.isRemote = filters.isRemote;
     }
     if (filters.location) {
       where.location = { contains: filters.location, mode: 'insensitive' };
@@ -145,21 +125,18 @@ export class JobService {
       where.OR = [
         { title: { contains: filters.search, mode: 'insensitive' } },
         { description: { contains: filters.search, mode: 'insensitive' } },
-        { organizationName: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
     if (filters.skills && filters.skills.length > 0) {
       where.requiredSkills = {
-        some: {
-          skillName: { in: filters.skills, mode: 'insensitive' },
-        },
+        hasSome: filters.skills,
       };
     }
 
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
         where,
-        include: { requiredSkills: true },
+        
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -173,21 +150,44 @@ export class JobService {
   /**
    * Get job by ID
    */
-  static async getJobById(jobId: string): Promise<Job | null> {
+  async getJobById(jobId: string): Promise<Job | null> {
     logger.debug({ jobId }, 'Fetching job');
     
     const job = await prisma.job.findUnique({
       where: { id: jobId },
-      include: { requiredSkills: true },
+      
     });
 
     return job ? transformJob(job) : null;
   }
 
   /**
+   * Get all jobs posted by a specific recruiter
+   */
+  async getJobsByRecruiter(recruiterId: string, page = 1, limit = 20): Promise<{ jobs: Job[]; total: number }> {
+    logger.debug({ recruiterId, page, limit }, 'Fetching recruiter jobs');
+
+    const skip = (page - 1) * limit;
+
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where: { recruiterId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.job.count({
+        where: { recruiterId },
+      }),
+    ]);
+
+    return { jobs: jobs.map(transformJob), total };
+  }
+
+  /**
    * Get matched jobs for a user based on their skills
    */
-  static async getMatchedJobs(
+  async getMatchedJobs(
     userId: string, 
     userSkills: UserSkill[], 
     auraScore: number
@@ -196,12 +196,12 @@ export class JobService {
 
     const jobs = await prisma.job.findMany({
       where: { status: 'ACTIVE' },
-      include: { requiredSkills: true },
+      
     });
 
     const matchedJobs = jobs.map(prismaJob => {
       const job = transformJob(prismaJob);
-      const matchResult = this.calculateSkillMatch(userSkills, job.requiredSkills, auraScore, job.minAuraScore);
+      const matchResult = JobService.calculateSkillMatch(userSkills, job.requiredSkills, auraScore, job.minAuraScore);
       return { ...job, matchResult };
     });
 
@@ -218,7 +218,7 @@ export class JobService {
    * Get recommended jobs based on user profile
    * Fetches user data from user-service
    */
-  static async getRecommendedJobs(userId: string): Promise<(Job & { matchResult: MatchResult })[]> {
+  async getRecommendedJobs(userId: string): Promise<(Job & { matchResult: MatchResult })[]> {
     try {
       // Fetch user skills from user-service
       const userDataResponse = await axios.get(
@@ -236,7 +236,7 @@ export class JobService {
       // Return all jobs if we can't get user data
       const jobs = await prisma.job.findMany({
         where: { status: 'ACTIVE' },
-        include: { requiredSkills: true },
+        
         take: 20,
         orderBy: { createdAt: 'desc' },
       });
@@ -257,7 +257,7 @@ export class JobService {
    */
   static calculateSkillMatch(
     userSkills: UserSkill[],
-    jobSkills: JobSkill[],
+    jobSkills: string[],
     userAura: number,
     minAura: number
   ): MatchResult {
@@ -273,42 +273,42 @@ export class JobService {
     let totalScore = 0;
     let requiredMet = true;
 
-    for (const jobSkill of jobSkills) {
+    for (const jobSkillName of jobSkills) {
       const userSkill = userSkills.find(
-        s => s.name.toLowerCase() === jobSkill.skillName.toLowerCase()
+        s => s.name.toLowerCase() === jobSkillName.toLowerCase()
       );
 
       if (userSkill) {
-        const meetsRequirement = userSkill.score >= jobSkill.minScore;
+        // Default min score requirement
+        const minScore = 50;
+        const meetsRequirement = userSkill.score >= minScore;
         
         // Verified skills get bonus
         const verifiedBonus = userSkill.isVerified ? 1.2 : 1.0;
-        const contributionScore = Math.min(100, (userSkill.score / jobSkill.minScore) * 100 * verifiedBonus);
+        const contributionScore = Math.min(100, (userSkill.score / minScore) * 100 * verifiedBonus);
         
         totalScore += contributionScore;
         matchedSkills.push({
-          skill: jobSkill.skillName,
-          required: jobSkill.minScore,
+          skill: jobSkillName,
+          required: minScore,
           userScore: userSkill.score,
           verified: userSkill.isVerified,
           status: meetsRequirement ? 'met' : 'partial',
         });
 
-        if (jobSkill.isRequired && !meetsRequirement) {
+        if (!meetsRequirement) {
           requiredMet = false;
         }
       } else {
         matchedSkills.push({
-          skill: jobSkill.skillName,
-          required: jobSkill.minScore,
+          skill: jobSkillName,
+          required: 50,
           userScore: 0,
           verified: false,
           status: 'missing',
         });
 
-        if (jobSkill.isRequired) {
-          requiredMet = false;
-        }
+        requiredMet = false;
       }
     }
 
@@ -325,7 +325,7 @@ export class JobService {
   /**
    * Increment view count
    */
-  static async incrementViews(jobId: string): Promise<void> {
+  async incrementViews(jobId: string): Promise<void> {
     logger.debug({ jobId }, 'Incrementing views');
     
     await prisma.job.update({
@@ -337,7 +337,7 @@ export class JobService {
   /**
    * Increment application count
    */
-  static async incrementApplications(jobId: string): Promise<void> {
+  async incrementApplications(jobId: string): Promise<void> {
     await prisma.job.update({
       where: { id: jobId },
       data: { applicationsCount: { increment: 1 } },
@@ -347,13 +347,13 @@ export class JobService {
   /**
    * Update job status
    */
-  static async updateJobStatus(jobId: string, status: 'ACTIVE' | 'PAUSED' | 'CLOSED'): Promise<Job | null> {
+  async updateJobStatus(jobId: string, status: 'ACTIVE' | 'PAUSED' | 'CLOSED'): Promise<Job | null> {
     logger.info({ jobId, status }, 'Updating job status');
     
     const job = await prisma.job.update({
       where: { id: jobId },
       data: { status },
-      include: { requiredSkills: true },
+      
     });
 
     return transformJob(job);
@@ -362,7 +362,7 @@ export class JobService {
   /**
    * Delete job
    */
-  static async deleteJob(jobId: string): Promise<boolean> {
+  async deleteJob(jobId: string): Promise<boolean> {
     logger.info({ jobId }, 'Deleting job');
     
     try {
@@ -376,7 +376,7 @@ export class JobService {
   /**
    * Search jobs with advanced filters
    */
-  static async searchJobs(params: {
+  async searchJobs(params: {
     query?: string;
     skills?: string[];
     type?: string[];
@@ -398,32 +398,29 @@ export class JobService {
       where.OR = [
         { title: { contains: params.query, mode: 'insensitive' } },
         { description: { contains: params.query, mode: 'insensitive' } },
-        { organizationName: { contains: params.query, mode: 'insensitive' } },
       ];
     }
 
     // Skills filter
     if (params.skills && params.skills.length > 0) {
       where.requiredSkills = {
-        some: {
-          skillName: { in: params.skills, mode: 'insensitive' },
-        },
+        hasSome: params.skills,
       };
     }
 
     // Type filter
     if (params.type && params.type.length > 0) {
-      where.jobType = { in: params.type as any };
+      where.type = { in: params.type as any };
     }
 
     // Level filter
     if (params.level && params.level.length > 0) {
-      where.experienceLevel = { in: params.level as any };
+      where.level = { in: params.level as any };
     }
 
     // Remote filter
     if (params.isRemote !== undefined) {
-      where.locationType = params.isRemote ? { in: ['REMOTE', 'HYBRID'] } : 'ONSITE';
+      where.isRemote = params.isRemote;
     }
 
     // Salary filter
@@ -456,7 +453,7 @@ export class JobService {
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
         where,
-        include: { requiredSkills: true },
+        
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
@@ -472,7 +469,7 @@ export class JobService {
   /**
    * Seed demo jobs for development
    */
-  static async seedDemoJobs(): Promise<void> {
+  async seedDemoJobs(): Promise<void> {
     const existingCount = await prisma.job.count();
     if (existingCount > 0) {
       logger.info('Demo jobs already exist, skipping seed');
@@ -483,141 +480,98 @@ export class JobService {
 
     const demoJobs = [
       {
-        organizationId: '64f0c79b5c3d2e1a8b9c0d1e', // org_demo
         recruiterId: '64f0c79b5c3d2e1a8b9c0d1f',    // recruiter_demo
-        organizationName: 'TechCorp',
         title: 'Senior React Developer',
         description: 'We are looking for a Senior React Developer to join our team...',
-        shortDescription: 'Senior React Developer position at TechCorp',
         requirements: '5+ years of experience with React, TypeScript, and modern frontend tools.',
         responsibilities: 'Lead frontend architecture, mentor juniors, implement features.',
-        jobType: 'FULL_TIME' as const,
-        experienceLevel: 'SENIOR' as const,
+        type: 'FULL_TIME' as const,
+        level: 'SENIOR' as const,
         location: 'Bangalore, India',
-        locationType: 'HYBRID' as const,
+        isRemote: false,
         salaryMin: 2000000,
         salaryMax: 3500000,
         salaryCurrency: 'INR',
         minAuraScore: 300,
         minCoreCount: 2,
         status: 'ACTIVE' as const,
-        requiredSkills: {
-          create: [
-            { skillName: 'React', minScore: 70, isRequired: true },
-            { skillName: 'TypeScript', minScore: 60, isRequired: true },
-            { skillName: 'JavaScript', minScore: 80, isRequired: true },
-            { skillName: 'Node.js', minScore: 50, isRequired: false },
-          ],
-        },
+        requiredSkills: ['React', 'TypeScript', 'JavaScript'],
+        preferredSkills: ['Node.js'],
       },
       {
-        organizationId: '64f0c79b5c3d2e1a8b9c0d20', // org_startup
         recruiterId: '64f0c79b5c3d2e1a8b9c0d21',    // recruiter_startup
-        organizationName: 'StartupX',
         title: 'Full Stack Developer',
         description: 'Join our fast-growing startup as a Full Stack Developer...',
-        shortDescription: 'Full Stack Developer at fast-growing StartupX',
         requirements: '2+ years of experience with React and Node.js.',
         responsibilities: 'Build features end-to-end, work directly with founders.',
-        jobType: 'FULL_TIME' as const,
-        experienceLevel: 'MID' as const,
+        type: 'FULL_TIME' as const,
+        level: 'MID' as const,
         location: 'Remote',
-        locationType: 'REMOTE' as const,
+        isRemote: true,
         salaryMin: 1000000,
         salaryMax: 1800000,
         salaryCurrency: 'INR',
         minAuraScore: 100,
         minCoreCount: 1,
         status: 'ACTIVE' as const,
-        requiredSkills: {
-          create: [
-            { skillName: 'React', minScore: 50, isRequired: true },
-            { skillName: 'Node.js', minScore: 50, isRequired: true },
-            { skillName: 'PostgreSQL', minScore: 40, isRequired: false },
-          ],
-        },
+        requiredSkills: ['React', 'Node.js'],
+        preferredSkills: ['PostgreSQL'],
       },
       {
-        organizationId: '64f0c79b5c3d2e1a8b9c0d22', // org_enterprise
         recruiterId: '64f0c79b5c3d2e1a8b9c0d23',    // recruiter_enterprise
-        organizationName: 'Enterprise Corp',
         title: 'Go Backend Developer',
         description: 'Looking for Go developer to build high-performance microservices...',
-        shortDescription: 'Go Backend Developer for microservices',
         requirements: '3+ years Go experience, microservices architecture.',
         responsibilities: 'Design and build microservices, optimize performance.',
-        jobType: 'FULL_TIME' as const,
-        experienceLevel: 'SENIOR' as const,
+        type: 'FULL_TIME' as const,
+        level: 'SENIOR' as const,
         location: 'Mumbai, India',
-        locationType: 'ONSITE' as const,
+        isRemote: false,
         salaryMin: 2500000,
         salaryMax: 4000000,
         salaryCurrency: 'INR',
         minAuraScore: 400,
         minCoreCount: 3,
         status: 'ACTIVE' as const,
-        requiredSkills: {
-          create: [
-            { skillName: 'Go', minScore: 70, isRequired: true },
-            { skillName: 'Docker', minScore: 50, isRequired: true },
-            { skillName: 'PostgreSQL', minScore: 60, isRequired: true },
-            { skillName: 'Redis', minScore: 40, isRequired: false },
-          ],
-        },
+        requiredSkills: ['Go', 'Docker', 'PostgreSQL'],
+        preferredSkills: ['Redis'],
       },
       {
-        organizationId: '64f0c79b5c3d2e1a8b9c0d1e', // org_demo
         recruiterId: '64f0c79b5c3d2e1a8b9c0d1f',    // recruiter_demo
-        organizationName: 'TechCorp',
         title: 'Python Data Engineer',
         description: 'Join our data team to build ETL pipelines...',
-        shortDescription: 'Python Data Engineer for ETL pipelines',
         requirements: 'Strong Python skills, experience with data pipelines.',
         responsibilities: 'Build data pipelines, maintain data warehouse.',
-        jobType: 'FULL_TIME' as const,
-        experienceLevel: 'MID' as const,
+        type: 'FULL_TIME' as const,
+        level: 'MID' as const,
         location: 'Hyderabad, India',
-        locationType: 'HYBRID' as const,
+        isRemote: false,
         salaryMin: 1500000,
         salaryMax: 2500000,
         salaryCurrency: 'INR',
         minAuraScore: 200,
         minCoreCount: 1,
         status: 'ACTIVE' as const,
-        requiredSkills: {
-          create: [
-            { skillName: 'Python', minScore: 70, isRequired: true },
-            { skillName: 'SQL', minScore: 60, isRequired: true },
-            { skillName: 'Apache Spark', minScore: 40, isRequired: false },
-          ],
-        },
+        requiredSkills: ['Python', 'SQL'],
+        preferredSkills: ['Apache Spark'],
       },
       {
-        organizationId: '64f0c79b5c3d2e1a8b9c0d20', // org_startup
         recruiterId: '64f0c79b5c3d2e1a8b9c0d21',    // recruiter_startup
-        organizationName: 'StartupX',
         title: 'Frontend Intern',
         description: 'Great opportunity for freshers to learn and grow...',
-        shortDescription: 'Frontend Intern position for freshers',
         requirements: 'Basic HTML/CSS/JS knowledge, willingness to learn.',
         responsibilities: 'Assist in building UI components, learn from seniors.',
-        jobType: 'INTERNSHIP' as const,
-        experienceLevel: 'ENTRY' as const,
+        type: 'INTERNSHIP' as const,
+        level: 'ENTRY' as const,
         location: 'Remote',
-        locationType: 'REMOTE' as const,
+        isRemote: true,
         salaryMin: 15000,
         salaryMax: 25000,
         salaryCurrency: 'INR',
         minAuraScore: 0,
         minCoreCount: 1,
         status: 'ACTIVE' as const,
-        requiredSkills: {
-          create: [
-            { skillName: 'JavaScript', minScore: 20, isRequired: true },
-            { skillName: 'HTML', minScore: 30, isRequired: true },
-            { skillName: 'CSS', minScore: 30, isRequired: true },
-          ],
-        },
+        requiredSkills: ['JavaScript', 'HTML', 'CSS'],
       },
     ];
 

@@ -15,6 +15,7 @@ type ProjectType string
 const (
 	ProjectTypeMicroservice ProjectType = "microservice"
 	ProjectTypeMonolith     ProjectType = "monolith"
+	ProjectTypeMonorepo     ProjectType = "monorepo" 
 	ProjectTypeLibrary      ProjectType = "library"
 	ProjectTypeCLI          ProjectType = "cli"
 	ProjectTypeAPI          ProjectType = "api"

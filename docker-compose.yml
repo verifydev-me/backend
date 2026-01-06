@@ -1,5 +1,4 @@
 services:
-  # ==================== API GATEWAY ====================
   gateway:
     build: ./gateway
     container_name: verifydev-gateway
@@ -22,11 +21,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== DATABASES ====================
-  # Using MongoDB Atlas (managed cloud database)
-  # Connection: mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/
-  # No local MongoDB container needed - using cloud
-
   redis:
     image: redis:7-alpine
     container_name: verifydev-redis
@@ -43,7 +37,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== MESSAGE QUEUE ====================
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: verifydev-rabbitmq
@@ -63,7 +56,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== OBJECT STORAGE ====================
   minio:
     image: minio/minio:latest
     container_name: verifydev-minio
@@ -84,7 +76,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== NODE.JS SERVICES ====================
   auth-service:
     build: ./auth-service
     container_name: verifydev-auth
@@ -134,7 +125,9 @@ services:
       - verifydev-network
 
   job-service:
-    build: ./job-service
+    build:
+      context: ./job-service
+      dockerfile: Dockerfile.dev
     container_name: verifydev-job
     ports:
       - "3004:3004"
@@ -144,6 +137,9 @@ services:
       - DATABASE_URL=${MONGODB_CONNECTION_STRING}_jobs
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    volumes:
+      - ./job-service/src:/app/src
+      - ./job-service/prisma:/app/prisma
     restart: unless-stopped
     networks:
       - verifydev-network
