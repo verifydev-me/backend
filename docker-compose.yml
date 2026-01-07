@@ -1,20 +1,23 @@
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: verifydev-postgres
-    environment:
-      POSTGRES_USER: verifydev
-      POSTGRES_PASSWORD: verifydev123
-      POSTGRES_DB: verifydev
+  gateway:
+    build: ./gateway
+    container_name: verifydev-gateway
     ports:
-      - "5432:5432"
+      - "80:80"
+      - "443:443"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./gateway/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - auth-service
+      - user-service
+      - job-service
+      - recruiter-service
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U verifydev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - verifydev-network
 
@@ -34,7 +37,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== MESSAGE QUEUE ====================
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: verifydev-rabbitmq
@@ -54,7 +56,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== OBJECT STORAGE ====================
   minio:
     image: minio/minio:latest
     container_name: verifydev-minio
@@ -75,7 +76,6 @@ services:
     networks:
       - verifydev-network
 
-  # ==================== NODE.JS SERVICES ====================
   auth-service:
     build: ./auth-service
     container_name: verifydev-auth
@@ -84,20 +84,19 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - REDIS_URL=redis://redis:6379
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_CALLBACK_URL=http://localhost:3001/api/v1/auth/github/callback
+      - GITHUB_CALLBACK_URL=http://localhost/api/v1/auth/github/callback
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-supersecretrefreshkey32characters}
       - FRONTEND_URL=http://localhost:3000
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -109,32 +108,39 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3002
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
+      - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     depends_on:
-      postgres:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
   job-service:
-    build: ./job-service
+    build:
+      context: ./job-service
+      dockerfile: Dockerfile.dev
     container_name: verifydev-job
     ports:
       - "3004:3004"
     environment:
       - NODE_ENV=development
       - PORT=3004
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_jobs
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    volumes:
+      - ./job-service/src:/app/src
+      - ./job-service/prisma:/app/prisma
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -146,13 +152,11 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3005
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_recruiters
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-recruiteraccesskey32characters!!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -161,15 +165,14 @@ services:
     container_name: verifydev-aura
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - CONSUME_QUEUE=project.analyzed
       - EXCHANGE_NAME=project.events
     depends_on:
-      postgres:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -193,6 +196,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
@@ -204,7 +208,7 @@ services:
     environment:
       - ENV=development
       - PORT=8003
-      - DATABASE_URL=postgresql://verifydev:verifydev123@postgres:5432/verifydev
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - STORAGE_ENDPOINT=minio:9000
       - STORAGE_ACCESS_KEY=minioadmin
@@ -212,15 +216,13 @@ services:
       - STORAGE_BUCKET=resumes
       - STORAGE_USE_SSL=false
     depends_on:
-      postgres:
-        condition: service_healthy
       minio:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - verifydev-network
 
 volumes:
-  postgres_data:
   redis_data:
   rabbitmq_data:
   minio_data:

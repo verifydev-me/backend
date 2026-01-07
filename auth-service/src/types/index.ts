@@ -54,6 +54,10 @@ export interface AuthResponse {
     user: UserResponse;
     tokens: AuthTokens;
   };
+  error?: {
+    code: string;
+    details?: unknown;
+  };
 }
 
 export interface UserResponse {
@@ -63,10 +67,21 @@ export interface UserResponse {
   name: string | null;
   avatarUrl: string | null;
   bio: string | null;
+  location: string | null;
+  company: string | null;
+  website: string | null;
+  blog: string | null;
+  twitterUsername: string | null;
+  twitter: string | null;
+  followers: number;
+  following: number;
+  publicRepos: number;
   auraScore: number;
+  auraLevel: string;
   coreCount: number;
   isVerified: boolean;
   isOpenToWork: boolean;
+  role: string;
 }
 
 // API Response Types

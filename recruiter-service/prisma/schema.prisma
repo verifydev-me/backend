@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== RECRUITER MODELS ====================
+
+model Recruiter {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // ========== AUTH ==========
+  email        String @unique
+  passwordHash String @map("password_hash")
+
+  // ========== PROFILE ==========
+  name      String
+  title     String? // e.g., "Senior Recruiter", "Talent Acquisition Manager"
+  phone     String?
+  avatarUrl String? @map("avatar_url")
+
+  // ========== ORGANIZATION ==========
+  organizationId String        @map("organization_id") @db.ObjectId
+  role           RecruiterRole @default(RECRUITER)
+
+  // ========== STATUS ==========
+  isActive      Boolean @default(true) @map("is_active")
+  isVerified    Boolean @default(false) @map("is_verified")
+  emailVerified Boolean @default(false) @map("email_verified")
+
+  // ========== TIMESTAMPS ==========
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  // ========== RELATIONS ==========
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions          RecruiterSession[]
+  savedCandidates   SavedCandidate[]
+  candidateFeedback CandidateFeedback[]
+  messages          Message[]
+  interviews        Interview[]
+  messageTemplates  MessageTemplate[]
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("recruiters")
+}
+
+// ==================== RECRUITER SESSION ====================
+
+model RecruiterSession {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id") @db.ObjectId
+
+  refreshToken String  @unique @map("refresh_token")
+  userAgent    String? @map("user_agent")
+  ipAddress    String? @map("ip_address")
+  isValid      Boolean @default(true) @map("is_valid")
+
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@index([recruiterId])
+  @@index([expiresAt])
+  @@index([isValid])
+  @@map("recruiter_sessions")
+}
+
+// ==================== ORGANIZATION ====================
+
+model Organization {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // ========== BASIC INFO ==========
+  name        String
+  slug        String  @unique
+  logo        String?
+  website     String?
+  description String?
+
+  // ========== LOCATION ==========
+  headquarters String?
+  country      String?
+
+  // ========== COMPANY DETAILS ==========
+  industry    String?
+  size        CompanySize @default(SMALL)
+  foundedYear Int?        @map("founded_year")
+  linkedIn    String?     @map("linkedin")
+
+  // ========== VERIFICATION ==========
+  isVerified Boolean   @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+
+  // ========== STATS (Denormalized for performance) ==========
+  totalJobs  Int @default(0) @map("total_jobs")
+  activeJobs Int @default(0) @map("active_jobs")
+
+  // ========== TIMESTAMPS ==========
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // ========== RELATIONS ==========
+  recruiters Recruiter[]
+
+  @@index([isVerified])
+  @@index([industry])
+  @@index([createdAt])
+  @@map("organizations")
+}
+
+// ==================== SAVED CANDIDATES ====================
+
+model SavedCandidate {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id") @db.ObjectId
+  candidateId String @map("candidate_id") @db.ObjectId // User ID from user-service
+
+  // ========== RECRUITER NOTES ==========
+  notes  String?
+  tags   String[] @default([])
+  rating Int? // 1-5 stars
+
+  // ========== STATUS ==========
+  status CandidateStatus @default(SAVED)
+
+  // ========== TIMESTAMPS ==========
+  savedAt   DateTime @default(now()) @map("saved_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@unique([recruiterId, candidateId])
+  @@index([recruiterId])
+  @@index([candidateId])
+  @@index([status])
+  @@index([savedAt(sort: Desc)])
+  @@map("saved_candidates")
+}
+
+// ==================== CANDIDATE FEEDBACK ====================
+
+model CandidateFeedback {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id") @db.ObjectId
+  candidateId String @map("candidate_id") @db.ObjectId // User ID from user-service
+
+  // ========== FEEDBACK DETAILS ==========
+  message String
+  status  FeedbackStatus @default(PENDING)
+  rating  Int? // 1-5 stars
+
+  // ========== CONTACT INFO (if provided) ==========
+  contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
+
+  // ========== METADATA ==========
+  jobId    String?          @map("job_id") @db.ObjectId // Optional: related to specific job
+  jobTitle String?          @map("job_title") // Denormalized
+  category FeedbackCategory @default(GENERAL)
+
+  // ========== TIMESTAMPS ==========
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  readAt    DateTime? @map("read_at")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@index([recruiterId])
+  @@index([candidateId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
+  @@index([recruiterId, status])
+  @@map("candidate_feedback")
+}
+
+// ==================== MESSAGES ====================
+
+model Message {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id") @db.ObjectId
+  candidateId String @map("candidate_id") @db.ObjectId // User ID from user-service
+
+  // ========== MESSAGE CONTENT ==========
+  subject  String
+  body     String
+  bodyHtml String? @map("body_html") // Optional HTML version
+
+  // ========== DIRECTION ==========
+  direction MessageDirection // RECRUITER_TO_CANDIDATE or CANDIDATE_TO_RECRUITER
+
+  // ========== RELATED CONTEXT ==========
+  jobId    String? @map("job_id") @db.ObjectId
+  jobTitle String? @map("job_title") // Denormalized
+  threadId String? @map("thread_id") @db.ObjectId // For threading/replies
+
+  // ========== STATUS ==========
+  status MessageStatus @default(SENT)
+
+  // ========== TIMESTAMPS ==========
+  sentAt     DateTime  @default(now()) @map("sent_at")
+  readAt     DateTime? @map("read_at")
+  archivedAt DateTime? @map("archived_at")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@index([recruiterId])
+  @@index([candidateId])
+  @@index([threadId])
+  @@index([jobId])
+  @@index([direction])
+  @@index([status])
+  @@index([sentAt(sort: Desc)])
+  @@index([recruiterId, candidateId])
+  @@map("messages")
+}
+
+// ==================== INTERVIEWS ====================
+
+model Interview {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String @map("recruiter_id") @db.ObjectId
+  candidateId String @map("candidate_id") @db.ObjectId // User ID from user-service
+  jobId       String @map("job_id") @db.ObjectId
+
+  // ========== BASIC INFO ==========
+  title       String // e.g., "Technical Interview - Round 1"
+  description String?
+
+  // ========== INTERVIEW TYPE ==========
+  type InterviewType @default(VIDEO)
+
+  // ========== SCHEDULING ==========
+  proposedSlots DateTime[] @map("proposed_slots") // Recruiter proposes multiple slots
+  selectedSlot  DateTime?  @map("selected_slot") // Candidate selects one
+  duration      Int        @default(60) // Minutes
+  timezone      String     @default("Asia/Kolkata")
+
+  // ========== MEETING DETAILS ==========
+  meetingLink  String? @map("meeting_link")
+  location     String? // For onsite interviews
+  instructions String?
+
+  // ========== INTERVIEWERS ==========
+  interviewers String[] @default([]) // Names or emails
+
+  // ========== STATUS ==========
+  status InterviewStatus @default(PENDING)
+
+  // ========== FEEDBACK (after interview) ==========
+  recruiterFeedback String? @map("recruiter_feedback")
+  candidateFeedback String? @map("candidate_feedback")
+  rating            Int? // 1-5 rating
+
+  // ========== TIMESTAMPS ==========
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  confirmedAt DateTime? @map("confirmed_at")
+  completedAt DateTime? @map("completed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  recruiter Recruiter @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@index([recruiterId])
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([status])
+  @@index([selectedSlot])
+  @@index([createdAt(sort: Desc)])
+  @@map("interviews")
+}
+
+// ==================== MESSAGE TEMPLATES ====================
+
+model MessageTemplate {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId String? @map("recruiter_id") @db.ObjectId // null = system template
+
+  // ========== TEMPLATE CONTENT ==========
+  name     String
+  subject  String
+  body     String
+  bodyHtml String? @map("body_html")
+
+  // ========== CATEGORIZATION ==========
+  category TemplateCategory @default(GENERAL)
+
+  // ========== PLACEHOLDERS ==========
+  // Supported: {{candidateName}}, {{jobTitle}}, {{companyName}}, {{recruiterName}}, etc.
+  placeholders String[] @default([])
+
+  // ========== VISIBILITY ==========
+  isPublic Boolean @default(false) @map("is_public") // System templates are public
+
+  // ========== TIMESTAMPS ==========
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recruiter Recruiter? @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@index([recruiterId])
+  @@index([category])
+  @@index([isPublic])
+  @@map("message_templates")
+}
+
+// ==================== ENUMS ====================
+
+enum RecruiterRole {
+  ADMIN // Full access - can manage org, invite recruiters
+  RECRUITER // Can post jobs, manage applications
+  VIEWER // Read-only access
+}
+
+enum CompanySize {
+  STARTUP // 1-10 employees
+  SMALL // 11-50
+  MEDIUM // 51-200
+  LARGE // 201-1000
+  ENTERPRISE // 1000+
+}
+
+enum CandidateStatus {
+  SAVED // Just bookmarked
+  CONTACTED // Reached out
+  INTERESTED // Showed interest
+  NOT_FIT // Not a match
+}
+
+enum FeedbackStatus {
+  PENDING // Not yet read
+  READ // Viewed by candidate
+  RESPONDED // Candidate responded
+  IGNORED // Candidate not interested
+}
+
+enum FeedbackCategory {
+  JOB_OPPORTUNITY // Job posting related
+  GENERAL // General inquiry
+  INTERVIEW // Interview invitation
+  NETWORKING // Just connecting
+  OTHER
+}
+
+enum MessageDirection {
+  RECRUITER_TO_CANDIDATE
+  CANDIDATE_TO_RECRUITER
+}
+
+enum MessageStatus {
+  DRAFT
+  SENT
+  DELIVERED
+  READ
+  ARCHIVED
+}
+
+enum InterviewType {
+  PHONE
+  VIDEO
+  ONSITE
+  TECHNICAL // Tech screen / coding
+  HR // HR round
+  FINAL
+}
+
+enum InterviewStatus {
+  PENDING // Slots proposed, awaiting candidate response
+  CONFIRMED // Slot selected and confirmed
+  RESCHEDULED // Needs rescheduling
+  COMPLETED // Interview done
+  CANCELLED // Called off
+  NO_SHOW // Candidate didn't show up
+}
+
+enum TemplateCategory {
+  JOB_INVITATION // Inviting to apply
+  INTERVIEW_REQUEST // Scheduling interview
+  OFFER_LETTER // Job offer
+  REJECTION // Sorry, not moving forward
+  FOLLOW_UP // Checking in
+  GENERAL // Other
+}

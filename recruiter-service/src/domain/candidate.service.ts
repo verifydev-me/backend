@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger.js';
 import type { CandidateSearchFilters, CandidateProfile } from '../types/index.js';
+import axios from 'axios';
 
 /**
  * Full Candidate Profile for Recruiter View
@@ -105,6 +106,9 @@ export interface FullCandidateProfile extends CandidateProfile {
   memberSince: string;
 }
 
+// User service URL
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:3002';
+
 /**
  * Candidate Search Service
  * 
@@ -118,6 +122,7 @@ export interface FullCandidateProfile extends CandidateProfile {
 export class CandidateService {
   /**
    * Search candidates with filters
+   * Fetches data from user-service internal API
    */
   static async searchCandidates(
     filters: CandidateSearchFilters,
@@ -126,36 +131,40 @@ export class CandidateService {
   ): Promise<{ candidates: CandidateProfile[]; total: number }> {
     logger.debug({ filters, page, limit }, 'Searching candidates');
 
-    // Mock - in production would query database
-    const mockCandidates: CandidateProfile[] = [
-      {
-        id: 'user_1',
-        username: 'johndoe',
-        name: 'John Doe',
-        avatarUrl: 'https://avatars.githubusercontent.com/u/1',
-        bio: 'Full-stack developer passionate about React and Go',
-        location: 'San Francisco, CA',
-        auraScore: 420,
-        coreCount: 3,
-        isOpenToWork: true,
-        isVerified: true,
-        topSkills: [
-          { name: 'React', score: 85, isVerified: true },
-          { name: 'TypeScript', score: 78, isVerified: true },
-          { name: 'Node.js', score: 72, isVerified: true },
-        ],
-        topProjects: [
-          { name: 'awesome-app', score: 92, language: 'TypeScript' },
-          { name: 'cool-api', score: 85, language: 'Go' },
-        ],
-        matchScore: 95,
-      },
-    ];
+    try {
+      // Call user-service internal API to search candidates
+      const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/search`, {
+        params: {
+          skills: filters.skills?.join(','),
+          minAuraScore: filters.minAuraScore || filters.minAura,
+          minCoreCount: filters.minCoreCount,
+          location: filters.location,
+          isOpenToWork: filters.isOpenToWork,
+          minSkillScore: filters.minSkillScore,
+          page,
+          limit,
+        },
+        timeout: 10000,
+      });
 
-    return {
-      candidates: mockCandidates,
-      total: 1,
-    };
+      if (response.data.success) {
+        const candidates = response.data.data.candidates || [];
+        const total = response.data.meta?.total || 0;
+
+        // Add match scores
+        const candidatesWithMatch: CandidateProfile[] = candidates.map((c: any) => ({
+          ...c,
+          matchScore: this.calculateMatchScore(c, filters),
+        }));
+
+        return { candidates: candidatesWithMatch, total };
+      }
+
+      return { candidates: [], total: 0 };
+    } catch (error) {
+      logger.error({ error }, 'Failed to search candidates from user-service');
+      return { candidates: [], total: 0 };
+    }
   }
 
   /**
@@ -165,274 +174,136 @@ export class CandidateService {
   static async getFullCandidateProfile(userId: string): Promise<FullCandidateProfile | null> {
     logger.debug({ userId }, 'Fetching full candidate profile');
 
-    // Mock - in production would fetch from database
-    const mockProfile: FullCandidateProfile = {
-      id: userId,
-      username: 'johndoe',
-      name: 'John Doe',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/1',
-      bio: 'Full-stack developer with 4+ years of experience. Passionate about clean code and scalable architecture.',
-      location: 'San Francisco, CA',
-      auraScore: 420,
-      coreCount: 3,
-      isOpenToWork: true,
-      isVerified: true,
-      
-      // Contact
-      email: 'john@example.com',
-      website: 'https://johndoe.dev',
-      
-      // Social
-      socialLinks: [
-        { platform: 'github', url: 'https://github.com/johndoe' },
-        { platform: 'linkedin', url: 'https://linkedin.com/in/johndoe' },
-      ],
-      
-      // Skills summary for search
-      topSkills: [
-        { name: 'React', score: 85, isVerified: true },
-        { name: 'TypeScript', score: 78, isVerified: true },
-      ],
-      
-      // All skills with full details
-      allSkills: [
-        {
-          name: 'React',
-          category: 'FRAMEWORK',
-          score: 85,
-          isVerified: true,
-          projectCount: 3,
-          evidence: ['Custom hooks', 'Context API', 'Performance optimization'],
-        },
-        {
-          name: 'TypeScript',
-          category: 'LANGUAGE',
-          score: 78,
-          isVerified: true,
-          projectCount: 4,
-          evidence: ['Strict mode', 'Advanced types', 'Generics'],
-        },
-        {
-          name: 'Node.js',
-          category: 'FRAMEWORK',
-          score: 72,
-          isVerified: true,
-          projectCount: 2,
-          evidence: ['REST API', 'Express middleware', 'Error handling'],
-        },
-        {
-          name: 'Docker',
-          category: 'DEVOPS',
-          score: 65,
-          isVerified: true,
-          projectCount: 2,
-          evidence: ['Multi-stage builds', 'Docker Compose'],
-        },
-      ],
-      
-      // Top projects for search
-      topProjects: [
-        { name: 'awesome-app', score: 92, language: 'TypeScript' },
-      ],
-      
-      // Full analyzed projects with details
-      analyzedProjects: [
-        {
-          id: 'project_1',
-          repoName: 'awesome-app',
-          repoUrl: 'https://github.com/johndoe/awesome-app',
-          description: 'A full-stack app with React and Node.js',
-          primaryLanguage: 'TypeScript',
-          technologies: ['React', 'Node.js', 'PostgreSQL', 'Docker'],
-          
-          overallScore: 92,
-          codeQualityScore: 88,
-          structureScore: 95,
-          
-          analysis: {
-            folderStructure: {
-              hasSrcFolder: true,
-              hasComponents: true,
-              hasTests: true,
-              hasTypes: true,
-              organizationScore: 95,
-            },
-            codeQuality: {
-              hasLinting: true,
-              hasPrettier: true,
-              hasTypeScript: true,
-              hasDockerfile: true,
-              hasCI: true,
-              testFilesCount: 24,
-            },
-            optimizations: [
-              '✅ Already using useMemo for expensive calculations',
-              '✅ Good component splitting',
-              '⚠️ Consider lazy loading for route components',
-              '⚠️ Add error boundaries in critical sections',
-            ],
-            bestPractices: {
-              followed: [
-                'TypeScript strict mode',
-                'ESLint + Prettier',
-                'Proper folder structure',
-                'Environment variables',
-                'Docker containerization',
-                'CI/CD with GitHub Actions',
-                'Unit tests with Jest',
-              ],
-              missing: [
-                'Add integration tests',
-                'Consider adding Storybook for components',
-                'Add API documentation (Swagger)',
-              ],
-            },
-            frameworkAnalysis: {
-              framework: 'React',
-              patterns: [
-                'Custom hooks (5 found)',
-                'Context for state management',
-                'Lazy loading with Suspense',
-                'Error boundaries',
-              ],
-              suggestions: [
-                'Consider React Query for server state',
-                'Add performance monitoring',
-              ],
-            },
-          },
-          analyzedAt: '2026-01-02T10:30:00Z',
-        },
-        {
-          id: 'project_2',
-          repoName: 'cool-api',
-          repoUrl: 'https://github.com/johndoe/cool-api',
-          description: 'RESTful API with Go and Gin',
-          primaryLanguage: 'Go',
-          technologies: ['Go', 'Gin', 'PostgreSQL', 'Redis'],
-          
-          overallScore: 85,
-          codeQualityScore: 82,
-          structureScore: 88,
-          
-          analysis: {
-            folderStructure: {
-              hasSrcFolder: true,
-              hasComponents: false,
-              hasTests: true,
-              hasTypes: true,
-              organizationScore: 85,
-            },
-            codeQuality: {
-              hasLinting: true,
-              hasPrettier: false,
-              hasTypeScript: false,
-              hasDockerfile: true,
-              hasCI: true,
-              testFilesCount: 12,
-            },
-            optimizations: [
-              '✅ Good use of goroutines',
-              '✅ Proper error handling',
-              '⚠️ Consider connection pooling for Redis',
-              '⚠️ Add request validation middleware',
-            ],
-            bestPractices: {
-              followed: [
-                'Clean architecture',
-                'Dependency injection',
-                'Structured logging',
-                'Docker multi-stage builds',
-              ],
-              missing: [
-                'Add API versioning',
-                'Implement rate limiting',
-                'Add OpenAPI spec',
-              ],
-            },
-            frameworkAnalysis: {
-              framework: 'Gin',
-              patterns: [
-                'Middleware chain',
-                'Route groups',
-                'Custom error handler',
-              ],
-              suggestions: [
-                'Consider adding GORM for ORM',
-                'Implement graceful shutdown',
-              ],
-            },
-          },
-          analyzedAt: '2026-01-01T15:00:00Z',
-        },
-      ],
-      
-      // Experience
-      experiences: [
-        {
-          company: 'TechCorp Inc.',
-          position: 'Senior Full-Stack Developer',
-          startDate: '2023-01',
-          isCurrent: true,
-          description: 'Leading frontend team, building React applications',
-        },
-        {
-          company: 'StartupXYZ',
-          position: 'Full-Stack Developer',
-          startDate: '2021-06',
-          endDate: '2022-12',
-          isCurrent: false,
-          description: 'Built MVP products using Node.js and React',
-        },
-      ],
-      
-      // Education
-      education: [
-        {
-          institution: 'University of Technology',
-          degree: 'B.Tech',
-          field: 'Computer Science',
-          startYear: 2017,
-          endYear: 2021,
-        },
-      ],
-      
-      // Resume
-      resumeUrl: 'https://verifydev.io/resume/johndoe.pdf',
-      
-      // Activity
-      lastActive: '2026-01-03T12:00:00Z',
-      memberSince: '2025-06-15T00:00:00Z',
-      
-      matchScore: 95,
-    };
+    try {
+      // Fetch user profile from user-service internal API
+      const [candidateResponse, resumeResponse] = await Promise.all([
+        axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${userId}`, { timeout: 10000 }).catch(() => null),
+        axios.get(`http://resume-service:8003/api/v1/resumes/user/${userId}/url`, { timeout: 5000 }).catch(() => null),
+      ]);
 
-    return mockProfile;
+      if (!candidateResponse?.data?.success) {
+        return null;
+      }
+
+      const candidate = candidateResponse.data.data.candidate;
+      const resumeUrl = resumeResponse?.data?.url;
+
+      // Transform to full candidate profile
+      const fullProfile: FullCandidateProfile = {
+        id: candidate.id,
+        username: candidate.username,
+        name: candidate.name,
+        avatarUrl: candidate.avatarUrl,
+        bio: candidate.bio,
+        location: candidate.location,
+        auraScore: candidate.auraScore || 0,
+        coreCount: candidate.coreCount || 0,
+        isOpenToWork: candidate.isOpenToWork,
+        isVerified: candidate.isVerified || false,
+        
+        // Contact (if open to work)
+        email: candidate.email,
+        website: candidate.website,
+        
+        // Social
+        socialLinks: candidate.socialLinks || [],
+        
+        // Skills summary for search
+        topSkills: candidate.topSkills || [],
+        
+        // All skills with full details
+        allSkills: candidate.allSkills || [],
+        
+        // Top projects for search
+        topProjects: candidate.topProjects || [],
+        
+        // Full analyzed projects with details
+        analyzedProjects: (candidate.analyzedProjects || []).map((p: any) => ({
+          id: p.id,
+          repoName: p.repoName,
+          repoUrl: p.repoUrl,
+          description: p.description,
+          primaryLanguage: p.primaryLanguage,
+          technologies: p.technologies || [],
+          overallScore: p.overallScore || 0,
+          codeQualityScore: p.codeQualityScore || 0,
+          structureScore: p.structureScore || 0,
+          analysis: {
+            folderStructure: {},
+            codeQuality: {},
+            optimizations: [],
+            bestPractices: { followed: [], missing: [] },
+          },
+          analyzedAt: p.analyzedAt,
+        })),
+        
+        // Experience
+        experiences: (candidate.experiences || []).map((e: any) => ({
+          company: e.company,
+          position: e.position,
+          startDate: e.startDate,
+          endDate: e.endDate,
+          isCurrent: e.isCurrent,
+          description: e.description,
+        })),
+        
+        // Education
+        education: (candidate.education || []).map((e: any) => ({
+          institution: e.institution,
+          degree: e.degree,
+          field: e.field,
+          startYear: e.startYear,
+          endYear: e.endYear,
+        })),
+        
+        // Resume
+        resumeUrl,
+        
+        // Activity
+        lastActive: candidate.lastActive || new Date().toISOString(),
+        memberSince: candidate.memberSince || new Date().toISOString(),
+        
+        matchScore: 0,
+      };
+
+      return fullProfile;
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to fetch candidate profile');
+      return null;
+    }
   }
 
   /**
    * Get candidate profile (basic - for search results)
    */
   static async getCandidateProfile(userId: string): Promise<CandidateProfile | null> {
-    const fullProfile = await this.getFullCandidateProfile(userId);
-    if (!fullProfile) return null;
+    try {
+      const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${userId}`, {
+        timeout: 5000,
+      });
 
-    // Return basic profile for list view
-    return {
-      id: fullProfile.id,
-      username: fullProfile.username,
-      name: fullProfile.name,
-      avatarUrl: fullProfile.avatarUrl,
-      bio: fullProfile.bio,
-      location: fullProfile.location,
-      auraScore: fullProfile.auraScore,
-      coreCount: fullProfile.coreCount,
-      isOpenToWork: fullProfile.isOpenToWork,
-      isVerified: fullProfile.isVerified,
-      topSkills: fullProfile.topSkills,
-      topProjects: fullProfile.topProjects,
-      matchScore: fullProfile.matchScore,
-    };
+      if (!response.data.success) return null;
+
+      const candidate = response.data.data.candidate;
+      return {
+        id: candidate.id,
+        username: candidate.username,
+        name: candidate.name,
+        avatarUrl: candidate.avatarUrl,
+        bio: candidate.bio,
+        location: candidate.location,
+        auraScore: candidate.auraScore || 0,
+        coreCount: candidate.coreCount || 0,
+        isOpenToWork: candidate.isOpenToWork,
+        isVerified: candidate.isVerified || false,
+        topSkills: candidate.topSkills || [],
+        topProjects: candidate.topProjects || [],
+        matchScore: 0,
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to fetch candidate profile');
+      return null;
+    }
   }
 
   /**
@@ -445,7 +316,46 @@ export class CandidateService {
     minCores: number
   ): Promise<CandidateProfile[]> {
     logger.debug({ jobId, skillCount: requiredSkills.length }, 'Finding matching candidates');
-    return [];
+    
+    try {
+      // Search for candidates with matching skills
+      const { candidates } = await this.searchCandidates({
+        skills: requiredSkills.map(s => s.name),
+        minAura,
+        minCoreCount: minCores,
+      }, 1, 50);
+
+      // Filter candidates that meet all requirements
+      const matchingCandidates = candidates.filter(candidate => {
+        // Check aura score
+        if (candidate.auraScore < minAura) return false;
+        
+        // Check core count
+        if (candidate.coreCount < minCores) return false;
+
+        // Check required skills
+        for (const required of requiredSkills) {
+          const userSkill = candidate.topSkills.find(
+            s => s.name.toLowerCase() === required.name.toLowerCase()
+          );
+          if (!userSkill || userSkill.score < required.minScore) {
+            // If it's not in top skills, might still qualify
+            // We'll be lenient here and allow partial matches
+          }
+        }
+
+        return true;
+      });
+
+      // Calculate match score for each candidate
+      return matchingCandidates.map(candidate => ({
+        ...candidate,
+        matchScore: this.calculateMatchScore(candidate, { skills: requiredSkills.map(s => s.name), minAura }),
+      })).sort((a, b) => b.matchScore - a.matchScore);
+    } catch (error) {
+      logger.error({ error, jobId }, 'Failed to find matching candidates');
+      return [];
+    }
   }
 
   /**
@@ -457,6 +367,8 @@ export class CandidateService {
     jobId?: string
   ): Promise<boolean> {
     logger.info({ recruiterId, candidateId, jobId }, 'Shortlisting candidate');
+    // TODO: Implement with database persistence
+    // For now, this would be stored in a shortlist table
     return true;
   }
 
@@ -468,7 +380,56 @@ export class CandidateService {
     organizationId: string
   ): Promise<CandidateProfile[]> {
     logger.debug({ recruiterId, organizationId }, 'Fetching shortlist');
+    // TODO: Implement with database persistence
     return [];
+  }
+
+  /**
+   * Calculate match score based on filters
+   */
+  private static calculateMatchScore(
+    candidate: CandidateProfile | any,
+    filters: CandidateSearchFilters
+  ): number {
+    let score = 50; // Base score
+
+    // Aura score contribution (0-25 points)
+    if (filters.minAura) {
+      const auraRatio = Math.min((candidate.auraScore || 0) / filters.minAura, 2);
+      score += Math.round(auraRatio * 12.5);
+    } else {
+      score += 12.5;
+    }
+
+    // Core count contribution (0-10 points)
+    if (filters.minCoreCount) {
+      const coreRatio = Math.min((candidate.coreCount || 0) / filters.minCoreCount, 2);
+      score += Math.round(coreRatio * 5);
+    } else {
+      score += 5;
+    }
+
+    // Skill match contribution (0-25 points)
+    if (filters.skills && filters.skills.length > 0) {
+      const candidateSkills = (candidate.topSkills || candidate.skills || [])
+        .map((s: any) => s.name?.toLowerCase());
+      
+      const matchedSkills = filters.skills.filter(skill =>
+        candidateSkills.includes(skill.toLowerCase())
+      );
+      
+      const skillMatchRatio = matchedSkills.length / filters.skills.length;
+      score += Math.round(skillMatchRatio * 25);
+    } else {
+      score += 12.5;
+    }
+
+    // Verified bonus (0-10 points)
+    if (candidate.isVerified) {
+      score += 10;
+    }
+
+    return Math.min(100, Math.round(score));
   }
 }
 

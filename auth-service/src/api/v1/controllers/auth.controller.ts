@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { GitHubService } from '../../services/github.service.js';
-import { AuthService } from '../../services/auth.service.js';
-import { TokenService } from '../../services/token.service.js';
-import { redis } from '../../config/redis.js';
-import { env } from '../../config/env.js';
-import { logger } from '../../utils/logger.js';
-import type { AuthenticatedRequest, ApiResponse, AuthResponse } from '../../types/index.js';
+import { GitHubService } from '../../../services/github.service.js';
+import { AuthService } from '../../../services/auth.service.js';
+import { TokenService } from '../../../services/token.service.js';
+import { redis } from '../../../config/redis.js';
+import { env } from '../../../config/env.js';
+import { logger } from '../../../utils/logger.js';
+import type { AuthenticatedRequest, ApiResponse, AuthResponse } from '../../../types/index.js';
 
 const STATE_EXPIRY = 600; // 10 minutes
 
@@ -17,7 +17,7 @@ export class AuthController {
    */
   static async initiateGitHub(
     req: Request,
-    res: Response<ApiResponse<{ authUrl: string }>>
+    res: Response
   ): Promise<void> {
     try {
       // Generate unique state for CSRF protection
@@ -29,11 +29,20 @@ export class AuthController {
       // Generate authorization URL
       const authUrl = GitHubService.getAuthorizationUrl(state);
 
-      res.json({
-        success: true,
-        message: 'Redirect to this URL for GitHub authentication',
-        data: { authUrl },
-      });
+      // Check if client wants JSON (API call) or redirect (browser)
+      const wantsJson = req.headers.accept?.includes('application/json') || 
+                        req.query.format === 'json';
+      
+      if (wantsJson) {
+        res.json({
+          success: true,
+          message: 'Redirect to this URL for GitHub authentication',
+          data: { authUrl },
+        });
+      } else {
+        // Direct redirect for browser requests
+        res.redirect(authUrl);
+      }
     } catch (error) {
       logger.error({ error }, 'Failed to initiate GitHub OAuth');
       res.status(500).json({

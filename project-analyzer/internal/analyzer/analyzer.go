@@ -146,28 +146,100 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		FolderStructure: folderStructure,
 		CodeSignals:     codeSignals,
 		AnalyzedAt:      time.Now().Format(time.RFC3339),
-		AnalysisVersion: "1.0.0",
+		AnalysisVersion: "2.0.0", // Updated version with enhanced analysis
 	}
+
+	// Detect project type
+	result.ProjectType = fileParser.DetectProjectType(folderStructure, codeSignals)
 
 	// Detect frameworks based on package files
 	result.Frameworks = a.detectFrameworks(repoPath)
 	result.Databases = a.detectDatabases(repoPath)
 	result.Tools = a.detectTools(repoPath)
 
-	// Framework-specific analysis
-	if primaryLang == "JavaScript" || primaryLang == "TypeScript" {
+	// Check which languages are present (not just primary)
+	hasJSTS := false
+	hasGo := false
+	hasPython := false
+	for _, lang := range langStats {
+		if lang.Name == "JavaScript" || lang.Name == "TypeScript" {
+			hasJSTS = true
+		}
+		if lang.Name == "Go" {
+			hasGo = true
+		}
+		if lang.Name == "Python" {
+			hasPython = true
+		}
+	}
+
+	if hasJSTS {
 		// React detection
 		reactSignals := fileParser.AnalyzeReact()
 		if reactSignals != nil {
 			result.ReactSignals = reactSignals
 		}
+		// Node.js detection
+		nodeSignals := fileParser.AnalyzeNode()
+		if nodeSignals != nil {
+			result.NodeSignals = nodeSignals
+		}
 	}
+
+	// Go-specific analysis
+	if hasGo {
+		goSignals := fileParser.AnalyzeGo()
+		if goSignals != nil {
+			result.GoSignals = goSignals
+		}
+	}
+
+	// Python-specific analysis
+	if hasPython {
+		pythonSignals := fileParser.AnalyzePython()
+		if pythonSignals != nil {
+			result.PythonSignals = pythonSignals
+		}
+	}
+
+	// Advanced patterns analysis (language agnostic)
+	result.AdvancedPatterns = fileParser.AnalyzeAdvancedPatterns()
+
+	// ============================================
+	// INDUSTRY-LEVEL ANALYSIS (3-Layer Pipeline)
+	// ============================================
+	// Layer 1: Extract infrastructure signals (raw facts)
+	infraExtractor := parser.NewInfraExtractor(repoPath)
+	infraSignals := infraExtractor.Extract()
+
+	// Layer 2: Infer verified skills from signals (deterministic rules)
+	inferenceEngine := parser.NewInferenceEngine()
+	industryAnalysis := inferenceEngine.InferSkills(infraSignals)
+
+	// Attach to result
+	result.IndustryAnalysis = industryAnalysis
+
+	log.Info().
+		Str("projectId", req.ProjectID).
+		Int("verifiedSkills", industryAnalysis.TotalSkills).
+		Int("highConfidence", industryAnalysis.HighConfidenceSkills).
+		Str("archType", string(industryAnalysis.Architecture.Type)).
+		Str("engLevel", industryAnalysis.EngineeringLevel).
+		Msg("🏭 Industry analysis complete")
 
 	// Calculate totals
 	for _, lang := range langStats {
 		result.TotalLines += lang.Lines
 		result.TotalFiles += lang.Files
 	}
+
+	log.Info().
+		Str("projectId", req.ProjectID).
+		Str("projectType", string(result.ProjectType)).
+		Str("primaryLang", primaryLang).
+		Int("totalLines", result.TotalLines).
+		Int("totalFiles", result.TotalFiles).
+		Msg("📊 Analysis metrics")
 
 	return result, nil
 }

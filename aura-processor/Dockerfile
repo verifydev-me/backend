@@ -1,30 +1,41 @@
-FROM node:20-alpine AS base
+# ============================================
+# Aura Processor - Production Dockerfile
+# ============================================
+FROM node:20-alpine AS builder
 
-FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+
+# Install OpenSSL and other required libraries for Prisma
+RUN apk add --no-cache openssl openssl-dev libc6-compat
+
+COPY package*.json ./
+RUN npm ci && npm cache clean --force
+
 COPY prisma ./prisma/
-RUN npm ci
 RUN npx prisma generate
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
+COPY tsconfig.json ./
+COPY src ./src
 
-FROM base AS runner
+RUN npm run build
+RUN npm prune --production
+
+FROM node:20-alpine AS production
+
 WORKDIR /app
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+RUN apk add --no-cache dumb-init openssl
+
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
+
 ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
+RUN npx prisma generate
 
-COPY --from=builder /app/dist ./dist
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY package.json ./
+USER nodejs
 
-USER appuser
-
-CMD ["node", "dist/index.js"]
+CMD ["dumb-init", "node", "dist/index.js"]

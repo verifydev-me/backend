@@ -1,87 +1,116 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
+// ==================== USER MODEL (Read-Only Mirror) ====================
+
 model User {
-  id            String    @id @default(uuid())
-  githubId      String    @unique @map("github_id")
-  username      String    @unique
-  email         String?   @unique
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  githubId      String  @unique @map("github_id")
+  username      String  @unique
+  email         String? @unique
   name          String?
-  avatarUrl     String?   @map("avatar_url")
+  avatarUrl     String? @map("avatar_url")
   bio           String?
   location      String?
   company       String?
   website       String?
-  twitterHandle String?   @map("twitter_handle")
-  
-  isPublic      Boolean   @default(true) @map("is_public")
-  isOpenToWork  Boolean   @default(false) @map("is_open_to_work")
-  isVerified    Boolean   @default(false) @map("is_verified")
-  auraScore     Int       @default(0) @map("aura_score")
-  coreCount     Int       @default(1) @map("core_count")
-  githubFollowers   Int   @default(0) @map("github_followers")
-  githubRepos       Int   @default(0) @map("github_repos")
+  twitterHandle String? @map("twitter_handle")
+
+  // ========== PROFILE ==========
+  isPublic     Boolean @default(true) @map("is_public")
+  isOpenToWork Boolean @default(false) @map("is_open_to_work")
+  isVerified   Boolean @default(false) @map("is_verified")
+
+  // ========== AURA & STATS ==========
+  auraScore           Int @default(0) @map("aura_score")
+  coreCount           Int @default(1) @map("core_count")
+  githubFollowers     Int @default(0) @map("github_followers")
+  githubRepos         Int @default(0) @map("github_repos")
   githubContributions Int @default(0) @map("github_contributions")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  lastLoginAt   DateTime? @map("last_login_at")
-  sessions      Session[]
-  skills        Skill[]
-  projects      Project[]
-  experiences   Experience[]
-  socialLinks   SocialLink[]
-  activities    Activity[]
+
+  // ========== TIMESTAMPS ==========
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+  githubAccessToken String?   @map("github_access_token")
+
+  // ========== RELATIONS ==========
+  sessions    Session[]
+  skills      Skill[]
+  projects    Project[]
+  experiences Experience[]
+  socialLinks SocialLink[]
+  activities  Activity[]
+
+  @@index([auraScore])
+  @@index([createdAt])
   @@map("users")
 }
 
+// ==================== SESSION MODEL ====================
+
 model Session {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  refreshToken  String    @unique @map("refresh_token")
-  userAgent     String?   @map("user_agent")
-  ipAddress     String?   @map("ip_address")
-  isValid       Boolean   @default(true) @map("is_valid")
-  expiresAt     DateTime  @map("expires_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @map("user_id") @db.ObjectId
+  refreshToken String   @unique @map("refresh_token")
+  userAgent    String?  @map("user_agent")
+  ipAddress    String?  @map("ip_address")
+  isValid      Boolean  @default(true) @map("is_valid")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
 }
 
+// ==================== SKILL MODEL ====================
+
 model Skill {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  name              String
-  category          SkillCategory @default(OTHER)
-  isVerified        Boolean   @default(false) @map("is_verified")
-  verifiedScore     Int       @default(0) @map("verified_score")
+  id       String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String        @map("user_id") @db.ObjectId
+  name     String
+  category SkillCategory @default(OTHER)
+
+  // ========== VERIFICATION ==========
+  isVerified        Boolean    @default(false) @map("is_verified")
+  verifiedScore     Int        @default(0) @map("verified_score")
   selfDeclaredLevel SkillLevel @default(BEGINNER) @map("self_declared_level")
-  projectCount      Int       @default(0) @map("project_count")
-  linesOfCode       Int       @default(0) @map("lines_of_code")
-  auraContribution  Int       @default(0) @map("aura_contribution")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ========== STATS ==========
+  projectCount     Int @default(0) @map("project_count")
+  linesOfCode      Int @default(0) @map("lines_of_code")
+  auraContribution Int @default(0) @map("aura_contribution")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, name])
   @@index([userId])
+  @@index([category])
+  @@index([isVerified])
   @@map("skills")
 }
 
 enum SkillCategory {
-  LANGUAGE        // JavaScript, Go, Python
-  FRAMEWORK       // React, Express, Gin
-  DATABASE        // PostgreSQL, MongoDB, Redis
-  DEVOPS          // Docker, K8s, CI/CD
-  TOOL            // Git, VS Code
-  SOFT_SKILL      // Communication, Leadership
+  LANGUAGE // JavaScript, Go, Python
+  FRAMEWORK // React, Express, Gin
+  DATABASE // PostgreSQL, MongoDB, Redis
+  DEVOPS // Docker, K8s, CI/CD
+  TOOL // Git, VS Code
+  SOFT_SKILL // Communication, Leadership
   OTHER
 }
 
@@ -92,35 +121,46 @@ enum SkillLevel {
   EXPERT
 }
 
+// ==================== PROJECT MODEL ====================
+
 model Project {
-  id              String    @id @default(uuid())
-  userId          String    @map("user_id")
-  
-  // GitHub info
-  githubRepoUrl   String    @map("github_repo_url")
-  repoName        String    @map("repo_name")
-  description     String?
-  stars           Int       @default(0)
-  forks           Int       @default(0)
-  language        String?   // Primary language
-  analysisStatus  AnalysisStatus @default(PENDING) @map("analysis_status")
-  analysisId      String?   @map("analysis_id") // MongoDB ObjectId
-  analyzedAt      DateTime? @map("analyzed_at")
-  codeQualityScore  Int     @default(0) @map("code_quality_score")
-  structureScore    Int     @default(0) @map("structure_score")
-  overallScore      Int     @default(0) @map("overall_score")
-  auraContribution  Int     @default(0) @map("aura_contribution")
-  isPublic        Boolean   @default(true) @map("is_public")
-  isPinned        Boolean   @default(false) @map("is_pinned")
-  displayOrder    Int       @default(0) @map("display_order")
-  
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+
+  // ========== GITHUB INFO ==========
+  githubRepoUrl String  @map("github_repo_url")
+  repoName      String  @map("repo_name")
+  description   String?
+  stars         Int     @default(0)
+  forks         Int     @default(0)
+  language      String?
+
+  // ========== ANALYSIS ==========
+  analysisStatus AnalysisStatus @default(PENDING) @map("analysis_status")
+  analysisId     String?        @map("analysis_id") @db.ObjectId
+  fullAnalysis   Json?          @map("full_analysis")
+  analyzedAt     DateTime?      @map("analyzed_at")
+
+  // ========== SCORES ==========
+  codeQualityScore Int @default(0) @map("code_quality_score")
+  structureScore   Int @default(0) @map("structure_score")
+  overallScore     Int @default(0) @map("overall_score")
+  auraContribution Int @default(0) @map("aura_contribution")
+
+  // ========== VISIBILITY ==========
+  isPublic     Boolean @default(true) @map("is_public")
+  isPinned     Boolean @default(false) @map("is_pinned")
+  displayOrder Int     @default(0) @map("display_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, githubRepoUrl])
   @@index([userId])
+  @@index([analysisStatus])
+  @@index([createdAt])
   @@map("projects")
 }
 
@@ -131,26 +171,30 @@ enum AnalysisStatus {
   FAILED
 }
 
+// ==================== EXPERIENCE MODEL ====================
+
 model Experience {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  
-  type          ExperienceType
-  title         String
-  organization  String
-  location      String?
-  description   String?
-  
-  startDate     DateTime  @map("start_date")
-  endDate       DateTime? @map("end_date")
-  isCurrent     Boolean   @default(false) @map("is_current")
-  skills        String[]  @default([])
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+
+  type         ExperienceType
+  title        String
+  organization String
+  location     String?
+  description  String?
+
+  startDate DateTime  @map("start_date")
+  endDate   DateTime? @map("end_date")
+  isCurrent Boolean   @default(false) @map("is_current")
+  skills    String[]  @default([])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
+  @@index([type])
   @@map("experiences")
 }
 
@@ -161,19 +205,22 @@ enum ExperienceType {
   VOLUNTEER
 }
 
+// ==================== SOCIAL LINK MODEL ====================
 
 model SocialLink {
-  id        String      @id @default(uuid())
-  userId    String      @map("user_id")
-  platform  SocialPlatform
-  url       String
-  username  String?
-  
-  createdAt DateTime    @default(now()) @map("created_at")
-  
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id       String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId   String         @map("user_id") @db.ObjectId
+  platform SocialPlatform
+  url      String
+  username String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, platform])
+  @@index([userId])
   @@map("social_links")
 }
 
@@ -189,25 +236,26 @@ enum SocialPlatform {
   OTHER
 }
 
+// ==================== ACTIVITY MODEL ====================
+
 model Activity {
-  id          String        @id @default(uuid())
-  userId      String        @map("user_id")
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @map("user_id") @db.ObjectId
   type        ActivityType
   description String?
-  
-  // Points earned
-  auraPoints  Int           @default(0) @map("aura_points")
-  
-  // Reference (optional)
-  referenceId   String?     @map("reference_id")
-  referenceType String?     @map("reference_type")
-  
-  createdAt   DateTime      @default(now()) @map("created_at")
-  
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  auraPoints Int @default(0) @map("aura_points")
+
+  referenceId   String? @map("reference_id")
+  referenceType String? @map("reference_type")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
-  @@index([createdAt])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
   @@map("activities")
 }
 

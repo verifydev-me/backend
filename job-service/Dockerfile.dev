@@ -1,0 +1,30 @@
+# Development Dockerfile - Skips TypeScript compilation
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache openssl openssl-dev libc6-compat curl
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev)
+RUN npm install
+
+# Install tsx globally for running TypeScript
+RUN npm install -g tsx
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate --schema=prisma/schema.prisma
+
+ENV NODE_ENV=development
+ENV PORT=3004
+
+EXPOSE 3004
+
+# Run with tsx for development (handles TypeScript natively)
+CMD ["tsx", "watch", "src/server.ts"]

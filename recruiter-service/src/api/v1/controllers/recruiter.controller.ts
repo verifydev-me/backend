@@ -1,18 +1,43 @@
 import { Request, Response } from 'express';
 import { CandidateService } from '../../../domain/candidate.service.js';
+import { MatchingService, type JobRequirements } from '../../../domain/matching.service.js';
 import { logger } from '../../../utils/logger.js';
 import type { RecruiterRequest, ApiResponse } from '../../../types/index.js';
 import { z } from 'zod';
 
 const searchFiltersSchema = z.object({
-  skills: z.array(z.string()).optional(),
-  minAuraScore: z.number().min(0).optional(),
-  minCoreCount: z.number().min(1).max(3).optional(),
+  skills: z.union([z.array(z.string()), z.string()]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return [val];
+    return val;
+  }),
+  minAuraScore: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (!val) return undefined;
+    return typeof val === 'string' ? parseInt(val, 10) : val;
+  }),
+  minCoreCount: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (!val) return undefined;
+    const num = typeof val === 'string' ? parseInt(val, 10) : val;
+    return num >= 1 && num <= 3 ? num : undefined;
+  }),
   location: z.string().optional(),
-  isOpenToWork: z.boolean().optional(),
-  minSkillScore: z.number().min(0).max(100).optional(),
-  page: z.number().min(1).default(1),
-  limit: z.number().min(1).max(50).default(20),
+  isOpenToWork: z.union([z.boolean(), z.string()]).optional().transform((val) => {
+    if (!val) return undefined;
+    return val === 'true' || val === true;
+  }),
+  minSkillScore: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (!val) return undefined;
+    const num = typeof val === 'string' ? parseInt(val, 10) : val;
+    return num >= 0 && num <= 100 ? num : undefined;
+  }),
+  page: z.union([z.number(), z.string()]).optional().transform((val) => {
+    const num = typeof val === 'string' ? parseInt(val, 10) : (val || 1);
+    return num >= 1 ? num : 1;
+  }).default(1),
+  limit: z.union([z.number(), z.string()]).optional().transform((val) => {
+    const num = typeof val === 'string' ? parseInt(val, 10) : (val || 20);
+    return num >= 1 && num <= 50 ? num : 20;
+  }).default(20),
 });
 
 export class RecruiterController {
@@ -230,7 +255,7 @@ export class RecruiterController {
       const { userId } = req.params;
       const { jobId } = req.body;
 
-      await CandidateService.shortlistCandidate(req.recruiter.recruiterId, userId, jobId);
+      await CandidateService.shortlistCandidate(req.recruiter.id, userId, jobId);
 
       res.json({
         success: true,
@@ -257,7 +282,7 @@ export class RecruiterController {
       }
 
       const candidates = await CandidateService.getShortlist(
-        req.recruiter.recruiterId,
+        req.recruiter.id,
         req.recruiter.organizationId
       );
 
@@ -303,6 +328,155 @@ export class RecruiterController {
     } catch (error) {
       logger.error({ error }, 'Failed to get dashboard');
       res.status(500).json({ success: false, message: 'Failed to get dashboard', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+  /**
+   * POST /jobs/:jobId/suggested-candidates
+   * Get candidates matching a job's requirements
+   */
+  static async getSuggestedCandidates(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { jobId } = req.params;
+      const { 
+        requiredSkills = [], 
+        niceToHaveSkills = [],
+        minAuraScore = 0, 
+        minCoreCount = 0, 
+        experienceLevel,
+        location,
+        locationType,
+        limit = 20 
+      } = req.body;
+
+      const jobRequirements: JobRequirements = {
+        jobId,
+        requiredSkills: (requiredSkills as any[]).map((s: any) => ({
+          name: typeof s === 'string' ? s : s.name,
+          minScore: typeof s === 'object' ? s.minScore : undefined,
+          isRequired: typeof s === 'object' ? s.isRequired !== false : true,
+        })),
+        niceToHaveSkills: (niceToHaveSkills as any[]).map((s: any) => ({
+          name: typeof s === 'string' ? s : s.name,
+        })),
+        minAuraScore,
+        minCoreCount,
+        experienceLevel,
+        location,
+        locationType,
+      };
+
+      const matchedCandidates = await MatchingService.findMatchingCandidates(
+        jobRequirements,
+        limit
+      );
+
+      res.json({
+        success: true,
+        message: `Found ${matchedCandidates.length} matching candidates`,
+        data: {
+          candidates: matchedCandidates.map(c => ({
+            id: c.id,
+            username: c.username,
+            name: c.name,
+            avatarUrl: c.avatarUrl,
+            location: c.location,
+            auraScore: c.auraScore,
+            coreCount: c.coreCount,
+            isOpenToWork: c.isOpenToWork,
+            matchScore: c.totalScore,
+            matchBreakdown: c.breakdown,
+            matchedSkills: c.matchedSkills,
+            missingSkills: c.missingSkills,
+            matchReasons: c.reasons,
+          })),
+          total: matchedCandidates.length,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get suggested candidates');
+      res.status(500).json({ success: false, message: 'Failed to get suggestions', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /candidates/:userId/match-score
+   * Calculate match score for a specific candidate against job requirements
+   */
+  static async calculateCandidateMatch(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { userId } = req.params;
+      const { 
+        jobId,
+        requiredSkills = [], 
+        niceToHaveSkills = [],
+        minAuraScore = 0, 
+        minCoreCount = 0, 
+        experienceLevel,
+        location,
+        locationType,
+        availableFrom,
+      } = req.body;
+
+      const jobRequirements: JobRequirements = {
+        jobId: jobId || 'manual',
+        requiredSkills: (requiredSkills as any[]).map((s: any) => ({
+          name: typeof s === 'string' ? s : s.name,
+          minScore: typeof s === 'object' ? s.minScore : undefined,
+          isRequired: typeof s === 'object' ? s.isRequired !== false : true,
+        })),
+        niceToHaveSkills: (niceToHaveSkills as any[]).map((s: any) => ({
+          name: typeof s === 'string' ? s : s.name,
+        })),
+        minAuraScore,
+        minCoreCount,
+        experienceLevel,
+        location,
+        locationType,
+        availableFrom: availableFrom ? new Date(availableFrom) : undefined,
+      };
+
+      const matchResult = await MatchingService.calculateApplicationMatch(
+        userId,
+        jobId || 'manual',
+        jobRequirements
+      );
+
+      if (!matchResult) {
+        res.status(404).json({ success: false, message: 'Candidate not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Match score calculated',
+        data: {
+          candidateId: matchResult.candidateId,
+          matchScore: matchResult.totalScore,
+          matchBreakdown: matchResult.breakdown,
+          matchedSkills: matchResult.matchedSkills,
+          missingSkills: matchResult.missingSkills,
+          matchReasons: matchResult.reasons,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to calculate match');
+      res.status(500).json({ success: false, message: 'Failed to calculate match', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 }

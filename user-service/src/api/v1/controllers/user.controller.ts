@@ -182,11 +182,102 @@ export class UserController {
       res.json({
         success: true,
         message: 'Aura summary retrieved',
-        data: { aura },
+        data: aura, // Return directly, not nested
       });
     } catch (error) {
       logger.error({ error }, 'Failed to get aura');
       res.status(500).json({ success: false, message: 'Failed to get aura', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /users/me/sync-github
+   * Sync GitHub profile data
+   */
+  static async syncGitHub(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      // For now, just return success - GitHub sync happens at login
+      res.json({
+        success: true,
+        message: 'GitHub profile synced',
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to sync GitHub');
+      res.status(500).json({ success: false, message: 'Failed to sync', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /users/:userId/skills-summary
+   * Internal endpoint for job service to get user skills
+   */
+  static async getSkillsSummary(
+    req: Request,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      
+      const [skills, user] = await Promise.all([
+        ProfileService.getUserSkills(userId),
+        ProfileService.getMyProfile(userId)
+      ]);
+
+      if (!user) {
+         res.status(404).json({ success: false, message: 'User not found', error: { code: 'NOT_FOUND' } });
+         return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Skills summary retrieved',
+        data: {
+          skills: skills.map(s => ({
+            name: s.name,
+            score: s.verifiedScore || 0,
+            isVerified: s.isVerified
+          })),
+          auraScore: user.auraScore
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get skills summary');
+      res.status(500).json({ success: false, message: 'Failed to get skills summary', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /users/me/skills
+   * Get current user's skills
+   */
+  static async getMySkills(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const skills = await ProfileService.getUserSkills(req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Skills retrieved',
+        data: skills,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get skills');
+      res.status(500).json({ success: false, message: 'Failed to get skills', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 

@@ -9,6 +9,7 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32),
   AUTH_SERVICE_URL: z.string().url(),
   ALLOWED_ORIGINS: z.string().transform((val) => val.split(',')),
+  GITHUB_TOKEN: z.string().optional(),
 });
 
 const parseEnv = () => {

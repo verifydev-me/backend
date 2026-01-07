@@ -5,6 +5,13 @@ import { authenticate } from '../../../middlewares/authenticate.js';
 const router = Router();
 
 /**
+ * @route   GET /api/v1/projects/available
+ * @desc    Get user's available GitHub repos to add
+ * @access  Private
+ */
+router.get('/available', authenticate, ProjectController.getAvailableRepos);
+
+/**
  * @route   POST /api/v1/projects
  * @desc    Add a new project for analysis
  * @access  Private
@@ -54,3 +61,4 @@ router.post('/:projectId/analyze', authenticate, ProjectController.reanalyze);
 router.post('/:projectId/pin', authenticate, ProjectController.togglePin);
 
 export default router;
+

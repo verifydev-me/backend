@@ -13,14 +13,13 @@ export interface ApiResponse<T = unknown> {
   message: string;
   data?: T;
   error?: { code: string; details?: unknown };
-  meta?: { page?: number; limit?: number; total?: number };
+  meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
 }
 
 // Job Types
 export interface Job {
   id: string;
-  organizationId: string;
-  organization?: Organization;
+  recruiterId: string;
   title: string;
   description: string;
   requirements: string;
@@ -32,7 +31,8 @@ export interface Job {
   salaryMin?: number;
   salaryMax?: number;
   salaryCurrency: string;
-  requiredSkills: JobSkill[];
+  requiredSkills: string[];
+  preferredSkills?: string[];
   minAuraScore: number;
   minCoreCount: number;
   status: JobStatus;
@@ -92,7 +92,8 @@ export interface CreateJobDto {
   salaryMin?: number;
   salaryMax?: number;
   salaryCurrency?: string;
-  requiredSkills: JobSkill[];
+  requiredSkills: string[];
+  preferredSkills?: string[];
   minAuraScore?: number;
   minCoreCount?: number;
   expiresAt?: Date;
@@ -111,4 +112,9 @@ export interface JobFilters {
 export interface ApplyJobDto {
   coverLetter?: string;
   resumeUrl?: string;
+  candidateName?: string;
+  candidateEmail?: string;
+  candidateAura?: number;
+  candidateCores?: number;
+  candidateSkills?: string[];
 }

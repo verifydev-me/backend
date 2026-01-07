@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/rs/zerolog/log"
 
+	"github.com/verifydev/resume-service/internal/models"
 	"github.com/verifydev/resume-service/internal/templates"
 )
 
@@ -31,7 +33,7 @@ func NewPDFGenerator(timeout time.Duration) (*PDFGenerator, error) {
 }
 
 // Generate creates a PDF from resume data
-func (g *PDFGenerator) Generate(ctx context.Context, data ResumeData) ([]byte, error) {
+func (g *PDFGenerator) Generate(ctx context.Context, data models.ResumeData) ([]byte, error) {
 	log.Info().Str("userId", data.User.ID).Msg("Generating PDF")
 	startTime := time.Now()
 
@@ -54,6 +56,15 @@ func (g *PDFGenerator) Generate(ctx context.Context, data ResumeData) ([]byte, e
 		Msg("PDF generated successfully")
 
 	return pdf, nil
+}
+
+// GenerateHTML generates HTML from resume data without converting to PDF
+func (g *PDFGenerator) GenerateHTML(data models.ResumeData) (string, error) {
+	html, err := g.templateEngine.Render(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to render template: %w", err)
+	}
+	return html, nil
 }
 
 // htmlToPDF converts HTML to PDF using headless Chrome
@@ -86,15 +97,15 @@ func (g *PDFGenerator) htmlToPDF(ctx context.Context, html string) ([]byte, erro
 		}),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var err error
-			pdfBuf, _, err = chromedp.PrintToPDF(&chromedp.PrintToPDFParams{
-				PrintBackground:   true,
-				PreferCSSPageSize: true,
-				MarginTop:         0.4,
-				MarginBottom:      0.4,
-				MarginLeft:        0.4,
-				MarginRight:       0.4,
-				Scale:             1.0,
-			}).Do(ctx)
+			pdfBuf, _, err = page.PrintToPDF().
+				WithPrintBackground(true).
+				WithPreferCSSPageSize(true).
+				WithMarginTop(0.4).
+				WithMarginBottom(0.4).
+				WithMarginLeft(0.4).
+				WithMarginRight(0.4).
+				WithScale(1.0).
+				Do(ctx)
 			return err
 		}),
 	); err != nil {

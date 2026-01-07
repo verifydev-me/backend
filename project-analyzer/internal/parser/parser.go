@@ -80,16 +80,49 @@ func (p *FileParser) GetLanguageStats() []signals.LanguageStats {
 	return result
 }
 
-// GetPrimaryLanguage returns the most used language
+// GetPrimaryLanguage returns the most used programming language
+// Excludes config files (JSON, YAML, HTML, CSS) from being primary
 func (p *FileParser) GetPrimaryLanguage(stats []signals.LanguageStats) string {
+	// Languages that should be considered as primary (actual code)
+	codeLangs := map[string]bool{
+		"TypeScript": true,
+		"JavaScript": true,
+		"Go":         true,
+		"Python":     true,
+		"Java":       true,
+		"Rust":       true,
+		"Ruby":       true,
+		"PHP":        true,
+		"C#":         true,
+		"C++":        true,
+		"C":          true,
+		"Swift":      true,
+		"Kotlin":     true,
+		"Vue":        true,
+		"Svelte":     true,
+	}
+
 	maxLines := 0
-	primary := ""
+	primary := "Unknown"
+
 	for _, s := range stats {
-		if s.Lines > maxLines {
+		// Only consider actual programming languages
+		if codeLangs[s.Name] && s.Lines > maxLines {
 			maxLines = s.Lines
 			primary = s.Name
 		}
 	}
+
+	// If no code language found, return the most used one
+	if primary == "Unknown" && len(stats) > 0 {
+		for _, s := range stats {
+			if s.Lines > maxLines {
+				maxLines = s.Lines
+				primary = s.Name
+			}
+		}
+	}
+
 	return primary
 }
 
@@ -131,6 +164,45 @@ func (p *FileParser) AnalyzeFolderStructure() signals.FolderAnalysis {
 			analysis.HasConfig = true
 		case "docs", "documentation":
 			analysis.HasDocs = true
+		case "api", "routes", "router":
+			analysis.HasAPI = true
+		case "models", "entities", "entity":
+			analysis.HasModels = true
+		case "services", "service", "domain":
+			analysis.HasServices = true
+		case "middleware", "middlewares":
+			analysis.HasMiddleware = true
+		case "controllers", "controller", "handlers", "handler":
+			analysis.HasControllers = true
+		}
+	}
+
+	// Also check inside src folder for nested structure
+	srcPath := filepath.Join(p.repoPath, "src")
+	if entries, err := os.ReadDir(srcPath); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			name := strings.ToLower(entry.Name())
+			switch name {
+			case "components":
+				analysis.HasComponents = true
+			case "utils", "helpers", "lib":
+				analysis.HasUtils = true
+			case "types", "@types":
+				analysis.HasTypes = true
+			case "api", "routes", "router":
+				analysis.HasAPI = true
+			case "models", "entities":
+				analysis.HasModels = true
+			case "services", "service", "domain":
+				analysis.HasServices = true
+			case "middleware", "middlewares":
+				analysis.HasMiddleware = true
+			case "controllers", "controller", "handlers":
+				analysis.HasControllers = true
+			}
 		}
 	}
 
@@ -160,12 +232,16 @@ func (p *FileParser) AnalyzeCodeSignals() signals.CodeSignals {
 			cs.HasEnvExample = true
 		case name == "dockerfile" || strings.HasPrefix(name, "dockerfile"):
 			cs.HasDockerfile = true
+		case name == "docker-compose.yml" || name == "docker-compose.yaml" || name == "compose.yml":
+			cs.HasDockerCompose = true
 		case name == ".eslintrc" || name == ".eslintrc.js" || name == ".eslintrc.json" || name == "eslint.config.js":
 			cs.HasLinting = true
 		case name == ".prettierrc" || name == ".prettierrc.js" || name == "prettier.config.js":
 			cs.HasPrettier = true
 		case name == "tsconfig.json":
 			cs.HasTypeScript = true
+		case name == "makefile":
+			cs.HasMakefile = true
 		}
 	}
 
