@@ -20,6 +20,7 @@ const (
 	SignalNginx   InfraSignal = "nginx"
 	SignalTraefik InfraSignal = "traefik"
 	SignalEnvoy   InfraSignal = "envoy"
+	SignalKong    InfraSignal = "kong"
 
 	// Message Queue Signals
 	SignalRabbitMQ InfraSignal = "rabbitmq"
@@ -324,6 +325,38 @@ const (
 	SignalMonorepo          InfraSignal = "monorepo"
 	SignalFrontendOnly      InfraSignal = "frontend_only"
 	SignalBackendOnly       InfraSignal = "backend_only"
+
+	// Frontend & Frameworks (Verification Targets)
+	SignalReact        InfraSignal = "react"
+	SignalNextJS       InfraSignal = "nextjs"
+	SignalNestJS       InfraSignal = "nestjs"
+	SignalVue          InfraSignal = "vue"
+	SignalAngular      InfraSignal = "angular"
+	SignalSvelte       InfraSignal = "svelte"
+	SignalRedux        InfraSignal = "redux"
+	SignalZustand      InfraSignal = "zustand"
+	SignalReactQuery   InfraSignal = "react_query"
+	SignalTailwind     InfraSignal = "tailwind"
+	SignalFramerMotion InfraSignal = "framer_motion"
+	SignalMaterialUI   InfraSignal = "material_ui"
+	SignalChakraUI     InfraSignal = "chakra_ui"
+	SignalFirebase     InfraSignal = "firebase"
+	SignalSupabase     InfraSignal = "supabase"
+	SignalJest         InfraSignal = "jest"
+	SignalCypress      InfraSignal = "cypress"
+	SignalPlaywright   InfraSignal = "playwright"
+
+	// Backend Frameworks (Granular)
+	SignalExpress InfraSignal = "express"
+	SignalGin     InfraSignal = "gin"
+	SignalDjango  InfraSignal = "django"
+	SignalFlask   InfraSignal = "flask"
+	SignalFastAPI InfraSignal = "fastapi"
+
+	// Languages (detected as signals)
+	SignalGo     InfraSignal = "go"
+	SignalNode   InfraSignal = "node"
+	SignalPython InfraSignal = "python"
 )
 
 // InfrastructureSignals - All extracted infrastructure facts
