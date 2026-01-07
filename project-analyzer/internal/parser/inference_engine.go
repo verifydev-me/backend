@@ -1395,18 +1395,30 @@ func (e *InferenceEngine) InferSkills(infraSignals *signals.InfrastructureSignal
 		}
 	}
 
-	// Apply penalty for incomplete projects
-	// If SignalIncompleteProject is detected, reduce all skill confidences
+	// Apply minor penalty for incomplete projects
+	// Only reduce resumeReady status, don't remove skills or heavily penalize
 	if infraSignals.HasSignal(signals.SignalIncompleteProject) {
-		penaltyFactor := 0.7 // 30% penalty for incomplete projects
-
+		// Update skills with warning but keep them all
 		for cat, skills := range analysis.SkillsByCategory {
 			for i := range skills {
-				skills[i].Confidence *= penaltyFactor
-				skills[i].ResumeReady = skills[i].Confidence >= 0.75
-				skills[i].Evidence = append(skills[i].Evidence, "⚠️ Project may be incomplete - reduced confidence")
+				// Only add warning evidence, don't heavily penalize confidence
+				skills[i].Evidence = append(skills[i].Evidence, "⚠️ Project structure incomplete")
+				// Slightly reduce resumeReady threshold for incomplete projects
+				skills[i].ResumeReady = skills[i].Confidence >= 0.80
 			}
 			analysis.SkillsByCategory[cat] = skills
+		}
+
+		// Update VerifiedSkills array to match
+		analysis.VerifiedSkills = make([]signals.VerifiedSkill, 0)
+		analysis.ResumeReadySkills = 0
+		for _, skills := range analysis.SkillsByCategory {
+			for _, skill := range skills {
+				analysis.VerifiedSkills = append(analysis.VerifiedSkills, skill)
+				if skill.ResumeReady {
+					analysis.ResumeReadySkills++
+				}
+			}
 		}
 	}
 
@@ -1433,15 +1445,17 @@ func (e *InferenceEngine) evaluateRule(rule SkillRule, sigs *signals.Infrastruct
 	optionalCount := 0
 	var matchedSignals []signals.InfraSignal
 	var evidenceList []string
+	var signalConfidenceSum float64
 
 	for _, optSig := range rule.OptionalSignals {
 		if sigs.HasSignal(optSig) {
 			optionalCount++
 			matchedSignals = append(matchedSignals, optSig)
 
-			// Add evidence from signal details
+			// Add evidence from signal details and track confidence
 			if detail, ok := sigs.SignalDetails[optSig]; ok {
 				evidenceList = append(evidenceList, detail.Evidence...)
+				signalConfidenceSum += detail.Confidence
 			}
 		}
 	}
@@ -1451,20 +1465,42 @@ func (e *InferenceEngine) evaluateRule(rule SkillRule, sigs *signals.Infrastruct
 		matchedSignals = append(matchedSignals, reqSig)
 		if detail, ok := sigs.SignalDetails[reqSig]; ok {
 			evidenceList = append(evidenceList, detail.Evidence...)
+			signalConfidenceSum += detail.Confidence
 		}
 	}
 
-	// Check minimum signal count
+	// Check minimum signal count - this applies when there are NO required signals
+	// AND optional signals are not meeting the minimum
 	if len(rule.RequiredSignals) == 0 && optionalCount < rule.MinSignalCount {
+		return signals.VerifiedSkill{}, false
+	}
+
+	// If no required signals and no optional signals matched, this rule doesn't apply
+	totalMatchedSignals := len(rule.RequiredSignals) + optionalCount
+	if totalMatchedSignals == 0 {
 		return signals.VerifiedSkill{}, false
 	}
 
 	// Calculate confidence based on matched signals
 	confidence := rule.BaseConfidence
+
+	// Boost confidence based on optional signals matched
 	if len(rule.OptionalSignals) > 0 {
 		boostFactor := float64(optionalCount) / float64(len(rule.OptionalSignals)) * 0.15
 		confidence += boostFactor
 	}
+
+	// Only BOOST confidence from signal detection, never reduce below base
+	// This prevents accuracy drops for valid detections
+	if totalMatchedSignals > 0 && signalConfidenceSum > 0 {
+		avgSignalConfidence := signalConfidenceSum / float64(totalMatchedSignals)
+		// If signals are high confidence (>0.85), boost the skill confidence
+		if avgSignalConfidence > 0.85 {
+			confidence += 0.05 // Small boost for high confidence signals
+		}
+	}
+
+	// Cap confidence at 1.0
 	if confidence > 1.0 {
 		confidence = 1.0
 	}
@@ -1474,10 +1510,10 @@ func (e *InferenceEngine) evaluateRule(rule SkillRule, sigs *signals.Infrastruct
 		evidenceList = rule.Evidence
 	}
 
-	// Deduplicate evidence
+	// Deduplicate evidence and keep up to 8 items for better context
 	evidenceList = dedupe(evidenceList)
-	if len(evidenceList) > 5 {
-		evidenceList = evidenceList[:5]
+	if len(evidenceList) > 8 {
+		evidenceList = evidenceList[:8]
 	}
 
 	skill := signals.VerifiedSkill{
@@ -1489,7 +1525,7 @@ func (e *InferenceEngine) evaluateRule(rule SkillRule, sigs *signals.Infrastruct
 		Signals:     matchedSignals,
 		Keywords:    rule.Keywords,
 		Weight:      rule.Weight,
-		ResumeReady: confidence >= 0.75,
+		ResumeReady: confidence >= 0.75, // Skills with 75%+ confidence are resume-ready
 	}
 
 	return skill, true

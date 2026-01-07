@@ -3,8 +3,7 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"strings"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -128,40 +127,90 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	default:
 	}
 
-	// 2. Parse files
-	fileParser := parser.NewFileParser(repoPath)
-
-	// 3. Build signals
-	langStats := fileParser.GetLanguageStats()
-	primaryLang := fileParser.GetPrimaryLanguage(langStats)
-	folderStructure := fileParser.AnalyzeFolderStructure()
-	codeSignals := fileParser.AnalyzeCodeSignals()
-
+	// Initialize result
 	result := &signals.ProjectSignals{
 		ProjectID:       req.ProjectID,
 		UserID:          req.UserID,
 		RepoURL:         req.RepoURL,
-		PrimaryLanguage: primaryLang,
-		Languages:       langStats,
-		FolderStructure: folderStructure,
-		CodeSignals:     codeSignals,
 		AnalyzedAt:      time.Now().Format(time.RFC3339),
-		AnalysisVersion: "2.0.0", // Updated version with enhanced analysis
+		AnalysisVersion: "3.0.0-PROD", // Enterprise Version
 	}
 
-	// Detect project type
-	result.ProjectType = fileParser.DetectProjectType(folderStructure, codeSignals)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-	// Detect frameworks based on package files
-	result.Frameworks = a.detectFrameworks(repoPath)
-	result.Databases = a.detectDatabases(repoPath)
-	result.Tools = a.detectTools(repoPath)
+	fileParser := parser.NewFileParser(repoPath)
+	infraExtractor := parser.NewInfraExtractor(repoPath)
 
-	// Check which languages are present (not just primary)
+	// ============================================
+	// PARALLEL EXECUTION: Phase 1
+	// ============================================
+
+	// 1. File Stats & Language Analysis
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		stats := fileParser.GetLanguageStats()
+		mu.Lock()
+		result.Languages = stats
+		result.PrimaryLanguage = fileParser.GetPrimaryLanguage(stats)
+		mu.Unlock()
+	}()
+
+	// 2. Folder Structure Analysis
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		structure := fileParser.AnalyzeFolderStructure()
+		mu.Lock()
+		result.FolderStructure = structure
+		mu.Unlock()
+	}()
+
+	// 3. Code Signals Analysis
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		codeSig := fileParser.AnalyzeCodeSignals()
+		mu.Lock()
+		result.CodeSignals = codeSig
+		mu.Unlock()
+	}()
+
+	// 4. Infrastructure Extraction (The Heavy Lifter)
+	var infraSignals *signals.InfrastructureSignals
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		infraSignals = infraExtractor.Extract()
+	}()
+
+	// 5. Advanced Pattern Analysis (Regex Scanning)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		patterns := fileParser.AnalyzeAdvancedPatterns()
+		mu.Lock()
+		result.AdvancedPatterns = patterns
+		mu.Unlock()
+	}()
+
+	// Wait for Phase 1
+	wg.Wait()
+
+	// ============================================
+	// SEQUENTIAL EXECUTION: Phase 2 (Dependent on Phase 1)
+	// ============================================
+
+	// Detect Project Type (Depends on Folder + Code Signals)
+	result.ProjectType = fileParser.DetectProjectType(result.FolderStructure, result.CodeSignals)
+
+	// Language Specific Analysis (Conditional)
 	hasJSTS := false
 	hasGo := false
 	hasPython := false
-	for _, lang := range langStats {
+
+	for _, lang := range result.Languages {
 		if lang.Name == "JavaScript" || lang.Name == "TypeScript" {
 			hasJSTS = true
 		}
@@ -173,62 +222,50 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		}
 	}
 
+	// Trigger Language Parsers in Parallel
 	if hasJSTS {
-		// React detection
-		reactSignals := fileParser.AnalyzeReact()
-		if reactSignals != nil {
-			result.ReactSignals = reactSignals
-		}
-		// Node.js detection
-		nodeSignals := fileParser.AnalyzeNode()
-		if nodeSignals != nil {
-			result.NodeSignals = nodeSignals
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result.ReactSignals = fileParser.AnalyzeReact()
+			result.NodeSignals = fileParser.AnalyzeNode()
+		}()
 	}
-
-	// Go-specific analysis
 	if hasGo {
-		goSignals := fileParser.AnalyzeGo()
-		if goSignals != nil {
-			result.GoSignals = goSignals
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result.GoSignals = fileParser.AnalyzeGo()
+		}()
 	}
-
-	// Python-specific analysis
 	if hasPython {
-		pythonSignals := fileParser.AnalyzePython()
-		if pythonSignals != nil {
-			result.PythonSignals = pythonSignals
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result.PythonSignals = fileParser.AnalyzePython()
+		}()
 	}
-
-	// Advanced patterns analysis (language agnostic)
-	result.AdvancedPatterns = fileParser.AnalyzeAdvancedPatterns()
+	wg.Wait()
 
 	// ============================================
-	// INDUSTRY-LEVEL ANALYSIS (3-Layer Pipeline)
+	// ENTERPRISE ANALYSIS: Phase 3 (Inference & Scoring)
 	// ============================================
-	// Layer 1: Extract infrastructure signals (raw facts)
-	infraExtractor := parser.NewInfraExtractor(repoPath)
-	infraSignals := infraExtractor.Extract()
 
-	// Layer 2: Infer verified skills from signals (deterministic rules)
+	// 1. Complexity Score
+	result.Complexity = infraExtractor.CalculateComplexity()
+
+	// 2. Verified Skills Inference
 	inferenceEngine := parser.NewInferenceEngine()
-	industryAnalysis := inferenceEngine.InferSkills(infraSignals)
+	result.IndustryAnalysis = inferenceEngine.InferSkills(infraSignals)
 
-	// Attach to result
-	result.IndustryAnalysis = industryAnalysis
+	// 3. Architecture Graph Generation
+	result.ArchitectureGraph = infraExtractor.GenerateArchitectureGraph()
 
-	log.Info().
-		Str("projectId", req.ProjectID).
-		Int("verifiedSkills", industryAnalysis.TotalSkills).
-		Int("highConfidence", industryAnalysis.HighConfidenceSkills).
-		Str("archType", string(industryAnalysis.Architecture.Type)).
-		Str("engLevel", industryAnalysis.EngineeringLevel).
-		Msg("🏭 Industry analysis complete")
+	// 4. Tech Stack Enrichment (From verified infra signals)
+	enrichTechStack(result, infraSignals)
 
-	// Calculate totals
-	for _, lang := range langStats {
+	// Calculate final totals
+	for _, lang := range result.Languages {
 		result.TotalLines += lang.Lines
 		result.TotalFiles += lang.Files
 	}
@@ -236,146 +273,111 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	log.Info().
 		Str("projectId", req.ProjectID).
 		Str("projectType", string(result.ProjectType)).
-		Str("primaryLang", primaryLang).
-		Int("totalLines", result.TotalLines).
-		Int("totalFiles", result.TotalFiles).
+		Str("scale", result.Complexity.ScaleLabel).
+		Float64("score", result.Complexity.TotalScore).
+		Int("skills", result.IndustryAnalysis.TotalSkills).
 		Msg("📊 Analysis metrics")
 
 	return result, nil
 }
 
-// detectFrameworks checks for popular frameworks
-func (a *Analyzer) detectFrameworks(repoPath string) []string {
-	var frameworks []string
+// enrichTechStack maps infra signals to user-friendly tech lists
+func enrichTechStack(result *signals.ProjectSignals, infra *signals.InfrastructureSignals) {
+	if infra == nil {
+		return
+	}
 
-	// Check package.json for JS/TS
-	pkgContent := readFileContent(repoPath, "package.json")
-	if pkgContent != "" {
-		checks := map[string]string{
-			"react":   "React",
-			"next":    "Next.js",
-			"vue":     "Vue",
-			"nuxt":    "Nuxt",
-			"angular": "Angular",
-			"svelte":  "Svelte",
-			"express": "Express",
-			"fastify": "Fastify",
-			"@nestjs": "NestJS",
-			"koa":     "Koa",
-		}
-		for pkg, name := range checks {
-			if containsIgnoreCase(pkgContent, pkg) {
-				frameworks = append(frameworks, name)
+	mapping := map[string]string{
+		// Databases
+		"postgres": "PostgreSQL", "mysql": "MySQL", "mongodb": "MongoDB", "redis": "Redis",
+		"dynamodb": "DynamoDB", "cassandra": "Cassandra", "elasticsearch": "Elasticsearch",
+		"sqlite": "SQLite", "mariadb": "MariaDB", "firestore": "Firestore",
+
+		// DevOps & Cloud
+		"docker": "Docker", "kubernetes": "Kubernetes", "aws": "AWS", "gcp": "Google Cloud",
+		"azure": "Azure", "terraform": "Terraform", "github_actions": "GitHub Actions",
+		"jenkins": "Jenkins", "gitlab_ci": "GitLab CI", "vercel": "Vercel", "netlify": "Netlify",
+
+		// Message Queues
+		"kafka": "Kafka", "rabbitmq": "RabbitMQ", "sqs": "AWS SQS", "nats": "NATS",
+
+		// Frameworks & Libs
+		"react": "React", "nextjs": "Next.js", "nestjs": "NestJS", "express": "Express",
+		"gin": "Gin", "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
+		"graphql": "GraphQL", "grpc": "gRPC", "tailwind": "Tailwind CSS",
+		"redux": "Redux", "socketio": "Socket.io",
+	}
+
+	// Frameworks
+	if infra.HasSignal(signals.SignalReact) {
+		result.Frameworks = append(result.Frameworks, "React")
+	}
+	if infra.HasSignal(signals.SignalNextJS) {
+		result.Frameworks = append(result.Frameworks, "Next.js")
+	}
+	if infra.HasSignal(signals.SignalNestJS) {
+		result.Frameworks = append(result.Frameworks, "NestJS")
+	}
+	if infra.HasSignal(signals.SignalExpress) {
+		result.Frameworks = append(result.Frameworks, "Express")
+	}
+	if infra.HasSignal(signals.SignalGin) {
+		result.Frameworks = append(result.Frameworks, "Gin")
+	}
+	if infra.HasSignal(signals.SignalDjango) {
+		result.Frameworks = append(result.Frameworks, "Django")
+	}
+
+	// Use mapping for the rest
+	// Note: In a real prod scenario, this mapping should be in a separate config file
+	uniqeTech := make(map[string]bool)
+
+	// Add existing
+	for _, t := range result.Databases {
+		uniqeTech[t] = true
+	}
+	for _, t := range result.Tools {
+		uniqeTech[t] = true
+	}
+	for _, t := range result.Frameworks {
+		uniqeTech[t] = true
+	}
+
+	// Enrich from signals
+	for signal := range infra.SignalDetails {
+		sigStr := string(signal)
+		if name, ok := mapping[sigStr]; ok {
+			if !uniqeTech[name] {
+				// Determine category simply
+				if isDatabase(name) {
+					result.Databases = append(result.Databases, name)
+				} else if isTool(name) {
+					result.Tools = append(result.Tools, name)
+				} else {
+					result.Frameworks = append(result.Frameworks, name)
+				}
+				uniqeTech[name] = true
 			}
 		}
 	}
-
-	// Check go.mod for Go
-	goMod := readFileContent(repoPath, "go.mod")
-	if goMod != "" {
-		goChecks := map[string]string{
-			"gin-gonic/gin": "Gin",
-			"echo":          "Echo",
-			"fiber":         "Fiber",
-			"chi":           "Chi",
-			"gorilla/mux":   "Gorilla",
-		}
-		for pkg, name := range goChecks {
-			if containsIgnoreCase(goMod, pkg) {
-				frameworks = append(frameworks, name)
-			}
-		}
-	}
-
-	// Check requirements.txt for Python
-	pyReq := readFileContent(repoPath, "requirements.txt")
-	if pyReq != "" {
-		pyChecks := map[string]string{
-			"django":  "Django",
-			"flask":   "Flask",
-			"fastapi": "FastAPI",
-		}
-		for pkg, name := range pyChecks {
-			if containsIgnoreCase(pyReq, pkg) {
-				frameworks = append(frameworks, name)
-			}
-		}
-	}
-
-	return frameworks
 }
 
-// detectDatabases checks for database usage
-func (a *Analyzer) detectDatabases(repoPath string) []string {
-	var databases []string
-
-	pkgContent := readFileContent(repoPath, "package.json")
-	goMod := readFileContent(repoPath, "go.mod")
-	content := pkgContent + goMod
-
-	checks := map[string]string{
-		"prisma":    "PostgreSQL (Prisma)",
-		"pg":        "PostgreSQL",
-		"mysql":     "MySQL",
-		"mongodb":   "MongoDB",
-		"mongoose":  "MongoDB",
-		"redis":     "Redis",
-		"ioredis":   "Redis",
-		"sqlite":    "SQLite",
-		"typeorm":   "TypeORM",
-		"sequelize": "Sequelize",
-		"go-pg":     "PostgreSQL",
-		"gorm":      "GORM",
-	}
-
-	for pkg, name := range checks {
-		if containsIgnoreCase(content, pkg) {
-			databases = append(databases, name)
+func isDatabase(name string) bool {
+	dbs := []string{"PostgreSQL", "MySQL", "MongoDB", "Redis", "DynamoDB", "Cassandra", "Elasticsearch", "SQLite", "MariaDB", "Firestore"}
+	for _, d := range dbs {
+		if d == name {
+			return true
 		}
 	}
-
-	return databases
+	return false
 }
 
-// detectTools checks for development tools
-func (a *Analyzer) detectTools(repoPath string) []string {
-	var tools []string
-
-	pkgContent := readFileContent(repoPath, "package.json")
-
-	checks := map[string]string{
-		"eslint":     "ESLint",
-		"prettier":   "Prettier",
-		"jest":       "Jest",
-		"vitest":     "Vitest",
-		"mocha":      "Mocha",
-		"cypress":    "Cypress",
-		"playwright": "Playwright",
-		"docker":     "Docker",
-		"webpack":    "Webpack",
-		"vite":       "Vite",
-		"rollup":     "Rollup",
-		"husky":      "Husky",
-	}
-
-	for pkg, name := range checks {
-		if containsIgnoreCase(pkgContent, pkg) {
-			tools = append(tools, name)
+func isTool(name string) bool {
+	tools := []string{"Docker", "Kubernetes", "AWS", "Google Cloud", "Azure", "Terraform", "GitHub Actions", "Jenkins", "GitLab CI", "Kafka", "RabbitMQ"}
+	for _, t := range tools {
+		if t == name {
+			return true
 		}
 	}
-
-	return tools
-}
-
-// Helper functions
-func readFileContent(repoPath, filename string) string {
-	content, err := os.ReadFile(repoPath + "/" + filename)
-	if err != nil {
-		return ""
-	}
-	return string(content)
-}
-
-func containsIgnoreCase(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+	return false
 }

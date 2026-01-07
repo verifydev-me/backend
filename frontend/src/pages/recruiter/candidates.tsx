@@ -119,15 +119,21 @@ export default function CandidateSearchPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
-  // Queries
-  const { data: candidates, isLoading } = useSearchCandidates({
+  // Queries with safe defaults
+  const { data: candidatesData, isLoading } = useSearchCandidates({
     ...filters,
     skills: selectedSkills.length > 0 ? selectedSkills : undefined,
   })
-  const { data: shortlist = [] } = useShortlist()
+  const { data: shortlistData = [] } = useShortlist()
   const shortlistMutation = useShortlistCandidate()
 
-  const shortlistedIds = new Set(Array.isArray(shortlist) ? shortlist.map(c => c?.id).filter(Boolean) : [])
+  // SAFE data access with explicit null checks
+  const candidatesList = candidatesData?.data || []
+  const totalCandidates = candidatesData?.meta?.total ?? 0
+  const totalPages = candidatesData?.meta?.totalPages ?? 0
+  const shortlist = Array.isArray(shortlistData) ? shortlistData : []
+  
+  const shortlistedIds = new Set(shortlist.map(c => c?.id).filter(Boolean))
 
   const handleFilterChange = (key: keyof CandidateSearchFilters, value: any) => {
     setFilters({ ...filters, [key]: value, page: 1 })
@@ -266,28 +272,28 @@ export default function CandidateSearchPage() {
           <PremiumStatCard
             icon={<Users className="w-6 h-6" />}
             label="Total Developers"
-            value={candidates?.meta.total || 0}
+            value={totalCandidates}
             gradient="from-violet-500 to-purple-600"
             delay={0}
           />
           <PremiumStatCard
             icon={<Shield className="w-6 h-6" />}
             label="Verified Profiles"
-            value={Math.floor((candidates?.meta.total || 0) * 0.85)}
+            value={Math.floor(totalCandidates * 0.85)}
             gradient="from-emerald-500 to-teal-600"
             delay={0.1}
           />
           <PremiumStatCard
             icon={<Flame className="w-6 h-6" />}
             label="Active & Hiring"
-            value={Math.floor((candidates?.meta.total || 0) * 0.6)}
+            value={Math.floor(totalCandidates * 0.6)}
             gradient="from-cyan-500 to-blue-600"
             delay={0.2}
           />
           <PremiumStatCard
             icon={<Crown className="w-6 h-6" />}
             label="Elite Devs"
-            value={Math.floor((candidates?.meta.total || 0) * 0.15)}
+            value={Math.floor(totalCandidates * 0.15)}
             gradient="from-amber-500 to-orange-600"
             delay={0.3}
           />
@@ -448,7 +454,7 @@ export default function CandidateSearchPage() {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                    {candidates?.meta.total || 0}
+                    {totalCandidates}
                   </span>
                   <span className="text-muted-foreground">developers found</span>
                 </div>
@@ -468,7 +474,7 @@ export default function CandidateSearchPage() {
                   <CandidateCardSkeleton key={i} delay={i * 0.1} />
                 ))}
               </div>
-            ) : candidates?.data && candidates.data.length > 0 ? (
+            ) : candidatesList.length > 0 ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -476,7 +482,7 @@ export default function CandidateSearchPage() {
                 className="grid gap-5 md:grid-cols-2"
               >
                 <AnimatePresence mode="popLayout">
-                  {candidates.data.map((candidate, idx) => (
+                  {candidatesList.map((candidate: any, idx: number) => (
                     <motion.div
                       key={candidate.id}
                       initial={{ opacity: 0, y: 30, rotateX: -10 }}
@@ -498,7 +504,7 @@ export default function CandidateSearchPage() {
             )}
 
             {/* Premium Pagination */}
-            {candidates && candidates.meta.totalPages > 1 && (
+            {totalPages > 1 && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -515,7 +521,7 @@ export default function CandidateSearchPage() {
                 </Button>
                 
                 <div className="flex items-center gap-1.5 px-4">
-                  {[...Array(Math.min(5, candidates.meta.totalPages))].map((_, i) => {
+                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
                     const page = i + 1
                     return (
                       <motion.button
@@ -533,16 +539,16 @@ export default function CandidateSearchPage() {
                       </motion.button>
                     )
                   })}
-                  {candidates.meta.totalPages > 5 && (
+                  {totalPages > 5 && (
                     <>
                       <span className="text-muted-foreground px-2">...</span>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => handleFilterChange('page', candidates.meta.totalPages)}
+                        onClick={() => handleFilterChange('page', totalPages)}
                         className="w-10 h-10 rounded-xl font-medium bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white transition-all"
                       >
-                        {candidates.meta.totalPages}
+                        {totalPages}
                       </motion.button>
                     </>
                   )}
@@ -550,7 +556,7 @@ export default function CandidateSearchPage() {
                 
                 <Button
                   variant="outline"
-                  disabled={filters.page === candidates.meta.totalPages}
+                  disabled={filters.page === totalPages}
                   onClick={() => handleFilterChange('page', (filters.page || 1) + 1)}
                   className="h-12 px-6 rounded-xl bg-white/5 border-white/20 hover:bg-white/10 hover:border-violet-500/50"
                 >
