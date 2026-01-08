@@ -129,13 +129,28 @@ function SkillBreakdownCard({ skill }: { skill: SkillData }) {
   const Icon = categoryIcons[category] || Code
   const colorClass = categoryColors[category] || 'from-primary to-primary/70'
   
+  // Check if this skill has incomplete project warning
+  const hasIncompleteWarning = skill.evidence?.some((e: string) => 
+    e.includes('incomplete') || e.includes('⚠️')
+  )
+  
+  // Filter out warning messages from display evidence
+  const displayEvidence = skill.evidence?.filter((e: string) => 
+    !e.includes('⚠️')
+  ) || []
+  
   return (
-    <div className="group rounded-xl border border-border/50 bg-card/50 backdrop-blur p-4 hover:border-primary/30 hover:shadow-lg transition-all">
+    <div className={cn(
+      "group rounded-xl border backdrop-blur p-4 hover:shadow-lg transition-all",
+      hasIncompleteWarning 
+        ? "border-amber-500/30 bg-amber-500/5"
+        : "border-border/50 bg-card/50 hover:border-primary/30"
+    )}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={cn(
             "w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br",
-            colorClass
+            hasIncompleteWarning ? "from-amber-500/70 to-amber-600/70" : colorClass
           )}>
             <Icon className="w-5 h-5 text-white" />
           </div>
@@ -156,31 +171,39 @@ function SkillBreakdownCard({ skill }: { skill: SkillData }) {
             ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" 
             : percentage >= 60 
               ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-              : percentage >= 40
+              : percentage >= 50
                 ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                : "bg-muted text-muted-foreground border border-border"
+                : "bg-red-500/15 text-red-400 border border-red-500/30"
         )}>
           {percentage}%
         </div>
       </div>
+      
+      {/* Low Confidence Warning */}
+      {percentage < 60 && (
+        <div className="mb-3 flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 rounded-lg px-2 py-1">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Low confidence - needs more evidence
+        </div>
+      )}
       
       {/* Progress Bar */}
       <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
         <div 
           className={cn(
             "h-full rounded-full transition-all duration-700 bg-gradient-to-r",
-            colorClass
+            hasIncompleteWarning ? "from-amber-500 to-amber-400" : colorClass
           )}
           style={{ width: `${percentage}%` }}
         />
       </div>
       
       {/* Evidence/Details */}
-      {skill.evidence && skill.evidence.length > 0 && (
+      {displayEvidence.length > 0 && (
         <div className="mt-3 pt-3 border-t border-border/30">
           <p className="text-xs text-muted-foreground mb-2">Evidence:</p>
           <div className="flex flex-wrap gap-1.5">
-            {skill.evidence.slice(0, 3).map((e: string, i: number) => (
+            {displayEvidence.slice(0, 4).map((e: string, i: number) => (
               <span 
                 key={i}
                 className="text-xs px-2 py-0.5 rounded-md bg-muted/50 text-muted-foreground"
@@ -192,8 +215,16 @@ function SkillBreakdownCard({ skill }: { skill: SkillData }) {
         </div>
       )}
       
+      {/* Incomplete Project Warning */}
+      {hasIncompleteWarning && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Partial detection - project may be incomplete
+        </div>
+      )}
+      
       {/* Resume Ready Badge */}
-      {skill.resumeReady && (
+      {skill.resumeReady && !hasIncompleteWarning && (
         <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400">
           <CheckCircle2 className="w-3.5 h-3.5" />
           Resume Ready
@@ -375,20 +406,158 @@ function ArchitectureCard({ architecture }: { architecture: ArchitectureData }) 
 }
 
 // ============================================
-// TECH STACK DISPLAY
+// TECH STACK DISPLAY - ENHANCED
 // ============================================
 interface TechStackData {
   languages?: { name: string; percentage: number }[]
   frameworks?: string[]
   databases?: string[]
   tools?: string[]
+  infrastructure?: string[]
+  messaging?: string[]
+  cloud?: string[]
+  observability?: string[]
+  testing?: string[]
 }
 
-function TechStackCard({ techStack }: { techStack: TechStackData }) {
-  if (!techStack) return null
+interface InfraSignals {
+  signals?: string[]
+  signalDetails?: Record<string, { signal: string; confidence: number; evidence: string[] }>
+}
+
+// Map infra signals to readable names and categories
+const signalToTechMapping: Record<string, { name: string; category: string }> = {
+  'docker_compose': { name: 'Docker Compose', category: 'infrastructure' },
+  'docker': { name: 'Docker', category: 'infrastructure' },
+  'kubernetes': { name: 'Kubernetes', category: 'infrastructure' },
+  'nginx': { name: 'Nginx', category: 'infrastructure' },
+  'traefik': { name: 'Traefik', category: 'infrastructure' },
+  'redis': { name: 'Redis', category: 'database' },
+  'postgres': { name: 'PostgreSQL', category: 'database' },
+  'mongodb': { name: 'MongoDB', category: 'database' },
+  'mysql': { name: 'MySQL', category: 'database' },
+  'rabbitmq': { name: 'RabbitMQ', category: 'messaging' },
+  'kafka': { name: 'Apache Kafka', category: 'messaging' },
+  'message_producer': { name: 'Message Queue', category: 'messaging' },
+  'message_consumer': { name: 'Event Consumer', category: 'messaging' },
+  'websocket': { name: 'WebSocket', category: 'realtime' },
+  'graphql': { name: 'GraphQL', category: 'api' },
+  'grpc': { name: 'gRPC', category: 'api' },
+  'rest_api': { name: 'REST API', category: 'api' },
+  'prometheus': { name: 'Prometheus', category: 'observability' },
+  'grafana': { name: 'Grafana', category: 'observability' },
+  'elastic': { name: 'Elasticsearch', category: 'observability' },
+  'opentelemetry': { name: 'OpenTelemetry', category: 'observability' },
+  'sentry': { name: 'Sentry', category: 'observability' },
+  'aws': { name: 'AWS', category: 'cloud' },
+  'gcp': { name: 'Google Cloud', category: 'cloud' },
+  'azure': { name: 'Azure', category: 'cloud' },
+  's3': { name: 'AWS S3', category: 'cloud' },
+  'lambda': { name: 'AWS Lambda', category: 'cloud' },
+  'jest': { name: 'Jest', category: 'testing' },
+  'cypress': { name: 'Cypress', category: 'testing' },
+  'tdd': { name: 'TDD', category: 'testing' },
+  'llm': { name: 'LLM/AI', category: 'ml' },
+  'circuit_breaker': { name: 'Circuit Breaker', category: 'pattern' },
+  'retry_logic': { name: 'Retry Pattern', category: 'pattern' },
+  'api_gateway_pattern': { name: 'API Gateway', category: 'pattern' },
+  'health_endpoints': { name: 'Health Checks', category: 'devops' },
+  'graceful_shutdown': { name: 'Graceful Shutdown', category: 'devops' },
+  'ci_cd': { name: 'CI/CD', category: 'devops' },
+  'github_actions': { name: 'GitHub Actions', category: 'devops' },
+  'rbac': { name: 'RBAC', category: 'security' },
+  'jwt': { name: 'JWT Auth', category: 'security' },
+  'oauth': { name: 'OAuth', category: 'security' },
+  'password_hashing': { name: 'Password Hashing', category: 'security' },
+}
+
+function TechStackCard({ techStack, skills, infraSignals }: { 
+  techStack: TechStackData; 
+  skills?: any[];
+  infraSignals?: InfraSignals 
+}) {
+  if (!techStack && (!skills || skills.length === 0) && !infraSignals) return null
   
-  const languages = techStack.languages || []
+  const languages = techStack?.languages || []
   const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
+  
+  // Extract technologies from skills by category
+  const skillsByCategory = (skills || []).reduce((acc: Record<string, string[]>, skill: any) => {
+    const cat = skill.category || 'tool'
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(skill.name)
+    return acc
+  }, {})
+  
+  // Extract technologies from infraSignals
+  const signalTechs: Record<string, string[]> = {
+    infrastructure: [],
+    database: [],
+    messaging: [],
+    realtime: [],
+    api: [],
+    observability: [],
+    cloud: [],
+    testing: [],
+    ml: [],
+    pattern: [],
+    devops: [],
+    security: [],
+  }
+  
+  if (infraSignals?.signals) {
+    infraSignals.signals.forEach(signal => {
+      const tech = signalToTechMapping[signal]
+      if (tech && signalTechs[tech.category]) {
+        if (!signalTechs[tech.category].includes(tech.name)) {
+          signalTechs[tech.category].push(tech.name)
+        }
+      }
+    })
+  }
+  
+  // Merge all sources
+  const databases = [...new Set([
+    ...(techStack?.databases || []), 
+    ...(skillsByCategory.database || []),
+    ...signalTechs.database
+  ])]
+  const frameworks = [...new Set([
+    ...(techStack?.frameworks || []), 
+    ...(skillsByCategory.framework || [])
+  ])]
+  const infrastructure = [...new Set([
+    ...(techStack?.infrastructure || []), 
+    ...(skillsByCategory.infrastructure || []),
+    ...signalTechs.infrastructure
+  ])]
+  const messaging = [...new Set([
+    ...(techStack?.messaging || []), 
+    ...(skillsByCategory.messaging || []),
+    ...signalTechs.messaging
+  ])]
+  const realtime = signalTechs.realtime
+  const apiTech = signalTechs.api
+  const cloud = [...new Set([
+    ...(techStack?.cloud || []), 
+    ...(skillsByCategory.cloud || []),
+    ...signalTechs.cloud
+  ])]
+  const observability = [...new Set([
+    ...(techStack?.observability || []), 
+    ...(skillsByCategory.observability || []),
+    ...signalTechs.observability
+  ])]
+  const testing = [...new Set([
+    ...(techStack?.testing || []), 
+    ...(skillsByCategory.testing || []),
+    ...signalTechs.testing
+  ])]
+  const devops = [...new Set([...(skillsByCategory.devops || []), ...signalTechs.devops])]
+  const security = signalTechs.security
+  const patterns = signalTechs.pattern
+  const mlTech = signalTechs.ml
+  const tools = [...new Set([...(techStack?.tools || []), ...(skillsByCategory.tool || [])])]
   
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur">
@@ -439,13 +608,16 @@ function TechStackCard({ techStack }: { techStack: TechStackData }) {
           </div>
         )}
         
-        {/* Frameworks, Databases, Tools */}
+        {/* Tech Categories Grid */}
         <div className="space-y-4">
-          {techStack.frameworks && techStack.frameworks.length > 0 && (
+          {/* Frameworks */}
+          {frameworks.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Frameworks</p>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Box className="w-3 h-3" /> Frameworks
+              </p>
               <div className="flex flex-wrap gap-2">
-                {techStack.frameworks.map((fw, i) => (
+                {frameworks.map((fw, i) => (
                   <Badge key={i} className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
                     {fw}
                   </Badge>
@@ -454,11 +626,14 @@ function TechStackCard({ techStack }: { techStack: TechStackData }) {
             </div>
           )}
           
-          {techStack.databases && techStack.databases.length > 0 && (
+          {/* Databases */}
+          {databases.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Databases</p>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Database className="w-3 h-3" /> Databases
+              </p>
               <div className="flex flex-wrap gap-2">
-                {techStack.databases.map((db, i) => (
+                {databases.map((db, i) => (
                   <Badge key={i} className="bg-blue-500/15 text-blue-400 border-blue-500/30">
                     {db}
                   </Badge>
@@ -467,11 +642,190 @@ function TechStackCard({ techStack }: { techStack: TechStackData }) {
             </div>
           )}
           
-          {techStack.tools && techStack.tools.length > 0 && (
+          {/* Infrastructure (Nginx, Docker, K8s, etc.) */}
+          {infrastructure.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Tools</p>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Server className="w-3 h-3" /> Infrastructure
+              </p>
               <div className="flex flex-wrap gap-2">
-                {techStack.tools.map((tool, i) => (
+                {infrastructure.map((infra, i) => (
+                  <Badge key={i} className="bg-orange-500/15 text-orange-400 border-orange-500/30">
+                    {infra}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Messaging (RabbitMQ, Kafka) */}
+          {messaging.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Network className="w-3 h-3" /> Messaging / Queues
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {messaging.map((msg, i) => (
+                  <Badge key={i} className="bg-pink-500/15 text-pink-400 border-pink-500/30">
+                    {msg}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Cloud Services */}
+          {cloud.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Cloud className="w-3 h-3" /> Cloud Services
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {cloud.map((c, i) => (
+                  <Badge key={i} className="bg-sky-500/15 text-sky-400 border-sky-500/30">
+                    {c}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Observability */}
+          {observability.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Activity className="w-3 h-3" /> Observability
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {observability.map((obs, i) => (
+                  <Badge key={i} className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30">
+                    {obs}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* DevOps */}
+          {devops.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <GitCommit className="w-3 h-3" /> DevOps
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {devops.map((d, i) => (
+                  <Badge key={i} className="bg-violet-500/15 text-violet-400 border-violet-500/30">
+                    {d}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Real-time */}
+          {realtime.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Zap className="w-3 h-3" /> Real-time
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {realtime.map((rt, i) => (
+                  <Badge key={i} className="bg-purple-500/15 text-purple-400 border-purple-500/30">
+                    {rt}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* API Technologies */}
+          {apiTech.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Network className="w-3 h-3" /> API Technologies
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {apiTech.map((api, i) => (
+                  <Badge key={i} className="bg-indigo-500/15 text-indigo-400 border-indigo-500/30">
+                    {api}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Security */}
+          {security.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Shield className="w-3 h-3" /> Security
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {security.map((sec, i) => (
+                  <Badge key={i} className="bg-red-500/15 text-red-400 border-red-500/30">
+                    {sec}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Design Patterns */}
+          {patterns.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Layers className="w-3 h-3" /> Design Patterns
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {patterns.map((p, i) => (
+                  <Badge key={i} className="bg-teal-500/15 text-teal-400 border-teal-500/30">
+                    {p}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* ML/AI */}
+          {mlTech.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> ML / AI
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {mlTech.map((ml, i) => (
+                  <Badge key={i} className="bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30">
+                    {ml}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Testing */}
+          {testing.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <TestTube className="w-3 h-3" /> Testing
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {testing.map((t, i) => (
+                  <Badge key={i} className="bg-green-500/15 text-green-400 border-green-500/30">
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Other Tools */}
+          {tools.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Gauge className="w-3 h-3" /> Other Tools
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {tools.map((tool, i) => (
                   <Badge key={i} variant="outline">
                     {tool}
                   </Badge>
@@ -693,6 +1047,183 @@ function FrameworkAnalysisCard({ frameworkAnalysis }: { frameworkAnalysis: Frame
 }
 
 // ============================================
+// COMPLEXITY CARD
+// ============================================
+interface ComplexityData {
+  totalScore: number
+  architectureScore: number
+  infrastructureScore: number
+  codeQualityScore: number
+  scaleLabel: string
+}
+
+function ComplexityCard({ complexity }: { complexity?: ComplexityData }) {
+  if (!complexity) return null
+
+  return (
+    <Card className="border-border/50 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Gauge className="h-5 w-5 text-indigo-500" />
+          Project Complexity
+          <Badge className={cn("ml-2", 
+            complexity.scaleLabel === 'Enterprise' ? "bg-purple-500/20 text-purple-400" :
+            complexity.scaleLabel === 'Growth/Scaleup' ? "bg-indigo-500/20 text-indigo-400" :
+            "bg-blue-500/20 text-blue-400"
+          )}>
+            {complexity.scaleLabel}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className="shrink-0">
+             <CircularScore value={complexity.totalScore} size={100} label="Complexity" />
+          </div>
+          <div className="flex-1 space-y-4 w-full">
+            <div>
+              <div className="flex justify-between text-sm mb-1.5">
+                <span>Architecture</span>
+                <span className="font-bold text-indigo-400">{Math.round(complexity.architectureScore)}/100</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" 
+                  style={{ width: `${complexity.architectureScore}%` }} 
+                />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1.5">
+                <span>Infrastructure</span>
+                <span className="font-bold text-pink-400">{Math.round(complexity.infrastructureScore)}/100</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500" 
+                  style={{ width: `${complexity.infrastructureScore}%` }} 
+                />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1.5">
+                <span>Code Quality</span>
+                <span className="font-bold text-emerald-400">{Math.round(complexity.codeQualityScore)}/100</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500" 
+                  style={{ width: `${complexity.codeQualityScore}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
+// ARCHITECTURE GRAPH VIEW
+// ============================================
+interface GraphNode {
+  id: string
+  label: string
+  type: string
+  technology: string
+}
+
+interface GraphEdge {
+  source: string
+  target: string
+  type: string
+}
+
+interface ArchitectureGraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+function ArchitectureGraphView({ graph }: { graph?: ArchitectureGraphData }) {
+  if (!graph || graph.nodes.length === 0) return null
+  
+  // Simple visualization for now - just nodes and connection list
+  
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'service': return Server
+      case 'database': return Database
+      case 'queue': return Network
+      case 'gateway': return Layers
+      case 'frontend': return Code
+      default: return Box
+    }
+  }
+
+  const getColor = (type: string) => {
+    switch (type) {
+      case 'service': return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+      case 'database': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+      case 'queue': return 'bg-pink-500/10 text-pink-400 border-pink-500/20'
+      case 'gateway': return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+      case 'frontend': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+      default: return 'bg-muted text-muted-foreground border-border'
+    }
+  }
+
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Network className="h-5 w-5 text-teal-500" />
+          System Topology
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {/* Nodes Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {graph.nodes.map(node => {
+            const Icon = getIcon(node.type)
+            return (
+              <div key={node.id} className={cn("p-4 rounded-xl border flex flex-col items-center text-center gap-2", getColor(node.type))}>
+                <Icon className="h-6 w-6 mb-1" />
+                <span className="font-bold text-sm truncate w-full" title={node.label}>{node.label}</span>
+                <span className="text-[10px] uppercase opacity-70 tracking-wider font-semibold">{node.type}</span>
+                {node.technology && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 mt-1 bg-background/50">
+                    {node.technology}
+                  </Badge>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        
+        {/* Edges / Flows */}
+        {graph.edges.length > 0 && (
+          <div className="p-4 rounded-xl bg-muted/20 border border-border/30">
+            <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Communication Flows</h4>
+            <div className="space-y-2">
+              {graph.edges.map((edge, i) => (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <span className="font-medium">{graph.nodes.find(n => n.id === edge.source)?.label || edge.source}</span>
+                  <div className="flex-1 h-px bg-border flex items-center justify-center relative">
+                     <span className="absolute -top-2 text-[10px] text-muted-foreground bg-background px-1">connects to</span>
+                     <div className="absolute right-0 top-1/2 -mt-[3px] w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-l-[6px] border-l-border" />
+                  </div>
+                  <span className="font-medium">{graph.nodes.find(n => n.id === edge.target)?.label || edge.target}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 export default function ProjectDetail() {
@@ -798,7 +1329,7 @@ export default function ProjectDetail() {
   })).filter(c => c.count > 0)
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-5 pb-10">
       {/* ===== HERO HEADER ===== */}
       <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-card via-card/80 to-card/60 backdrop-blur-xl p-6 md:p-8">
         <div className="flex items-start gap-4 mb-6">
@@ -894,7 +1425,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* ===== OVERALL SCORE & SUMMARY ===== */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-3 gap-4">
         {/* Overall Score */}
         <Card className="border-border/50 bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur">
           <CardContent className="p-6 flex flex-col items-center justify-center">
@@ -955,7 +1486,7 @@ export default function ProjectDetail() {
 
       {/* ===== SKILLS BREAKDOWN SECTION ===== */}
       {verifiedSkills.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -992,13 +1523,13 @@ export default function ProjectDetail() {
 
       {/* ===== SKILLS BY CATEGORY ===== */}
       {Object.keys(skillsByCategory).length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Layers className="w-5 h-5 text-primary" />
             Skills by Category
           </h2>
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {Object.entries(skillsByCategory).map(([category, skills]) => {
               if (!Array.isArray(skills) || skills.length === 0) return null
               const Icon = categoryIcons[category] || Code
@@ -1046,16 +1577,33 @@ export default function ProjectDetail() {
         </div>
       )}
 
+      {/* ===== COMPLEXITY & GRAPH ===== */}
+      <div className="grid gap-4">
+        {project.complexity && (
+          <ComplexityCard complexity={project.complexity} />
+        )}
+        
+        {project.architectureGraph && (
+          <ArchitectureGraphView graph={project.architectureGraph} />
+        )}
+      </div>
+
       {/* ===== ARCHITECTURE & TECH STACK ===== */}
       {fullAnalysis.industryAnalysis?.architecture && (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4">
           <ArchitectureCard architecture={fullAnalysis.industryAnalysis.architecture} />
-          {fullAnalysis.techStack && <TechStackCard techStack={fullAnalysis.techStack} />}
+          {(fullAnalysis.techStack || verifiedSkills.length > 0) && (
+            <TechStackCard 
+              techStack={fullAnalysis.techStack || {}} 
+              skills={verifiedSkills} 
+              infraSignals={fullAnalysis.industryAnalysis?.infraSignals}
+            />
+          )}
         </div>
       )}
 
       {/* ===== METRICS & LANGUAGES ===== */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Metrics Radar */}
         {metrics && metricsData.length > 0 && (
           <Card className="border-border/50 bg-card/50 backdrop-blur">

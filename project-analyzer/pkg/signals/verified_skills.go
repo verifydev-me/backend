@@ -203,38 +203,60 @@ func (ia *IndustryAnalysis) CalculateOverallScore() float64 {
 // DetermineEngineeringLevel determines the engineering sophistication
 func (ia *IndustryAnalysis) DetermineEngineeringLevel() string {
 	score := ia.CalculateOverallScore()
+	totalSkills := ia.TotalSkills
+	highConfCount := ia.HighConfidenceSkills
 
-	// Check for specific patterns
-	hasDocker := false
-	hasCI := false
-	hasMicroservices := false
-	hasObservability := false
-	hasAdvancedPatterns := false
+	// Count infrastructure indicators
+	hasInfra := false    // Docker, K8s, etc.
+	hasBackend := false  // Database, API, etc.
+	hasAdvanced := false // Microservices, messaging, etc.
 
 	for _, skill := range ia.VerifiedSkills {
-		switch skill.Name {
-		case "Docker & Containerization":
-			hasDocker = true
-		case "Microservices Architecture":
-			hasMicroservices = true
-		case "CI/CD Pipeline":
-			hasCI = true
-		case "Observability Stack", "Monitoring & Metrics":
-			hasObservability = true
-		case "Event-Driven Architecture", "Message Queues (RabbitMQ)", "CQRS Pattern":
-			hasAdvancedPatterns = true
+		category := string(skill.Category)
+		name := skill.Name
+
+		// Infrastructure detection
+		if category == "infrastructure" || category == "devops" {
+			hasInfra = true
+		}
+
+		// Backend detection
+		if category == "database" || category == "messaging" || category == "architecture" {
+			hasBackend = true
+		}
+
+		// Advanced pattern detection
+		if name == "Microservices Architecture" || name == "Event-Driven Architecture" ||
+			category == "messaging" || name == "gRPC" || name == "GraphQL" {
+			hasAdvanced = true
 		}
 	}
 
-	// Determine level
-	if hasMicroservices && hasObservability && hasAdvancedPatterns && score >= 75 {
+	// Simpler level determination based primarily on score and skill count
+	// This ensures complex projects get proper recognition
+
+	// Production-grade: High score + many skills + advanced patterns
+	if score >= 75 && totalSkills >= 10 && hasAdvanced {
 		ia.EngineeringLevel = "Production-grade"
-	} else if hasDocker && hasCI && score >= 60 {
+	} else if score >= 70 && totalSkills >= 8 {
+		// Also production-grade for high skill projects
+		ia.EngineeringLevel = "Production-grade"
+	} else if score >= 55 && totalSkills >= 5 && (hasInfra || hasBackend) {
+		// Advanced: Good score + decent skills + infrastructure or backend
 		ia.EngineeringLevel = "Advanced"
-	} else if hasDocker || hasCI && score >= 40 {
+	} else if score >= 50 && totalSkills >= 5 {
+		// Also advanced for moderate complexity
+		ia.EngineeringLevel = "Advanced"
+	} else if score >= 35 && totalSkills >= 3 {
+		// Intermediate: Moderate score + few skills
 		ia.EngineeringLevel = "Intermediate"
-	} else {
+	} else if totalSkills >= 2 || highConfCount >= 1 {
+		// Basic+: Has some verified skills
+		ia.EngineeringLevel = "Intermediate"
+	} else if totalSkills > 0 {
 		ia.EngineeringLevel = "Basic"
+	} else {
+		ia.EngineeringLevel = "Unknown"
 	}
 
 	return ia.EngineeringLevel

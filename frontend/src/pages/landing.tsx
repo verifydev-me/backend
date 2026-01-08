@@ -269,7 +269,7 @@ function FloatingParticles() {
       {[...Array(15)].map((_, i) => (
         <motion.div
           key={`star-${i}`}
-          className="absolute w-1 h-1 bg-white rounded-full"
+          className="absolute w-1 h-1 bg-foreground/30 rounded-full"
           style={{
             left: `${Math.random() * 100}%`,
             top: `${Math.random() * 100}%`,
@@ -609,6 +609,7 @@ export default function LandingPage() {
       {/* Stats Section - Enhanced */}
       <section className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-[0.1]" />
         <div className="container mx-auto px-4 relative">
           <motion.div
             initial="hidden"
@@ -643,7 +644,8 @@ export default function LandingPage() {
       </section>
 
       {/* For Developers & Recruiters Section */}
-      <section className="py-32 relative overflow-hidden">
+      <section className="py-32 relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(var(--primary)/0.05),transparent_50%)]" />
         <div className="container mx-auto px-4">
           <motion.div
             initial="hidden"
@@ -718,6 +720,8 @@ export default function LandingPage() {
 
       {/* Features Section - Enhanced */}
       <section id="features" className="py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-[0.05]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
         <div className="container mx-auto px-4">
           <motion.div
             initial="hidden"
@@ -781,6 +785,7 @@ export default function LandingPage() {
 
       {/* How It Works Section - Enhanced */}
       <section id="how-it-works" className="py-32 relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.03)_1px,transparent_1px)] bg-[size:24px_24px] opacity-50" />
         <div className="container mx-auto px-4">
           <motion.div
             initial="hidden"
@@ -856,7 +861,8 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonials Section - Enhanced */}
-      <section id="testimonials" className="py-32 relative overflow-hidden">
+      <section id="testimonials" className="py-32 relative overflow-hidden bg-gradient-to-t from-background via-primary/5 to-background">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--primary)/0.05)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--primary)/0.05)_1px,transparent_1px)] bg-[size:6rem_4rem]" />
         <div className="container mx-auto px-4">
           <motion.div
             initial="hidden"

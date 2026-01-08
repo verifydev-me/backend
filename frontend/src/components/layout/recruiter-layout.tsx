@@ -55,12 +55,12 @@ export default function RecruiterLayout() {
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           {sidebarOpen && (
             <Link to="/recruiter/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
                 <span className="text-white font-bold text-sm">V</span>
               </div>
               <div>
-                <span className="font-bold text-lg bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">VerifyDev</span>
-                <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 border-orange-500/30 text-orange-400">
+                <span className="font-bold text-lg bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">VerifyDev</span>
+                <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 border-primary/30 text-primary">
                   Recruiter
                 </Badge>
               </div>
@@ -102,12 +102,12 @@ export default function RecruiterLayout() {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-gradient-to-r from-orange-500/20 to-orange-600/10 text-orange-400 border-l-2 border-orange-500'
+                    ? 'bg-primary/10 text-primary border-l-2 border-primary'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
                 title={!sidebarOpen ? item.name : undefined}
               >
-                <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-orange-400")} />
+                <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-primary")} />
                 {sidebarOpen && <span>{item.name}</span>}
               </Link>
             )
@@ -124,9 +124,9 @@ export default function RecruiterLayout() {
               )}
             >
               <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9 border-2 border-orange-500/30">
+                <Avatar className="h-9 w-9 border-2 border-primary/30">
                   <AvatarImage src="" alt={recruiterName} />
-                  <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white text-sm font-semibold">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-sm font-semibold">
                     {getInitials(recruiterName)}
                   </AvatarFallback>
                 </Avatar>
@@ -172,7 +172,7 @@ export default function RecruiterLayout() {
             
             {/* Right side - User Actions */}
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10" asChild>
+              <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10" asChild>
                 <Link to="/recruiter/post-job">
                   <Plus className="h-4 w-4 mr-2" />
                   Post Job
@@ -183,8 +183,8 @@ export default function RecruiterLayout() {
                   <span className="text-sm text-muted-foreground hidden sm:block">
                     {recruiterName}
                   </span>
-                  <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-orange-500/30 transition-all">
-                    <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-semibold">
+                  <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all">
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-semibold">
                       {getInitials(recruiterName)}
                     </AvatarFallback>
                   </Avatar>

@@ -15,7 +15,7 @@ type ProjectType string
 const (
 	ProjectTypeMicroservice ProjectType = "microservice"
 	ProjectTypeMonolith     ProjectType = "monolith"
-	ProjectTypeMonorepo     ProjectType = "monorepo" 
+	ProjectTypeMonorepo     ProjectType = "monorepo"
 	ProjectTypeLibrary      ProjectType = "library"
 	ProjectTypeCLI          ProjectType = "cli"
 	ProjectTypeAPI          ProjectType = "api"
@@ -59,7 +59,10 @@ type ProjectSignals struct {
 	// ============================================
 	// INDUSTRY-LEVEL ANALYSIS (NEW)
 	// ============================================
-	IndustryAnalysis *IndustryAnalysis `json:"industryAnalysis,omitempty"`
+	// Industry Analysis
+	IndustryAnalysis  *IndustryAnalysis  `json:"industryAnalysis,omitempty"`
+	Complexity        *ComplexityScore   `json:"complexity,omitempty"`
+	ArchitectureGraph *ArchitectureGraph `json:"architectureGraph,omitempty"`
 
 	// Metadata
 	TotalFiles      int    `json:"totalFiles"`
@@ -233,4 +236,36 @@ type AdvancedPatterns struct {
 
 	// Keywords Found
 	AdvancedKeywords []string `json:"advancedKeywords"`
+}
+
+// ComplexityScore represents the calculated complexity metrics
+type ComplexityScore struct {
+	TotalScore          float64 `json:"totalScore"`          // 0-100
+	ArchitectureScore   float64 `json:"architectureScore"`   // 0-100
+	InfrastructureScore float64 `json:"infrastructureScore"` // 0-100
+	CodeQualityScore    float64 `json:"codeQualityScore"`    // 0-100
+	ScaleLabel          string  `json:"scaleLabel"`          // "Hobby", "Startup", "Enterprise"
+}
+
+// ============================================
+// ARCHITECTURE GRAPH (VISUALIZATION)
+// ============================================
+
+type ArchitectureGraph struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}
+
+type GraphNode struct {
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	Type       string `json:"type"`             // service, database, queue, gateway, frontend
+	Technology string `json:"technology"`       // node, go, postgres, redis
+	Parent     string `json:"parent,omitempty"` // for nested grouping
+}
+
+type GraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"` // connection, dependency
 }

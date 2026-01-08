@@ -102,6 +102,17 @@ func (p *FileParser) GetPrimaryLanguage(stats []signals.LanguageStats) string {
 		"Svelte":     true,
 	}
 
+	// Non-programming formats that should NEVER be primary
+	nonCodeFormats := map[string]bool{
+		"JSON":     true,
+		"YAML":     true,
+		"HTML":     true,
+		"CSS":      true,
+		"SCSS":     true,
+		"Markdown": true,
+		"XML":      true,
+	}
+
 	maxLines := 0
 	primary := "Unknown"
 
@@ -113,10 +124,12 @@ func (p *FileParser) GetPrimaryLanguage(stats []signals.LanguageStats) string {
 		}
 	}
 
-	// If no code language found, return the most used one
+	// If no code language found, try any language that's NOT a config format
 	if primary == "Unknown" && len(stats) > 0 {
+		maxLines = 0 // Reset for second pass
 		for _, s := range stats {
-			if s.Lines > maxLines {
+			// Never return JSON, YAML, HTML, CSS as primary
+			if !nonCodeFormats[s.Name] && s.Lines > maxLines {
 				maxLines = s.Lines
 				primary = s.Name
 			}
@@ -286,11 +299,16 @@ func countLines(path string) int {
 }
 
 func extToLanguage(ext string) string {
+	// Only return actual programming languages - NOT config formats
+	// JSON, YAML, XML are config files and should NOT be counted as languages
 	mapping := map[string]string{
 		".js":     "JavaScript",
 		".jsx":    "JavaScript",
+		".mjs":    "JavaScript",
+		".cjs":    "JavaScript",
 		".ts":     "TypeScript",
 		".tsx":    "TypeScript",
+		".mts":    "TypeScript",
 		".go":     "Go",
 		".py":     "Python",
 		".java":   "Java",
@@ -299,17 +317,23 @@ func extToLanguage(ext string) string {
 		".php":    "PHP",
 		".cs":     "C#",
 		".cpp":    "C++",
+		".cc":     "C++",
+		".cxx":    "C++",
 		".c":      "C",
+		".h":      "C",
+		".hpp":    "C++",
 		".swift":  "Swift",
 		".kt":     "Kotlin",
 		".vue":    "Vue",
 		".svelte": "Svelte",
-		".css":    "CSS",
-		".scss":   "SCSS",
-		".html":   "HTML",
-		".json":   "JSON",
-		".yaml":   "YAML",
-		".yml":    "YAML",
+		// CSS/HTML are still useful for frontend detection but not as primary
+		".css":  "CSS",
+		".scss": "SCSS",
+		".sass": "SCSS",
+		".less": "CSS",
+		".html": "HTML",
+		".htm":  "HTML",
+		// DO NOT include JSON, YAML, XML - they are config formats NOT languages
 	}
 	return mapping[ext]
 }
