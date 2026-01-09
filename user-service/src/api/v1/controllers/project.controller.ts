@@ -9,6 +9,7 @@ const addProjectSchema = z.object({
   repoName: z.string().min(1).max(200),
   description: z.string().max(500).optional().nullable().transform(val => val || undefined),
   defaultBranch: z.string().max(100).optional().nullable().transform(val => val || undefined),
+  projectType: z.enum(['backend', 'frontend', 'fullstack', 'ml', 'library']).optional(),
 });
 
 // Batch analysis - max 3 projects at a time

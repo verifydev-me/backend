@@ -65,6 +65,16 @@ model User {
   githubRepos         Int @default(0) @map("github_repos")
   githubContributions Int @default(0) @map("github_contributions")
 
+  // ========== DEVELOPER ROLE & NICHE (SYSTEM-INFERRED) ==========
+  // Primary role is auto-inferred from project analysis - cannot be edited
+  primaryRole     String?         @map("primary_role") // "Backend Developer", "Full Stack Engineer", etc.
+  primaryNiche    DeveloperNiche? @map("primary_niche") // Domain categorization
+  secondaryNiche  DeveloperNiche? @map("secondary_niche") // Backup domain
+  nicheConfidence Int             @default(0) @map("niche_confidence") // 0-100 system confidence
+  nicheInferredAt DateTime?       @map("niche_inferred_at")
+  // System-generated tags (non-editable)
+  autoTags        String[]        @default([]) @map("auto_tags") // ["Backend Developer", "Infrastructure Aware"]
+
   // ========== TIMESTAMPS ==========
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
@@ -88,6 +98,7 @@ model User {
   @@index([isStudent])
   @@index([onboardingComplete])
   @@index([createdAt])
+  @@index([primaryNiche])
   @@map("users")
 }
 
@@ -249,6 +260,10 @@ model Project {
   showToRecruiters  Boolean @default(true) @map("show_to_recruiters") // Show in recruiter search
   customDescription String? @map("custom_description") // Override GitHub description
 
+  // ========== PROJECT NICHE (USER INPUT) ==========
+  // User selects this when adding project - helps analyzer focus on relevant signals
+  projectNiche DeveloperNiche? @map("project_niche")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -387,6 +402,28 @@ enum RemotePreference {
   ONSITE_ONLY // Only onsite jobs
   HYBRID // Prefers hybrid
   FLEXIBLE // Open to all
+}
+
+// ==================== DEVELOPER NICHE ENUM ====================
+
+enum DeveloperNiche {
+  WEB_FRONTEND // React, Vue, Angular, Next.js, UI/UX
+  WEB_BACKEND // Node, Express, Django, FastAPI, REST APIs
+  WEB_FULLSTACK // Full-stack web development
+  MOBILE_ANDROID // Kotlin, Java, Android SDK
+  MOBILE_IOS // Swift, Objective-C, iOS SDK
+  MOBILE_CROSS // React Native, Flutter, Xamarin
+  BACKEND_SYSTEMS // Go, Rust, C++, Systems programming
+  DISTRIBUTED // Kafka, RabbitMQ, gRPC, Microservices
+  DATA_ENGINEERING // Spark, Airflow, ETL, Data pipelines
+  ML_AI // TensorFlow, PyTorch, ML/DL models
+  DEVOPS // Docker, K8s, Terraform, CI/CD
+  CLOUD_INFRA // AWS, GCP, Azure architecture
+  SECURITY // AppSec, Penetration testing, Cryptography
+  BLOCKCHAIN // Solidity, Web3, Smart contracts
+  EMBEDDED // C, Embedded systems, IoT
+  GAME_DEV // Unity, Unreal, Game engines
+  GENERAL // No specific niche detected
 }
 
 // ==================== JOB APPLICATION MODELS ====================

@@ -93,7 +93,12 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
     }, 'Aura calculated');
 
     // Update project in database with full analysis data
-    await updateProject(signals, auraResult);
+    const projectUpdated = await updateProject(signals, auraResult);
+    
+    if (!projectUpdated) {
+      logger.warn({ projectId: signals.projectId }, '⏭️ Project not found (likely deleted), skipping remaining updates');
+      return;
+    }
 
     // Update/create skills (includes Docker, Kafka, Redis, etc. - all in one place)
     await updateSkills(signals.userId, auraResult.skills);
@@ -130,29 +135,39 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
 async function updateProject(
   signals: ProjectSignalsExtended,
   auraResult: AuraCalculation
-): Promise<void> {
+): Promise<boolean> {
   const { projectScore, breakdown } = auraResult;
 
-  // Basic update that works without new schema fields
-  await prisma.project.update({
-    where: { id: signals.projectId },
-    data: {
-      analysisStatus: 'COMPLETED',
-      analyzedAt: new Date(signals.analyzedAt),
-      overallScore: projectScore,
-      structureScore: breakdown.structure,
-      codeQualityScore: breakdown.codeQuality,
-      auraContribution: projectScore,
-      language: signals.primaryLanguage,
-      fullAnalysis: auraResult.fullAnalysis as any,
-    },
-  });
-  
-  logger.info({
-    projectId: signals.projectId,
-    score: projectScore,
-    breakdown,
-  }, '💾 Project updated with analysis');
+  try {
+    // Basic update that works without new schema fields
+    await prisma.project.update({
+      where: { id: signals.projectId },
+      data: {
+        analysisStatus: 'COMPLETED',
+        analyzedAt: new Date(signals.analyzedAt),
+        overallScore: projectScore,
+        structureScore: breakdown.structure,
+        codeQualityScore: breakdown.codeQuality,
+        auraContribution: projectScore,
+        language: signals.primaryLanguage,
+        fullAnalysis: auraResult.fullAnalysis as any,
+      },
+    });
+    
+    logger.info({
+      projectId: signals.projectId,
+      score: projectScore,
+      breakdown,
+    }, '💾 Project updated with analysis');
+    
+    return true;
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      logger.warn({ projectId: signals.projectId }, '⚠️ Project not found in DB during update');
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**

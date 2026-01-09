@@ -1394,6 +1394,18 @@ func (e *InferenceEngine) loadRules() {
 			Evidence:        []string{"React framework detected"},
 		},
 		{
+			SkillName:       "TypeScript",
+			Category:        signals.CategoryLanguage,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalTypeScript},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact, signals.SignalNextJS, signals.SignalNestJS},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          7,
+			Keywords:        []string{"typescript", "ts", "type-safe", "static typing"},
+			Evidence:        []string{"TypeScript detected in project"},
+		},
+		{
 			SkillName:       "Next.js",
 			Category:        signals.CategoryFramework,
 			Level:           signals.LevelAdvanced,

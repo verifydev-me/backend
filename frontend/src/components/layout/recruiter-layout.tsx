@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useRecruiterStore } from '@/store/recruiter-store'
 import { useUIStore } from '@/store/ui-store'
 import { cn, getInitials } from '@/lib/utils'
@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Menu,
   Building,
+  LogOut,
 } from 'lucide-react'
 
 const navigation = [
@@ -25,9 +26,14 @@ const navigation = [
 
 export default function RecruiterLayout() {
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const { recruiter } = useRecruiterStore()
+  const { recruiter, logout } = useRecruiterStore()
   const location = useLocation()
+  const navigate = useNavigate()
 
+  const handleLogout = () => {
+    logout()
+    navigate('/auth')
+  }
 
 
   // Get recruiter info safely
@@ -121,30 +127,44 @@ export default function RecruiterLayout() {
         {/* User Section with Detailing */}
         <div className="p-4 mt-auto border-t border-border/50 bg-muted/5">
           {recruiter && (
-            <div
-              className={cn(
-                'flex items-center gap-3 rounded-2xl p-2.5 transition-all border border-border/30 bg-card/50 shadow-sm hover:border-primary/30 hover:bg-muted/50 cursor-pointer group',
-                sidebarOpen ? 'justify-between' : 'justify-center border-none bg-transparent shadow-none'
-              )}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-10 w-10 border-2 border-border/50 group-hover:border-primary/30 transition-colors">
-                  <AvatarImage src="" alt={recruiterName} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-bold">
-                    {getInitials(recruiterName)}
-                  </AvatarFallback>
-                </Avatar>
-                {sidebarOpen && (
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-foreground truncate max-w-[120px]">
-                      {recruiterName}
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate max-w-[120px] opacity-70">
-                      {recruiterEmail}
-                    </span>
-                  </div>
+            <div className={cn('flex flex-col gap-3', sidebarOpen ? '' : 'items-center')}>
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl p-2.5 transition-all border border-border/30 bg-card/50 shadow-sm hover:border-primary/30 hover:bg-muted/50 cursor-pointer group',
+                  sidebarOpen ? 'justify-between' : 'justify-center border-none bg-transparent shadow-none'
                 )}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 border-2 border-border/50 group-hover:border-primary/30 transition-colors">
+                    <AvatarImage src="" alt={recruiterName} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xs font-bold">
+                      {getInitials(recruiterName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {sidebarOpen && (
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-foreground truncate max-w-[120px]">
+                        {recruiterName}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[120px] opacity-70">
+                        {recruiterEmail}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Logout Button */}
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className={cn(
+                  'flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-xl',
+                  sidebarOpen ? 'w-full justify-start px-3 py-2' : 'w-10 h-10 p-0 justify-center'
+                )}
+              >
+                <LogOut className="h-4 w-4" />
+                {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+              </Button>
             </div>
           )}
         </div>

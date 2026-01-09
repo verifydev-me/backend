@@ -7,6 +7,12 @@ type AnalyzeRequest struct {
 	RepoURL       string `json:"repoUrl"`
 	RepoName      string `json:"repoName"`
 	DefaultBranch string `json:"defaultBranch"`
+	// Niche - User-selected project domain for targeted analyzer routing
+	// Values: WEB_FRONTEND, WEB_BACKEND, BACKEND_SYSTEMS, DEVOPS, etc.
+	Niche string `json:"niche,omitempty"`
+	// UserProjectType - User-specified project type for context-aware scoring
+	// Values: backend, frontend, fullstack, ml, library
+	UserProjectType string `json:"projectType,omitempty"`
 }
 
 // ProjectType - Type of project detected
@@ -64,6 +70,11 @@ type ProjectSignals struct {
 	Complexity        *ComplexityScore   `json:"complexity,omitempty"`
 	ArchitectureGraph *ArchitectureGraph `json:"architectureGraph,omitempty"`
 
+	// ============================================
+	// AUTONOMOUS INTELLIGENCE ENGINE OUTPUT
+	// ============================================
+	IntelligenceVerdict *IntelligenceVerdict `json:"intelligenceVerdict,omitempty"`
+
 	// Metadata
 	TotalFiles      int    `json:"totalFiles"`
 	TotalLines      int    `json:"totalLines"`
@@ -81,18 +92,23 @@ type LanguageStats struct {
 
 // FolderAnalysis - Folder structure signals
 type FolderAnalysis struct {
-	HasSrcFolder      bool     `json:"hasSrcFolder"`
-	HasComponents     bool     `json:"hasComponents"`
-	HasUtils          bool     `json:"hasUtils"`
-	HasTests          bool     `json:"hasTests"`
-	HasTypes          bool     `json:"hasTypes"`
-	HasConfig         bool     `json:"hasConfig"`
-	HasDocs           bool     `json:"hasDocs"`
-	HasAPI            bool     `json:"hasApi"`         // api/ or routes/
-	HasModels         bool     `json:"hasModels"`      // models/ or entities/
-	HasServices       bool     `json:"hasServices"`    // services/ or domain/
-	HasMiddleware     bool     `json:"hasMiddleware"`  // middleware/
-	HasControllers    bool     `json:"hasControllers"` // controllers/ or handlers/
+	HasSrcFolder   bool `json:"hasSrcFolder"`
+	HasComponents  bool `json:"hasComponents"`
+	HasUtils       bool `json:"hasUtils"`
+	HasTests       bool `json:"hasTests"`
+	HasTypes       bool `json:"hasTypes"`
+	HasConfig      bool `json:"hasConfig"`
+	HasDocs        bool `json:"hasDocs"`
+	HasAPI         bool `json:"hasApi"`         // api/ or routes/
+	HasModels      bool `json:"hasModels"`      // models/ or entities/
+	HasServices    bool `json:"hasServices"`    // services/ or domain/
+	HasMiddleware  bool `json:"hasMiddleware"`  // middleware/
+	HasControllers bool `json:"hasControllers"` // controllers/ or handlers/
+	// New fields to match SignalScanner coverage
+	HasInternal       bool     `json:"hasInternal"` // Go pattern
+	HasPkg            bool     `json:"hasPkg"`      // Go pattern
+	HasCmd            bool     `json:"hasCmd"`      // Go pattern
+	HasGateway        bool     `json:"hasGateway"`  // Microservices
 	MaxDepth          int      `json:"maxDepth"`
 	TopLevelFolders   []string `json:"topLevelFolders"`
 	OrganizationScore int      `json:"organizationScore"` // 0-100
@@ -268,4 +284,63 @@ type GraphEdge struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
 	Type   string `json:"type"` // connection, dependency
+}
+
+// ============================================
+// AUTONOMOUS INTELLIGENCE ENGINE OUTPUT
+// ============================================
+
+// IntelligenceVerdict - Recruiter-grade project assessment
+type IntelligenceVerdict struct {
+	// Summary
+	ProjectIntentSummary string   `json:"projectIntentSummary"`
+	TechStackSnapshot    []string `json:"techStackSnapshot"`
+
+	// Scores
+	ArchitectureMaturity int     `json:"architectureMaturity"` // 0-10
+	OverallScore         float64 `json:"overallScore"`         // 0-100
+
+	// Developer Assessment
+	DeveloperLevel string `json:"developerLevel"` // JUNIOR/INTERMEDIATE/SENIOR/EXPERT
+	ProjectIntent  string `json:"projectIntent"`  // LEARNING/HOBBY/PRODUCTION/ENTERPRISE
+
+	// Signals
+	KeySignals      []string `json:"keySignals"`
+	StrengthSignals []string `json:"strengthSignals"`
+	RiskSignals     []string `json:"riskSignals"`
+
+	// Suggestions (sorted by priority)
+	Suggestions []IntelligenceSuggestion `json:"suggestions"`
+
+	// Skills (extracted with confidence)
+	ExtractedSkills []IntelligenceSkill `json:"extractedSkills"`
+
+	// Recruiter Output
+	SeniorEngineerVerdict string `json:"seniorEngineerVerdict"`
+	HireSignal            string `json:"hireSignal"` // STRONG_HIRE/HIRE/BORDERLINE/NO_HIRE
+
+	// Metadata
+	AnalysisTimeMs   int64    `json:"analysisTimeMs"`
+	ModulesExecuted  []string `json:"modulesExecuted"`
+	ModulesSkipped   []string `json:"modulesSkipped"`
+	EarlyTermination bool     `json:"earlyTermination"`
+	ExitReason       string   `json:"exitReason,omitempty"`
+}
+
+// IntelligenceSuggestion - Impact-weighted improvement suggestion
+type IntelligenceSuggestion struct {
+	Category    string `json:"category"`
+	Message     string `json:"message"`
+	ImpactScore int    `json:"impactScore"` // 1-10
+	EffortScore int    `json:"effortScore"` // 1-10
+	Priority    int    `json:"priority"`    // ImpactScore / EffortScore
+}
+
+// IntelligenceSkill - Extracted skill with confidence scoring
+type IntelligenceSkill struct {
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Confidence  int      `json:"confidence"` // 0-100
+	Evidence    []string `json:"evidence"`
+	ResumeReady bool     `json:"resumeReady"`
 }

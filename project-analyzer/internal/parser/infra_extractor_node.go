@@ -35,7 +35,7 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 
 	// Comprehensive dependency mapping
 	depSignals := map[string]signals.InfraSignal{
-		// ===== FRONTEND FRAMEWORKS =====
+		// ===== FRONTEND FRAMEWORKS (EXACT MATCH ONLY) =====
 		"react":         signals.SignalReact,
 		"react-dom":     signals.SignalReact,
 		"next":          signals.SignalNextJS,
@@ -47,10 +47,8 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"preact":        signals.SignalReact,
 
 		// ===== BUILD TOOLS & BUNDLERS =====
-		"vite":                 signals.SignalReact, // Modern bundler - implies modern React
-		"@vitejs/plugin-react": signals.SignalReact,
-		"webpack":              signals.SignalHTTPFramework,
-		"esbuild":              signals.SignalHTTPFramework,
+		// Note: vite, webpack, esbuild are framework-agnostic - don't assume React
+		"@vitejs/plugin-react": signals.SignalReact, // Only this is React-specific
 		"turbopack":            signals.SignalNextJS,
 
 		// ===== FRONTEND STATE MANAGEMENT =====
@@ -61,40 +59,37 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"react-query":           signals.SignalReactQuery,
 		"recoil":                signals.SignalReact,
 		"jotai":                 signals.SignalReact,
-		"mobx":                  signals.SignalReact,
+		// Note: mobx is framework-agnostic
 
-		// ===== FRONTEND UI LIBRARIES =====
+		// ===== FRONTEND UI LIBRARIES (React-specific only) =====
 		"tailwindcss":                   signals.SignalTailwind,
 		"@mui/material":                 signals.SignalMaterialUI,
 		"@chakra-ui/react":              signals.SignalChakraUI,
 		"framer-motion":                 signals.SignalFramerMotion,
-		"@radix-ui/react-dialog":        signals.SignalReact, // Radix UI (Shadcn base)
+		"@radix-ui/react-dialog":        signals.SignalReact,
 		"@radix-ui/react-dropdown-menu": signals.SignalReact,
 		"@radix-ui/react-slot":          signals.SignalReact,
 		"@radix-ui/react-tabs":          signals.SignalReact,
-		"class-variance-authority":      signals.SignalTailwind, // CVA for Shadcn
-		"clsx":                          signals.SignalReact,
+		"class-variance-authority":      signals.SignalTailwind,
 		"tailwind-merge":                signals.SignalTailwind,
 		"tailwindcss-animate":           signals.SignalTailwind,
-		"lucide-react":                  signals.SignalReact, // Icons
+		"lucide-react":                  signals.SignalReact,
 		"@heroicons/react":              signals.SignalReact,
 		"react-icons":                   signals.SignalReact,
+		// Note: clsx is a utility - not React-specific
 
 		// ===== FORMS & VALIDATION =====
 		"zod":                 signals.SignalInputValidation,
 		"yup":                 signals.SignalInputValidation,
 		"joi":                 signals.SignalInputValidation,
 		"react-hook-form":     signals.SignalReact,
-		"formik":              signals.SignalReact,
 		"@hookform/resolvers": signals.SignalInputValidation,
+		// Note: formik is framework-agnostic
 
-		// ===== DATA VISUALIZATION =====
+		// ===== DATA VISUALIZATION (React-specific only) =====
 		"recharts":        signals.SignalReact,
-		"chart.js":        signals.SignalReact,
-		"d3":              signals.SignalReact,
-		"victory":         signals.SignalReact,
-		"nivo":            signals.SignalReact,
 		"react-chartjs-2": signals.SignalReact,
+		// Note: chart.js, d3, victory, nivo are framework-agnostic
 
 		// ===== ROUTING =====
 		"react-router-dom": signals.SignalReact,
@@ -102,23 +97,18 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"wouter":           signals.SignalReact,
 
 		// ===== HTTP CLIENTS =====
-		"axios": signals.SignalReact,
-		"ky":    signals.SignalReact,
-		"got":   signals.SignalHTTPFramework,
+		// Note: axios, ky, got are generic - don't map to React
+		"got": signals.SignalHTTPFramework,
 
-		// ===== ANIMATION & UI EFFECTS =====
+		// ===== ANIMATION & UI EFFECTS (React-specific) =====
 		"lottie-react":                     signals.SignalReact,
 		"@lottiefiles/react-lottie-player": signals.SignalReact,
-		"gsap":                             signals.SignalReact,
 		"react-spring":                     signals.SignalReact,
 		"react-countup":                    signals.SignalReact,
 		"react-big-calendar":               signals.SignalReact,
 
 		// ===== DATE/TIME =====
-		"date-fns": signals.SignalReact,
-		"dayjs":    signals.SignalReact,
-		"moment":   signals.SignalReact,
-		"luxon":    signals.SignalReact,
+		// Note: date libraries are generic utilities - don't map to React
 
 		// ===== DATABASES =====
 		"prisma":         signals.SignalPrisma,
@@ -208,7 +198,7 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"firebase-admin":        signals.SignalFirebase,
 
 		// ===== TYPESCRIPT =====
-		"typescript": signals.SignalReact, // Implies modern codebase
+		"typescript": signals.SignalTypeScript,
 	}
 
 	// Check dependencies and devDependencies
@@ -217,8 +207,10 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 			for dep := range deps {
 				depLower := strings.ToLower(dep)
 				for pattern, signal := range depSignals {
-					if strings.Contains(depLower, strings.ToLower(pattern)) || dep == pattern {
-						evidence := fmt.Sprintf("%s/package.json → %s", serviceName, dep)
+					// Use EXACT match only to avoid false positives
+					// e.g. @typescript-eslint should NOT match "react"
+					if dep == pattern || depLower == strings.ToLower(pattern) {
+						evidence := fmt.Sprintf("%s detected in %s/package.json", dep, serviceName)
 						e.signals.AddSignal(signal, 0.9, []string{evidence}, "deep_service_scan")
 					}
 				}

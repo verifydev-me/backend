@@ -124,6 +124,7 @@ export interface AnalyzeProjectData {
   repoId: number
   repoName: string
   repoUrl: string
+  projectType?: 'backend' | 'frontend' | 'fullstack' | 'ml' | 'library'
 }
 
 // ============================================

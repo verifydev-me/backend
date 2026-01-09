@@ -12,13 +12,15 @@ import (
 // InfraExtractor extracts infrastructure signals from a repository
 // LAYER 1: Pure fact extraction - NO decisions
 type InfraExtractor struct {
-	repoPath string
-	signals  *signals.InfrastructureSignals
+	repoPath    string
+	projectType string // backend, frontend, fullstack, etc.
+	signals     *signals.InfrastructureSignals
 }
 
-func NewInfraExtractor(repoPath string) *InfraExtractor {
+func NewInfraExtractor(repoPath, projectType string) *InfraExtractor {
 	return &InfraExtractor{
-		repoPath: repoPath,
+		repoPath:    repoPath,
+		projectType: projectType,
 		signals: &signals.InfrastructureSignals{
 			SignalDetails: make(map[signals.InfraSignal]signals.SignalDetail),
 		},
@@ -45,7 +47,6 @@ func (e *InfraExtractor) Extract() *signals.InfrastructureSignals {
 	// Phase 6: Docker compose analysis
 	e.extractDockerComposeSignals()
 
-	// ===== EXTREME LEVEL EXTRACTION =====
 	// Phase 7: Cloud-native & Infrastructure as Code
 	e.extractCloudNativeSignals()
 
@@ -69,7 +70,12 @@ func (e *InfraExtractor) Extract() *signals.InfrastructureSignals {
 
 	// ===== ENTERPRISE-GRADE DEEP ANALYSIS =====
 	// Phase 14: Deep scan nested services (services/*, gateway/*, apps/*)
-	e.extractDeepServiceSignals()
+	// PROD OPTIMIZATION: Skip for pure frontend projects to save time
+	if e.projectType != "frontend" {
+		e.extractDeepServiceSignals()
+	} else {
+		// Log internal debug? No logger here, but safe to skip
+	}
 
 	// Phase 15: Deep Verification of Usage (Ghost Dependency Check)
 	e.verifySignals()

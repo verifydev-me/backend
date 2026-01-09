@@ -27,9 +27,19 @@ func (p *FileParser) GetLanguageStats() []signals.LanguageStats {
 		files int
 	})
 
+	const maxFiles = 10000 // Performance limit
+	fileCount := 0
+
 	filepath.Walk(p.repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
+		}
+
+		// Performance: Early exit if too many files
+		fileCount++
+		if fileCount > maxFiles {
+			log.Warn().Int("maxFiles", maxFiles).Msg("File limit reached, stopping scan")
+			return filepath.SkipAll
 		}
 
 		// Skip common non-code directories
@@ -187,6 +197,14 @@ func (p *FileParser) AnalyzeFolderStructure() signals.FolderAnalysis {
 			analysis.HasMiddleware = true
 		case "controllers", "controller", "handlers", "handler":
 			analysis.HasControllers = true
+		case "internal":
+			analysis.HasInternal = true
+		case "pkg":
+			analysis.HasPkg = true
+		case "cmd":
+			analysis.HasCmd = true
+		case "gateway", "api-gateway":
+			analysis.HasGateway = true
 		}
 	}
 
@@ -219,6 +237,42 @@ func (p *FileParser) AnalyzeFolderStructure() signals.FolderAnalysis {
 		}
 	}
 
+	// For microservices: check inside services/ directory for each service's internal structure
+	servicesDir := filepath.Join(p.repoPath, "services")
+	if entries, err := os.ReadDir(servicesDir); err == nil {
+		for _, serviceEntry := range entries {
+			if !serviceEntry.IsDir() {
+				continue
+			}
+			// Check each service's src/ folder
+			serviceSrcPath := filepath.Join(servicesDir, serviceEntry.Name(), "src")
+			if srcEntries, err := os.ReadDir(serviceSrcPath); err == nil {
+				for _, entry := range srcEntries {
+					if !entry.IsDir() {
+						continue
+					}
+					name := strings.ToLower(entry.Name())
+					switch name {
+					case "api", "routes", "router":
+						analysis.HasAPI = true
+					case "models", "entities":
+						analysis.HasModels = true
+					case "services", "service", "domain":
+						analysis.HasServices = true
+					case "middleware", "middlewares":
+						analysis.HasMiddleware = true
+					case "controllers", "controller", "handlers":
+						analysis.HasControllers = true
+					case "types":
+						analysis.HasTypes = true
+					case "config", "configs":
+						analysis.HasConfig = true
+					}
+				}
+			}
+		}
+	}
+
 	analysis.TopLevelFolders = topLevelFolders
 	analysis.MaxDepth = p.calculateMaxDepth(p.repoPath, 0)
 	analysis.OrganizationScore = p.calculateOrganizationScore(analysis)
@@ -227,13 +281,66 @@ func (p *FileParser) AnalyzeFolderStructure() signals.FolderAnalysis {
 }
 
 // AnalyzeCodeSignals checks for common code quality indicators
+// Uses recursive scanning and MULTI-LEVEL package.json analysis
 func (p *FileParser) AnalyzeCodeSignals() signals.CodeSignals {
 	cs := signals.CodeSignals{}
 
-	// Check root files
-	files, _ := os.ReadDir(p.repoPath)
-	for _, f := range files {
-		name := strings.ToLower(f.Name())
+	// Recursive walk to find quality indicators anywhere in the project
+	filepath.Walk(p.repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		// Skip common noise directories
+		if info.IsDir() {
+			name := info.Name()
+			if name == "node_modules" || name == ".git" || name == "vendor" ||
+				name == "__pycache__" || name == "dist" || name == "build" ||
+				name == ".next" || name == "out" || name == "coverage" {
+				return filepath.SkipDir
+			}
+			// If we find a 'tests' directory, count it as test presence
+			if name == "tests" || name == "__tests__" || name == "test" || name == "spec" {
+				cs.TestFilesCount += 5 // Significant bonus for dedicated test folders
+			}
+			return nil
+		}
+
+		name := strings.ToLower(info.Name())
+
+		// Check ALL package.json files for dependencies
+		if name == "package.json" {
+			if content, err := os.ReadFile(path); err == nil {
+				pkgContent := strings.ToLower(string(content))
+
+				// Linting & Formatting
+				if strings.Contains(pkgContent, "\"eslint\"") || strings.Contains(pkgContent, "eslint-config") {
+					cs.HasLinting = true
+				}
+				if strings.Contains(pkgContent, "\"prettier\"") || strings.Contains(pkgContent, "prettier-plugin") {
+					cs.HasPrettier = true
+				}
+				if strings.Contains(pkgContent, "\"typescript\"") || strings.Contains(pkgContent, "\"@types/") {
+					cs.HasTypeScript = true
+				}
+
+				// Testing Frameworks
+				if strings.Contains(pkgContent, "\"jest\"") || strings.Contains(pkgContent, "\"mocha\"") ||
+					strings.Contains(pkgContent, "\"vitest\"") || strings.Contains(pkgContent, "\"cypress\"") ||
+					strings.Contains(pkgContent, "\"playwright\"") || strings.Contains(pkgContent, "\"supertest\"") {
+					if cs.TestFilesCount == 0 {
+						cs.TestFilesCount = 1 // At least mark as having tests
+					}
+				}
+
+				// CI/Hooks
+				if strings.Contains(pkgContent, "\"husky\"") || strings.Contains(pkgContent, "\"lint-staged\"") {
+					// Good indicator of quality, though not full CI
+				}
+			}
+		}
+
+		// Quality indicators - set to true if found anywhere
 		switch {
 		case name == "readme.md" || name == "readme":
 			cs.HasReadme = true
@@ -241,13 +348,14 @@ func (p *FileParser) AnalyzeCodeSignals() signals.CodeSignals {
 			cs.HasLicense = true
 		case name == ".gitignore":
 			cs.HasGitignore = true
-		case name == ".env.example" || name == ".env.sample":
+		case name == ".env.example" || name == ".env.sample" || name == ".env.template":
 			cs.HasEnvExample = true
 		case name == "dockerfile" || strings.HasPrefix(name, "dockerfile"):
 			cs.HasDockerfile = true
 		case name == "docker-compose.yml" || name == "docker-compose.yaml" || name == "compose.yml":
 			cs.HasDockerCompose = true
-		case name == ".eslintrc" || name == ".eslintrc.js" || name == ".eslintrc.json" || name == "eslint.config.js":
+		case name == ".eslintrc" || name == ".eslintrc.js" || name == ".eslintrc.json" ||
+			name == "eslint.config.js" || name == "eslint.config.mjs":
 			cs.HasLinting = true
 		case name == ".prettierrc" || name == ".prettierrc.js" || name == "prettier.config.js":
 			cs.HasPrettier = true
@@ -256,25 +364,24 @@ func (p *FileParser) AnalyzeCodeSignals() signals.CodeSignals {
 		case name == "makefile":
 			cs.HasMakefile = true
 		}
-	}
 
-	// Check for CI/CD
-	if _, err := os.Stat(filepath.Join(p.repoPath, ".github/workflows")); err == nil {
-		cs.HasCI = true
-	}
-	if _, err := os.Stat(filepath.Join(p.repoPath, ".gitlab-ci.yml")); err == nil {
-		cs.HasCI = true
-	}
-
-	// Count test files
-	filepath.Walk(p.repoPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+		// CI detection (files)
+		rel, _ := filepath.Rel(p.repoPath, path)
+		if strings.HasPrefix(rel, ".github/workflows") ||
+			strings.HasPrefix(rel, ".gitlab-ci") ||
+			name == "jenkinsfile" || name == ".travis.yml" ||
+			name == "azure-pipelines.yml" || name == "circle.yml" {
+			cs.HasCI = true
 		}
-		name := strings.ToLower(info.Name())
-		if strings.Contains(name, ".test.") || strings.Contains(name, ".spec.") || strings.HasSuffix(name, "_test.go") {
+
+		// Test file counting (Relaxed matching)
+		if strings.Contains(name, ".test.") || strings.Contains(name, ".spec.") ||
+			strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, "test_") ||
+			strings.HasSuffix(name, "_test.py") ||
+			(strings.Contains(path, "/tests/") && !info.IsDir() && (strings.HasSuffix(name, ".ts") || strings.HasSuffix(name, ".js") || strings.HasSuffix(name, ".go"))) {
 			cs.TestFilesCount++
 		}
+
 		return nil
 	})
 
@@ -339,22 +446,27 @@ func extToLanguage(ext string) string {
 }
 
 func (p *FileParser) calculateMaxDepth(path string, currentDepth int) int {
-	maxDepth := currentDepth
+	const maxDepth = 15 // Performance limit
+	if currentDepth >= maxDepth {
+		return currentDepth
+	}
+
+	maxDepthFound := currentDepth
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return maxDepth
+		return maxDepthFound
 	}
 
 	for _, entry := range entries {
 		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") &&
 			entry.Name() != "node_modules" && entry.Name() != "vendor" {
 			depth := p.calculateMaxDepth(filepath.Join(path, entry.Name()), currentDepth+1)
-			if depth > maxDepth {
-				maxDepth = depth
+			if depth > maxDepthFound {
+				maxDepthFound = depth
 			}
 		}
 	}
-	return maxDepth
+	return maxDepthFound
 }
 
 func (p *FileParser) calculateOrganizationScore(analysis signals.FolderAnalysis) int {

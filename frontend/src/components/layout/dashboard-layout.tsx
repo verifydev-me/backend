@@ -3,7 +3,7 @@
  * Sidebar and header that dynamically respond to accent color.
  */
 
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth-store'
 import { useUIStore } from '@/store/ui-store'
 import { cn, getInitials } from '@/lib/utils'
@@ -22,6 +22,7 @@ import {
   ScrollText,
   Search,
   Sparkles,
+  LogOut,
 } from 'lucide-react'
 
 const navigation = [
@@ -36,9 +37,15 @@ const navigation = [
 ]
 
 export default function DashboardLayout() {
-  const { user } = useAuthStore()
+  const { user, logout } = useAuthStore()
   const { sidebarOpen, toggleSidebar } = useUIStore()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/auth')
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -120,28 +127,42 @@ export default function DashboardLayout() {
 
         <div className="p-4 mt-auto border-t border-border/50 bg-muted/5">
           {user && (
-            <div
-              className={cn(
-                'flex items-center gap-3 rounded-2xl p-2.5 transition-all border border-border/30 bg-card/50 shadow-sm hover:border-primary/30 hover:bg-muted/50 cursor-pointer group',
-                sidebarOpen ? 'justify-between' : 'justify-center border-none bg-transparent shadow-none'
-              )}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-10 w-10 rounded-xl border-2 border-border/50 group-hover:border-primary/30 transition-colors">
-                  <AvatarImage src={user.avatarUrl} alt={user.name} />
-                  <AvatarFallback className="rounded-xl bg-primary/10 text-primary text-xs font-bold">{getInitials(user.name)}</AvatarFallback>
-                </Avatar>
-                {sidebarOpen && (
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-foreground truncate">
-                      {user.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate opacity-70">
-                      @{user.username}
-                    </span>
-                  </div>
+            <div className={cn('flex flex-col gap-3', sidebarOpen ? '' : 'items-center')}>
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl p-2.5 transition-all border border-border/30 bg-card/50 shadow-sm hover:border-primary/30 hover:bg-muted/50 cursor-pointer group',
+                  sidebarOpen ? 'justify-between' : 'justify-center border-none bg-transparent shadow-none'
                 )}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 rounded-xl border-2 border-border/50 group-hover:border-primary/30 transition-colors">
+                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarFallback className="rounded-xl bg-primary/10 text-primary text-xs font-bold">{getInitials(user.name)}</AvatarFallback>
+                  </Avatar>
+                  {sidebarOpen && (
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-foreground truncate">
+                        {user.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate opacity-70">
+                        @{user.username}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Logout Button */}
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className={cn(
+                  'flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-xl',
+                  sidebarOpen ? 'w-full justify-start px-3 py-2' : 'w-10 h-10 p-0 justify-center'
+                )}
+              >
+                <LogOut className="h-4 w-4" />
+                {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+              </Button>
             </div>
           )}
         </div>

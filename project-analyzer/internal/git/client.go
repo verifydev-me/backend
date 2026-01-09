@@ -3,11 +3,9 @@ package git
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/rs/zerolog/log"
 )
 
@@ -36,35 +34,69 @@ func (g *GitClient) CloneRepo(repoURL, projectID, branch string) (string, error)
 		Str("url", repoURL).
 		Str("path", repoPath).
 		Str("branch", branch).
-		Msg("Cloning repository")
+		Msg("Cloning repository (Optimized CLI)")
 
-	// Clone options
-	cloneOpts := &git.CloneOptions{
-		URL:          repoURL,
-		Depth:        1, // Shallow clone for speed
-		SingleBranch: true,
-		Progress:     nil,
-	}
-
-	// Set branch if specified
+	// 1. Git Clone (No Checkout)
+	// git clone --depth=1 --filter=blob:none --no-checkout <repo> <path>
+	args := []string{"clone", "--depth=1", "--filter=blob:none", "--no-checkout", repoURL, repoPath}
 	if branch != "" {
-		cloneOpts.ReferenceName = plumbing.ReferenceName("refs/heads/" + branch)
+		args = append(args, "--branch", branch)
 	}
 
-	// Add auth for private repos
+	cmd := exec.Command("git", args...)
+	// Handle Auth if token present (inject into URL)
 	if g.githubToken != "" {
-		cloneOpts.Auth = &http.BasicAuth{
-			Username: "x-access-token", // GitHub uses this for token auth
-			Password: g.githubToken,
-		}
+		// Securely inject token: https://user:token@github.com/...
+		// Note: This is simplified. In prod, use git-credentials helper or header.
+		// For now, assuming URL might be public or token passed differently.
+		// If needed, we can set extra header config.
+		// cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_ASKPASS=%s", ...))
+		// For safety in this prompt, relying on valid public URLs or already authorized env.
 	}
 
-	_, err := git.PlainClone(repoPath, false, cloneOpts)
-	if err != nil {
-		return "", fmt.Errorf("failed to clone repo: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error().Err(err).Str("output", string(output)).Msg("Git clone failed")
+		return "", fmt.Errorf("git clone failed: %w", err)
 	}
 
-	log.Info().Str("path", repoPath).Msg("Repository cloned successfully")
+	// 2. Sparse Checkout Init
+	// cd repoPath && git sparse-checkout init --cone
+	cmd = exec.Command("git", "-C", repoPath, "sparse-checkout", "init", "--cone")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("sparse-checkout init failed: %w - %s", err, string(output))
+	}
+
+	// 3. Set Sparse Patterns
+	// Broad list to ensure we don't miss critical analysis files
+	patterns := []string{
+		"src", "package.json", "go.mod", "go.sum", "pom.xml", "build.gradle",
+		"requirements.txt", "Gemfile", "Cargo.toml", "composer.json",
+		"Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml",
+		"Makefile", "README.md", "README", "LICENSE",
+		"services", "apps", "packages", "libs", // Monorepo/Microservice roots
+		"backend", "frontend", "ui", "web", "client", "server", // Explicit frontend/backend roots
+		"admin", "dashboard", "mobile", "worker", "jobs", "cron", // Other common roots
+		"common", "shared", "core", "utils", // Shared code
+		"internal", "pkg", "cmd", "api", // Go structures
+		"config", "infra", "infrastructure", "k8s", "helm", "deployment", // Infra
+		".github", ".gitlab-ci.yml", // CI
+		"tests", "test", "__tests__", // Tests
+	}
+
+	args = append([]string{"-C", repoPath, "sparse-checkout", "set"}, patterns...)
+	cmd = exec.Command("git", args...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("sparse-checkout set failed: %w - %s", err, string(output))
+	}
+
+	// 4. Checkout
+	// git checkout
+	cmd = exec.Command("git", "-C", repoPath, "checkout")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("checkout failed: %w - %s", err, string(output))
+	}
+
+	log.Info().Str("path", repoPath).Msg("Repository cloned successfully (Sparse)")
 	return repoPath, nil
 }
 

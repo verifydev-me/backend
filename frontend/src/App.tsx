@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { useAuthStore } from '@/store/auth-store'
 import { useRecruiterStore } from '@/store/recruiter-store'
@@ -28,12 +28,10 @@ import Notifications from '@/pages/notifications'
 import PublicProfile from '@/pages/public-profile'
 import AuthCallback from '@/pages/auth-callback'
 import AuthError from '@/pages/auth-error'
-import OtpLogin from '@/pages/auth/otp-login'
 import ConnectPlatforms from '@/pages/connect-platforms'
 import NotFound from '@/pages/not-found'
 import Onboarding from '@/pages/onboarding'
-import Login from '@/pages/login'
-import RoleSelection from '@/pages/role-selection'
+import AuthPage from '@/pages/auth'
 
 // Recruiter Pages
 
@@ -104,12 +102,15 @@ function App() {
           <Route path="/auth/error" element={<AuthError />} />
         </Route>
 
-        {/* Role Selection Route (No layout) */}
-        <Route path="/get-started" element={<RoleSelection />} />
+        {/* Role Selection Route - Redirect to /auth */}
+        <Route path="/get-started" element={<Navigate to="/auth" replace />} />
 
-        {/* Developer Login Route (No layout) */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/auth/otp-login" element={<OtpLogin />} />
+        {/* Unified Auth Page */}
+        <Route path="/auth" element={<AuthPage />} />
+
+        {/* Legacy Developer Login Routes (redirect to /auth) */}
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
+        <Route path="/auth/otp-login" element={<Navigate to="/auth" replace />} />
         <Route path="/connect-platforms" element={<ConnectPlatforms />} />
 
         {/* Recruiter Auth Routes (No layout) */}
