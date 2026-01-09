@@ -83,18 +83,20 @@ func (e *InfraExtractor) verifySignals() {
 					fmt.Sprintf("Verified usage in %d code file(s)", usageCount),
 				}, "code_verification")
 			} else {
-				// PENAILTY DISABLED FOR NOW TO PREVENT FALSE NEGATIVES
-				// If we found it in docker-compose, we trust it mostly.
-				// Only penalize if it was found via package manager (not file/inference)
-				/*
-					detail := e.signals.SignalDetails[signal]
-					if strings.Contains(detail.Source, "dep") || strings.Contains(detail.Source, "package") {
-						newConfidence := detail.Confidence * 0.8 // Reduce by 20%
-						e.signals.AddSignal(signal, newConfidence, []string{
-							"Warning: Dependency installed but no usage patterns found in code",
-						}, "code_verification")
+				// GENTLER PENALTY: Apply small confidence reduction for unused dependencies
+				// Trust Docker Compose sources, only penalize package manager sources
+				detail := e.signals.SignalDetails[signal]
+				if strings.Contains(detail.Source, "dep") || strings.Contains(detail.Source, "package") {
+					// Only reduce by 10% (was 20%) - be less aggressive
+					newConfidence := detail.Confidence * 0.9
+					if newConfidence < 0.5 {
+						newConfidence = 0.5 // Don't go below 50%
 					}
-				*/
+					e.signals.AddSignal(signal, newConfidence, []string{
+						"Note: Installed but no direct usage patterns detected",
+					}, "code_verification")
+				}
+				// Docker Compose/Dockerfile sources are trusted - no penalty
 			}
 		}
 	}

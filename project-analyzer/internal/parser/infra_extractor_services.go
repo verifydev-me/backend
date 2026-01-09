@@ -27,7 +27,7 @@ func (e *InfraExtractor) extractServiceStructureSignals() {
 	servicePatterns := []string{
 		"service", "svc", "api", "gateway", "worker", "processor", "consumer", "producer",
 	}
-	
+
 	learningPatterns := []string{
 		"task", "phase", "part", "chapter", "lesson", "example", "sample", "assignment", "day", "step", "tutorial",
 	}
@@ -120,33 +120,32 @@ func (e *InfraExtractor) extractServiceStructureSignals() {
 		}
 	}
 
-	// Case 1: It's a monorepo (has frontend + 1 backend, or workspaces config)
-	if len(frontendFolders) > 0 && len(actualBackendServices) == 1 {
+	// Case 1: It's a monorepo with frontend + backend
+	if len(frontendFolders) > 0 && len(actualBackendServices) >= 1 {
 		e.signals.AddSignal(signals.SignalMonorepo, 0.90,
 			append(frontendFolders, actualBackendServices...),
 			"monorepo_structure")
-		e.signals.ServiceCount = 1 // Only 1 actual backend service
-		e.signals.ServiceNames = actualBackendServices
-		return // Exit early - this is NOT microservices
+		// DON'T return early - continue to check for microservices
 	}
 
-	// Case 2: Has workspaces but multiple packages (still monorepo, not microservices)
-	if e.isMonorepo() && len(actualBackendServices) <= 2 {
+	// Case 2: Has workspace config (monorepo tools)
+	if e.isMonorepo() {
 		e.signals.AddSignal(signals.SignalMonorepo, 0.90,
 			actualBackendServices,
 			"workspace_monorepo")
-		e.signals.ServiceCount = len(actualBackendServices)
-		e.signals.ServiceNames = actualBackendServices
-		return // Exit early - workspaces = monorepo
+		// DON'T return early - continue to check for microservices
 	}
 
-	// Case 3: Actual microservices - 2+ independent backend services
+	// Case 3: Microservices - 2+ independent backend services
+	// This can COEXIST with monorepo signal (microservices in a monorepo)
 	if len(actualBackendServices) >= 2 {
 		e.signals.AddSignal(signals.SignalMultipleServices, 0.9, actualBackendServices, "service_dirs")
 		e.signals.AddSignal(signals.SignalServiceIsolation, 0.85, actualBackendServices, "independent_services")
-		e.signals.ServiceCount = len(actualBackendServices)
-		e.signals.ServiceNames = actualBackendServices
 	}
+
+	// Always set service count and names
+	e.signals.ServiceCount = len(actualBackendServices)
+	e.signals.ServiceNames = actualBackendServices
 }
 
 // extractDeepServiceSignals scans nested service folders for dependencies

@@ -13,11 +13,21 @@ const addManualSkillSchema = z.object({
   name: z.string().min(1, 'Skill name is required').max(100),
   category: z.nativeEnum(SkillCategory).optional(),
   selfDeclaredLevel: z.nativeEnum(SkillLevel).optional(),
+  evidence: z.array(z.object({
+    label: z.string().optional(),
+    url: z.string().url('Invalid URL'),
+    description: z.string().optional(),
+  })).optional(),
 });
 
 const updateManualSkillSchema = z.object({
   selfDeclaredLevel: z.nativeEnum(SkillLevel).optional(),
   category: z.nativeEnum(SkillCategory).optional(),
+  evidence: z.array(z.object({
+    label: z.string().optional(),
+    url: z.string().url('Invalid URL'),
+    description: z.string().optional(),
+  })).optional(),
 });
 
 // ============================================

@@ -164,12 +164,13 @@ export class ApplicationService {
         candidateAura: data.candidateAura || 0,
         candidateCores: data.candidateCores || 1,
         candidateSkills: data.candidateSkills || [],
+        candidateProjects: data.candidateProjects as any, // Cast to any for Json type
+        candidateExperience: data.candidateExperience as any,
+        candidateCertifications: data.candidateCertifications as any,
         status: 'PENDING',
         matchScore,
       },
     });
-
-    // Increment job application count
     await prisma.job.update({
       where: { id: jobId },
       data: { applicationsCount: { increment: 1 } }

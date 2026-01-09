@@ -211,7 +211,7 @@ export default function ApplicantsPage() {
         <TabsContent value={activeTab} className="space-y-4">
           <AnimatePresence mode="popLayout">
             {filteredApplicants.length === 0 ? (
-              <Card>
+              <Card className="border border-border/50">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <User className="w-12 h-12 text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground">No applicants in this category</p>
@@ -296,7 +296,7 @@ function ApplicantCard({ applicant, job, index, onStatusChange, onAddNote }: App
       exit={{ opacity: 0, y: -20 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Card className="hover:shadow-md transition-shadow">
+      <Card className="border border-border/50 hover:shadow-md transition-shadow">
         <CardContent className="p-6">
           <div className="flex items-start gap-6">
             {/* Avatar */}

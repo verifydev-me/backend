@@ -34,6 +34,14 @@ export const jobFiltersSchema = z.object({
 export const applyJobSchema = z.object({
   coverLetter: z.string().max(5000).optional(),
   resumeUrl: z.string().url().optional(),
+  candidateName: z.string().min(1).max(200).optional(),
+  candidateEmail: z.string().email().optional(),
+  candidateAura: z.number().min(0).optional(),
+  candidateCores: z.number().min(1).optional(),
+  candidateSkills: z.array(z.string()).optional(),
+  candidateProjects: z.array(z.any()).optional(),
+  candidateExperience: z.array(z.any()).optional(),
+  candidateCertifications: z.array(z.any()).optional(),
 });
 
 export type CreateJobInput = z.infer<typeof createJobSchema>;

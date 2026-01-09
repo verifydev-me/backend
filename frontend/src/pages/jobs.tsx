@@ -82,7 +82,7 @@ const jobTypeIcons: Record<string, React.ReactNode> = {
 // Skeleton component
 function JobCardSkeleton() {
   return (
-    <Card>
+    <Card className="border border-border/80">
       <CardContent className="py-6">
         <div className="flex gap-4">
           <div className="h-14 w-14 rounded-xl bg-muted animate-pulse" />
@@ -243,8 +243,8 @@ export default function Jobs() {
         transition={{ delay: 0.1 }}
         className="grid grid-cols-2 md:grid-cols-4 gap-4"
       >
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent" />
+        <Card className="relative overflow-hidden border border-border/80">
+          <div className="absolute inset-0 bg-muted/30" />
           <CardContent className="p-4 relative">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Briefcase className="h-4 w-4" />
@@ -253,8 +253,8 @@ export default function Jobs() {
             <p className="text-2xl font-bold mt-1">{stats.total}</p>
           </CardContent>
         </Card>
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
+        <Card className="relative overflow-hidden border border-border/80">
+          <div className="absolute inset-0 bg-muted/30" />
           <CardContent className="p-4 relative">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Home className="h-4 w-4" />
@@ -263,8 +263,8 @@ export default function Jobs() {
             <p className="text-2xl font-bold mt-1">{stats.remote}</p>
           </CardContent>
         </Card>
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent" />
+        <Card className="relative overflow-hidden border border-border/80">
+          <div className="absolute inset-0 bg-muted/30" />
           <CardContent className="p-4 relative">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Zap className="h-4 w-4" />
@@ -273,8 +273,8 @@ export default function Jobs() {
             <p className="text-2xl font-bold mt-1 text-primary">{matchedJobs?.length || 0}</p>
           </CardContent>
         </Card>
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent" />
+        <Card className="relative overflow-hidden border border-border/80">
+          <div className="absolute inset-0 bg-muted/30" />
           <CardContent className="p-4 relative">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <DollarSign className="h-4 w-4" />
@@ -293,7 +293,7 @@ export default function Jobs() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
           >
-            <Card className="bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border-primary/20 overflow-hidden">
+            <Card className="border border-primary/30 bg-muted/30 overflow-hidden">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -384,7 +384,7 @@ export default function Jobs() {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <Card>
+              <Card className="border border-border/80">
                 <CardContent className="py-4">
                   <div className="flex flex-wrap gap-4">
                     <div className="flex-1 min-w-[200px]">
@@ -473,9 +473,9 @@ export default function Jobs() {
             return (
               <motion.div key={job.id} variants={itemVariants}>
                 <Card className={cn(
-                  "group transition-all duration-300 hover:shadow-lg",
-                  isMatched && "border-primary/30 bg-primary/5",
-                  isSaved && "border-yellow-500/30"
+                  "group transition-all duration-300 hover:shadow-lg border border-border/80",
+                  isMatched && "border-primary/40 bg-primary/5",
+                  isSaved && "border-yellow-500/40"
                 )}>
                   <CardContent className="py-6">
                     <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -658,7 +658,7 @@ export default function Jobs() {
         >
           <Card className="border-dashed">
             <CardContent className="py-16 text-center">
-              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
                 <Briefcase className="h-8 w-8 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-semibold mb-2">No jobs found</h3>

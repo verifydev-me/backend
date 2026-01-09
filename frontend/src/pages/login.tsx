@@ -89,7 +89,7 @@ export default function Login() {
              transition={{ duration: 0.8 }}
            >
              <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 rounded-2xl bg-primary shadow-xl shadow-primary/20">
+                <div className="p-3 rounded-xl bg-primary shadow-xl shadow-primary/20">
                   <Code2 className="w-8 h-8 text-primary-foreground" />
                 </div>
                 <span className="text-3xl font-bold tracking-tight text-foreground">VerifyDev</span>
@@ -122,7 +122,7 @@ export default function Login() {
                 { icon: Shield, title: "Identity Proof", desc: "Verified developer badges" },
                 { icon: Zap, title: "Instant Match", desc: "Skip technical screenings" }
               ].map((item, i) => (
-                <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-card/50 border border-border backdrop-blur-sm hover:bg-card/80 transition-colors">
+                <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-card/50 border border-border/80 backdrop-blur-sm hover:bg-card/80 transition-colors">
                   <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
                     <item.icon className="w-5 h-5" />
                   </div>
@@ -141,7 +141,7 @@ export default function Login() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <div className="relative overflow-hidden rounded-3xl border border-border bg-card/80 backdrop-blur-xl shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-2xl">
             {/* Subtle gradient accent */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
             
@@ -169,6 +169,13 @@ export default function Login() {
                   <span className="flex-shrink-0 mx-4 text-muted-foreground text-xs uppercase tracking-wider">or</span>
                   <div className="flex-grow border-t border-border"></div>
                 </div>
+
+                <Link to="/auth/otp-login" className="block">
+                  <Button variant="outline" className="w-full h-12 rounded-xl border-border hover:bg-muted hover:border-primary/30 text-muted-foreground hover:text-foreground transition-all">
+                    <span className="mr-2">📧</span>
+                    Sign in with Email/OTP
+                  </Button>
+                </Link>
 
                 <Link to="/recruiter/login" className="block">
                   <Button variant="outline" className="w-full h-12 rounded-xl border-border hover:bg-muted hover:border-primary/30 text-muted-foreground hover:text-foreground transition-all">

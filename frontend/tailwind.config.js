@@ -68,6 +68,8 @@ export default {
   		},
   		fontFamily: {
   			sans: [
+  				'Outfit',
+  				'Poppins',
   				'Inter',
   				'system-ui',
   				'sans-serif'

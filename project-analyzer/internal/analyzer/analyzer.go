@@ -292,63 +292,92 @@ func enrichTechStack(result *signals.ProjectSignals, infra *signals.Infrastructu
 		"postgres": "PostgreSQL", "mysql": "MySQL", "mongodb": "MongoDB", "redis": "Redis",
 		"dynamodb": "DynamoDB", "cassandra": "Cassandra", "elasticsearch": "Elasticsearch",
 		"sqlite": "SQLite", "mariadb": "MariaDB", "firestore": "Firestore",
+		"prisma": "Prisma", "typeorm": "TypeORM", "gorm": "GORM", "mongoose": "Mongoose",
 
 		// DevOps & Cloud
-		"docker": "Docker", "kubernetes": "Kubernetes", "aws": "AWS", "gcp": "Google Cloud",
-		"azure": "Azure", "terraform": "Terraform", "github_actions": "GitHub Actions",
-		"jenkins": "Jenkins", "gitlab_ci": "GitLab CI", "vercel": "Vercel", "netlify": "Netlify",
+		"docker": "Docker", "docker_compose": "Docker Compose", "kubernetes": "Kubernetes",
+		"aws": "AWS", "gcp": "Google Cloud", "azure": "Azure", "s3": "AWS S3",
+		"terraform": "Terraform", "pulumi": "Pulumi", "helm": "Helm",
+		"github_actions": "GitHub Actions", "gitlab_ci": "GitLab CI", "jenkins": "Jenkins",
+		"vercel": "Vercel", "netlify": "Netlify", "supabase": "Supabase", "firebase": "Firebase",
 
 		// Message Queues
 		"kafka": "Kafka", "rabbitmq": "RabbitMQ", "sqs": "AWS SQS", "nats": "NATS",
 
-		// Frameworks & Libs
-		"react": "React", "nextjs": "Next.js", "nestjs": "NestJS", "express": "Express",
-		"gin": "Gin", "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
-		"graphql": "GraphQL", "grpc": "gRPC", "tailwind": "Tailwind CSS",
-		"redux": "Redux", "socketio": "Socket.io",
+		// Frontend Frameworks
+		"react": "React", "nextjs": "Next.js", "vue": "Vue.js", "angular": "Angular",
+		"svelte": "Svelte", "tailwind": "Tailwind CSS", "redux": "Redux", "zustand": "Zustand",
+		"react_query": "React Query", "framer_motion": "Framer Motion",
+
+		// Backend Frameworks
+		"nestjs": "NestJS", "express": "Express", "fastify": "Fastify",
+		"gin": "Gin", "echo": "Echo", "fiber": "Fiber",
+		"django": "Django", "flask": "Flask", "fastapi": "FastAPI",
+		"graphql": "GraphQL", "grpc": "gRPC", "websocket": "WebSocket",
+
+		// Testing
+		"jest": "Jest", "cypress": "Cypress", "playwright": "Playwright",
+
+		// Observability
+		"prometheus": "Prometheus", "grafana": "Grafana", "sentry": "Sentry",
+		"datadog": "Datadog", "opentelemetry": "OpenTelemetry",
 	}
 
-	// Frameworks
+	// Explicit framework detection (these are commonly needed)
 	if infra.HasSignal(signals.SignalReact) {
-		result.Frameworks = append(result.Frameworks, "React")
+		result.Frameworks = appendUnique(result.Frameworks, "React")
 	}
 	if infra.HasSignal(signals.SignalNextJS) {
-		result.Frameworks = append(result.Frameworks, "Next.js")
+		result.Frameworks = appendUnique(result.Frameworks, "Next.js")
+	}
+	if infra.HasSignal(signals.SignalVue) {
+		result.Frameworks = appendUnique(result.Frameworks, "Vue.js")
+	}
+	if infra.HasSignal(signals.SignalAngular) {
+		result.Frameworks = appendUnique(result.Frameworks, "Angular")
 	}
 	if infra.HasSignal(signals.SignalNestJS) {
-		result.Frameworks = append(result.Frameworks, "NestJS")
+		result.Frameworks = appendUnique(result.Frameworks, "NestJS")
 	}
 	if infra.HasSignal(signals.SignalExpress) {
-		result.Frameworks = append(result.Frameworks, "Express")
+		result.Frameworks = appendUnique(result.Frameworks, "Express")
 	}
 	if infra.HasSignal(signals.SignalGin) {
-		result.Frameworks = append(result.Frameworks, "Gin")
+		result.Frameworks = appendUnique(result.Frameworks, "Gin")
 	}
 	if infra.HasSignal(signals.SignalDjango) {
-		result.Frameworks = append(result.Frameworks, "Django")
+		result.Frameworks = appendUnique(result.Frameworks, "Django")
+	}
+	if infra.HasSignal(signals.SignalTailwind) {
+		result.Frameworks = appendUnique(result.Frameworks, "Tailwind CSS")
+	}
+	if infra.HasSignal(signals.SignalZustand) {
+		result.Frameworks = appendUnique(result.Frameworks, "Zustand")
+	}
+	if infra.HasSignal(signals.SignalRedux) {
+		result.Frameworks = appendUnique(result.Frameworks, "Redux")
+	}
+	if infra.HasSignal(signals.SignalReactQuery) {
+		result.Frameworks = appendUnique(result.Frameworks, "React Query")
 	}
 
-	// Use mapping for the rest
-	// Note: In a real prod scenario, this mapping should be in a separate config file
-	uniqeTech := make(map[string]bool)
-
-	// Add existing
+	// Track what we've already added
+	uniqueTech := make(map[string]bool)
 	for _, t := range result.Databases {
-		uniqeTech[t] = true
+		uniqueTech[t] = true
 	}
 	for _, t := range result.Tools {
-		uniqeTech[t] = true
+		uniqueTech[t] = true
 	}
 	for _, t := range result.Frameworks {
-		uniqeTech[t] = true
+		uniqueTech[t] = true
 	}
 
-	// Enrich from signals
+	// Enrich from signals using mapping
 	for signal := range infra.SignalDetails {
 		sigStr := string(signal)
 		if name, ok := mapping[sigStr]; ok {
-			if !uniqeTech[name] {
-				// Determine category simply
+			if !uniqueTech[name] {
 				if isDatabase(name) {
 					result.Databases = append(result.Databases, name)
 				} else if isTool(name) {
@@ -356,14 +385,28 @@ func enrichTechStack(result *signals.ProjectSignals, infra *signals.Infrastructu
 				} else {
 					result.Frameworks = append(result.Frameworks, name)
 				}
-				uniqeTech[name] = true
+				uniqueTech[name] = true
 			}
 		}
 	}
 }
 
+// appendUnique adds an item to slice if not already present
+func appendUnique(slice []string, item string) []string {
+	for _, s := range slice {
+		if s == item {
+			return slice
+		}
+	}
+	return append(slice, item)
+}
+
 func isDatabase(name string) bool {
-	dbs := []string{"PostgreSQL", "MySQL", "MongoDB", "Redis", "DynamoDB", "Cassandra", "Elasticsearch", "SQLite", "MariaDB", "Firestore"}
+	dbs := []string{
+		"PostgreSQL", "MySQL", "MongoDB", "Redis", "DynamoDB", "Cassandra",
+		"Elasticsearch", "SQLite", "MariaDB", "Firestore",
+		"Prisma", "TypeORM", "GORM", "Mongoose", // ORMs count as database tech
+	}
 	for _, d := range dbs {
 		if d == name {
 			return true
@@ -373,7 +416,16 @@ func isDatabase(name string) bool {
 }
 
 func isTool(name string) bool {
-	tools := []string{"Docker", "Kubernetes", "AWS", "Google Cloud", "Azure", "Terraform", "GitHub Actions", "Jenkins", "GitLab CI", "Kafka", "RabbitMQ"}
+	tools := []string{
+		"Docker", "Docker Compose", "Kubernetes", "Helm",
+		"AWS", "AWS S3", "Google Cloud", "Azure",
+		"Terraform", "Pulumi",
+		"GitHub Actions", "GitLab CI", "Jenkins",
+		"Kafka", "RabbitMQ", "NATS", "AWS SQS",
+		"Prometheus", "Grafana", "Sentry", "Datadog", "OpenTelemetry",
+		"Supabase", "Firebase", "Vercel", "Netlify",
+		"Jest", "Cypress", "Playwright",
+	}
 	for _, t := range tools {
 		if t == name {
 			return true

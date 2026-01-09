@@ -308,12 +308,13 @@ export class JobService {
           status: 'missing',
         });
 
-        requiredMet = false;
       }
     }
 
     const matchScore = Math.round(totalScore / jobSkills.length);
-    const meetsMinimum = requiredMet && userAura >= minAura;
+    // Relaxed requirement: Allow all authenticated users to apply,
+    // but keep the score for recruiter info.
+    const meetsMinimum = true;
 
     return {
       matchScore: Math.min(100, matchScore),

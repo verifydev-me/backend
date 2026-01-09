@@ -110,11 +110,11 @@ export default function RecruiterJobsPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Card>
+        <Card className="border border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Briefcase className="w-5 h-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-muted">
+                <Briefcase className="w-5 h-5 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{jobs.length}</p>
@@ -124,11 +124,11 @@ export default function RecruiterJobsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <Eye className="w-5 h-5 text-green-600" />
+              <div className="p-2 rounded-lg bg-muted">
+                <Eye className="w-5 h-5 text-green-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeJobs}</p>
@@ -138,11 +138,11 @@ export default function RecruiterJobsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                <Users className="w-5 h-5 text-purple-600" />
+              <div className="p-2 rounded-lg bg-muted">
+                <Users className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalApplicants}</p>
@@ -152,11 +152,11 @@ export default function RecruiterJobsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <Clock className="w-5 h-5 text-orange-600" />
+              <div className="p-2 rounded-lg bg-muted">
+                <Clock className="w-5 h-5 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{jobs.filter(j => j.status === 'DRAFT').length}</p>
@@ -198,7 +198,7 @@ export default function RecruiterJobsPage() {
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : filteredJobs.length === 0 ? (
-        <Card>
+        <Card className="border border-border/50">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Briefcase className="w-12 h-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
@@ -233,7 +233,7 @@ function JobCard({ job, index }: { job: Job; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Card className="hover:shadow-md transition-shadow">
+      <Card className="border border-border/50 hover:shadow-md transition-shadow">
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">

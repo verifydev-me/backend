@@ -75,6 +75,34 @@ model Session {
   @@map("sessions")
 }
 
+// ==================== OTP VERIFICATION MODEL ====================
+
+model OtpVerification {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  email     String?
+  phone     String?
+  code      String
+  type      OtpType    @default(LOGIN)
+  isUsed    Boolean    @default(false) @map("is_used")
+  expiresAt DateTime   @map("expires_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+  usedAt    DateTime?  @map("used_at")
+
+  @@unique([email, type])
+  @@unique([phone, type])
+  @@index([email])
+  @@index([phone])
+  @@index([expiresAt])
+  @@index([type])
+  @@map("otp_verifications")
+}
+
+enum OtpType {
+  SIGNUP
+  LOGIN
+  MOBILE_VERIFY
+}
+
 // ==================== SKILL MODEL ====================
 
 model Skill {

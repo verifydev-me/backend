@@ -382,10 +382,10 @@ export default function LandingPage() {
                 </Link>
               ) : (
                 <>
-                  <Link to="/login" className="hidden sm:block">
+                  <Link to="/get-started" className="hidden sm:block">
                     <Button variant="ghost" className="rounded-xl">Sign In</Button>
                   </Link>
-                  <Link to="/login">
+                  <Link to="/get-started">
                     <Button className="rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 btn-shine">
                       <Github className="mr-2 h-4 w-4" />
                       Get Started
@@ -479,21 +479,21 @@ export default function LandingPage() {
               >
                 {isAuthenticated ? (
                   <Link to="/dashboard">
-                    <Button size="lg" className="group px-10 py-7 text-lg rounded-2xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine">
+                    <Button size="lg" className="group px-10 py-7 text-lg rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine">
                       Go to Dashboard
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                 ) : (
                   <>
-                    <Link to="/login">
-                      <Button size="lg" className="group px-10 py-7 text-lg rounded-2xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine breathe-glow">
+                    <Link to="/get-started">
+                      <Button size="lg" className="group px-10 py-7 text-lg rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine breathe-glow">
                         <Github className="mr-2 h-5 w-5" />
                         Get Verified — It's Free
                         <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </Link>
-                    <Link to="/recruiter">
+                    <Link to="/get-started">
                       <Button size="lg" variant="outline" className="px-10 py-7 text-lg rounded-2xl border-2 hover:bg-primary/5 transition-all">
                         <Building className="mr-2 h-5 w-5" />
                         I'm Hiring Developers
@@ -527,7 +527,7 @@ export default function LandingPage() {
             >
                 {/* Floating Cards */}
                 <motion.div 
-                  className="absolute -top-8 -left-4 md:left-8 p-4 rounded-2xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
+                  className="absolute -top-8 -left-4 md:left-8 p-4 rounded-xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
                   animate={{ y: [-5, 5, -5], rotate: [-2, 2, -2] }}
                   transition={{ duration: 4, repeat: Infinity }}
                 >
@@ -543,7 +543,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 <motion.div 
-                  className="absolute -top-4 -right-4 md:right-8 p-4 rounded-2xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
+                  className="absolute -top-4 -right-4 md:right-8 p-4 rounded-xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
                   animate={{ y: [5, -5, 5], rotate: [2, -2, 2] }}
                   transition={{ duration: 3.5, repeat: Infinity }}
                 >
@@ -559,7 +559,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 <motion.div 
-                  className="absolute -bottom-4 left-1/4 p-4 rounded-2xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
+                  className="absolute -bottom-4 left-1/4 p-4 rounded-xl bg-card/90 backdrop-blur-xl border shadow-xl z-20"
                   animate={{ y: [-3, 3, -3], rotate: [-1, 1, -1] }}
                   transition={{ duration: 5, repeat: Infinity }}
                 >
@@ -580,7 +580,7 @@ export default function LandingPage() {
                   className="relative z-10"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/15 to-primary/10 rounded-[40px] blur-3xl" />
-                  <div className="relative bg-card/30 backdrop-blur-sm rounded-[40px] border border-border/30 p-8 overflow-hidden">
+                  <div className="relative bg-card/30 backdrop-blur-sm rounded-3xl border border-border/30 p-8 overflow-hidden">
                     <Player
                       autoplay
                       loop
@@ -626,7 +626,7 @@ export default function LandingPage() {
               >
                 <motion.div
                   whileHover={{ scale: 1.05, y: -5 }}
-                  className="relative p-8 rounded-3xl bg-card/50 backdrop-blur-xl border border-border/50 hover:border-primary/50 transition-all overflow-hidden"
+                  className="relative p-8 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/50 hover:border-primary/50 transition-all overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative">
@@ -666,7 +666,7 @@ export default function LandingPage() {
 
           {/* Tab Switcher */}
           <div className="flex justify-center mb-12">
-            <div className="inline-flex p-1.5 bg-card/50 backdrop-blur-xl rounded-2xl border border-border/50">
+            <div className="inline-flex p-1.5 bg-card/50 backdrop-blur-xl rounded-xl border border-border/80">
               {(['developers', 'recruiters'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -704,7 +704,7 @@ export default function LandingPage() {
                 >
                   <Card className="h-full bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all rounded-3xl overflow-hidden">
                     <CardContent className="p-8 text-center">
-                      <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-r from-primary to-purple-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <div className="w-16 h-16 mx-auto rounded-xl bg-gradient-to-r from-primary to-purple-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <item.icon className="w-8 h-8 text-white" />
                       </div>
                       <h3 className="text-xl font-bold mb-2">{item.title}</h3>
@@ -767,7 +767,7 @@ export default function LandingPage() {
                 <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
                 <Card className="relative h-full bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all rounded-3xl overflow-hidden">
                   <CardContent className="p-8">
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
+                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
                       <feature.icon className="w-7 h-7 text-white" />
                     </div>
                     <div className="flex items-center gap-2 mb-3">
@@ -832,7 +832,7 @@ export default function LandingPage() {
                     className="relative"
                   >
                     <div className={`absolute inset-0 bg-gradient-to-r ${step.color} rounded-3xl blur-2xl opacity-10`} />
-                    <div className="relative bg-card/50 backdrop-blur-xl rounded-3xl border border-border/50 p-8 hover:border-primary/30 transition-all">
+                    <div className="relative bg-card/50 backdrop-blur-xl rounded-2xl border border-border/80 p-8 hover:border-primary/30 transition-all">
                       <div className="inline-flex items-center gap-4 mb-4">
                         <span className={`text-5xl font-black bg-gradient-to-r ${step.color} bg-clip-text text-transparent`}>
                           {step.number}
@@ -903,7 +903,7 @@ export default function LandingPage() {
                   <div className={`absolute inset-0 bg-gradient-to-br ${testimonials[activeTestimonial].gradient} opacity-5`} />
                   <CardContent className="p-8 md:p-12 h-full flex flex-col justify-center relative">
                     <div className="flex items-center gap-4 mb-8">
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${testimonials[activeTestimonial].gradient} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
+                      <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${testimonials[activeTestimonial].gradient} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
                         {testimonials[activeTestimonial].avatar}
                       </div>
                       <div>
@@ -1055,7 +1055,7 @@ export default function LandingPage() {
             className="max-w-4xl mx-auto text-center"
           >
             <motion.div variants={scaleIn} className="mb-8">
-              <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-r from-primary to-purple-500 flex items-center justify-center shadow-2xl shadow-primary/30 mb-8">
+              <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-r from-primary to-purple-500 flex items-center justify-center shadow-2xl shadow-primary/30 mb-8">
                 <Rocket className="w-12 h-12 text-white" />
               </div>
             </motion.div>
@@ -1071,8 +1071,8 @@ export default function LandingPage() {
               It's your turn to shine.
             </motion.p>
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link to="/login">
-                <Button size="lg" className="px-12 py-8 text-lg rounded-2xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine breathe-glow">
+              <Link to="/get-started">
+                <Button size="lg" className="px-12 py-8 text-lg rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine breathe-glow">
                   <Github className="mr-2 h-6 w-6" />
                   Get Verified Now — It's Free
                   <ArrowRight className="ml-2 h-6 w-6" />

@@ -117,4 +117,7 @@ export interface ApplyJobDto {
   candidateAura?: number;
   candidateCores?: number;
   candidateSkills?: string[];
+  candidateProjects?: any[];
+  candidateExperience?: any[];
+  candidateCertifications?: any[];
 }
