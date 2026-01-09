@@ -355,7 +355,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Navigation Bar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/70 backdrop-blur-2xl border-b border-border/40 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
@@ -366,9 +366,9 @@ export default function LandingPage() {
             </Link>
             
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-              <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
-              <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Testimonials</a>
+              <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-all relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary after:transition-all">Features</a>
+              <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-all relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary after:transition-all">How It Works</a>
+              <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-all relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary after:transition-all">Testimonials</a>
               <Link to="/recruiter" className="text-sm text-muted-foreground hover:text-foreground transition-colors">For Recruiters</Link>
             </div>
 
@@ -438,7 +438,7 @@ export default function LandingPage() {
               {/* Main Heading - ULTRA Premium Typography */}
               <motion.h1 
                 variants={fadeInUp}
-                className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-[1.05] tracking-tight"
+                className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-[1.1] tracking-tight"
               >
                 <motion.span 
                   className="block bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent"
@@ -475,7 +475,7 @@ export default function LandingPage() {
               {/* CTA Buttons */}
               <motion.div 
                 variants={fadeInUp}
-                className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16"
+                className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start items-center mb-16"
               >
                 {isAuthenticated ? (
                   <Link to="/dashboard">
@@ -487,14 +487,14 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Link to="/get-started">
-                      <Button size="lg" className="group px-10 py-7 text-lg rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 transition-all shadow-2xl shadow-primary/25 btn-shine breathe-glow">
+                      <Button size="lg" className="group px-10 py-7 text-lg rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 hover:scale-105 transition-all shadow-2xl shadow-primary/25 hover:shadow-primary/40 btn-shine breathe-glow">
                         <Github className="mr-2 h-5 w-5" />
                         Get Verified — It's Free
                         <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </Link>
                     <Link to="/get-started">
-                      <Button size="lg" variant="outline" className="px-10 py-7 text-lg rounded-2xl border-2 hover:bg-primary/5 transition-all">
+                      <Button size="lg" variant="outline" className="px-10 py-7 text-lg rounded-2xl border-2 hover:bg-primary/5 hover:scale-105 hover:border-primary/50 transition-all">
                         <Building className="mr-2 h-5 w-5" />
                         I'm Hiring Developers
                       </Button>
@@ -625,8 +625,8 @@ export default function LandingPage() {
                 className="group"
               >
                 <motion.div
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  className="relative p-8 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/50 hover:border-primary/50 transition-all overflow-hidden"
+                  whileHover={{ scale: 1.05, y: -8 }}
+                  className="relative p-10 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/40 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative">
@@ -761,14 +761,14 @@ export default function LandingPage() {
               <motion.div
                 key={feature.title}
                 variants={scaleIn}
-                whileHover={{ y: -10, scale: 1.02 }}
+                whileHover={{ y: -12, scale: 1.02 }}
                 className="group relative"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
-                <Card className="relative h-full bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all rounded-3xl overflow-hidden">
+                <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl blur-xl opacity-0 group-hover:opacity-25 transition-opacity duration-500`} />
+                <Card className="relative h-full bg-card/40 backdrop-blur-2xl border-border/40 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all rounded-3xl overflow-hidden">
                   <CardContent className="p-8">
-                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
-                      <feature.icon className="w-7 h-7 text-white" />
+                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg`}>
+                      <feature.icon className="w-7 h-7 text-white group-hover:scale-110 transition-transform" />
                     </div>
                     <div className="flex items-center gap-2 mb-3">
                       <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{feature.title}</h3>

@@ -174,6 +174,10 @@ export interface Job {
   minAuraScore?: number
   status: JobStatus
   applicationsCount: number
+  viewsCount?: number
+  isRemote?: boolean
+  minCoreCount?: number
+  preferredSkills?: string[]
   createdAt: string
   updatedAt: string
 }

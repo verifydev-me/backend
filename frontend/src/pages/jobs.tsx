@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -113,6 +113,7 @@ export default function Jobs() {
   const [sortBy, setSortBy] = useState<string>('relevance')
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
+  const navigate = useNavigate()
   
   // const queryClient = useQueryClient()
 
@@ -472,177 +473,175 @@ export default function Jobs() {
             
             return (
               <motion.div key={job.id} variants={itemVariants}>
-                <Card className={cn(
-                  "group transition-all duration-300 hover:shadow-lg border border-border/80",
-                  isMatched && "border-primary/40 bg-primary/5",
+                <Card 
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                  className={cn(
+                  "group relative overflow-hidden transition-all duration-300 hover:shadow-xl border-border/60 cursor-pointer",
+                  "hover:border-primary/50 active:scale-[0.99]",
+                  isMatched ? "bg-gradient-to-br from-background to-primary/5 border-primary/20" : "bg-card",
                   isSaved && "border-yellow-500/40"
                 )}>
-                  <CardContent className="py-6">
-                    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                      {/* Company Logo */}
+                  {/* Hover Gradient Glow */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                  
+                  <CardContent className="p-6 relative">
+                    <div className="flex flex-col gap-4">
+                      {/* Top Row: Logo + Main Info + Salary/Actions */}
                       <div className="flex items-start gap-4">
+                        {/* Logo */}
                         <div className={cn(
-                          "h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
-                          "bg-muted group-hover:bg-primary/10"
+                          "h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300",
+                          "bg-surface-1 border border-border/50 shadow-sm group-hover:shadow-md"
                         )}>
                           {job.companyLogo ? (
                             <img
                               src={job.companyLogo}
                               alt={job.company}
-                              className="h-10 w-10 object-contain rounded-lg"
+                              className="h-9 w-9 object-contain rounded-md"
                             />
                           ) : (
-                            <Building className="h-6 w-6 text-muted-foreground" />
+                            <Building className="h-7 w-7 text-muted-foreground/40" />
                           )}
                         </div>
-                        
-                        {/* Mobile: Company name next to logo */}
-                        <div className="lg:hidden">
-                          <Link
-                            to={`/jobs/${job.id}`}
-                            className="text-lg font-semibold hover:text-primary transition-colors"
-                          >
-                            {job.title}
-                          </Link>
-                          <p className="text-muted-foreground">{job.company}</p>
+
+                        {/* Title & Company */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-2">
+                             <div>
+                                <h3 className="text-lg font-bold text-foreground hover:text-primary transition-colors line-clamp-1">
+                                  {job.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                                  <span className="font-medium text-foreground/80">
+                                    {job.company || "Confidential Company"}
+                                  </span>
+                                  <span className="h-1 w-1 rounded-full bg-border" />
+                                  <span className="flex items-center gap-1">
+                                     <MapPin className="h-3 w-3" />
+                                     {job.isRemote ? "Remote" : job.location}
+                                  </span>
+                                </div>
+                             </div>
+
+                             {/* Right Side: Salary & Badges (Desktop) */}
+                             <div className="hidden sm:flex flex-col items-end gap-1">
+                                <p className="font-bold text-lg text-emerald-600 dark:text-emerald-400">
+                                  {formatSalary(job.salaryMin, job.salaryMax, job.salaryCurrency)}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs">
+                                    {(job.minAuraScore || 0) > 0 && (
+                                        <Badge variant="outline" className="h-5 border-primary/20 text-primary bg-primary/5 gap-1 px-1.5 font-normal">
+                                            <Zap className="h-3 w-3" /> {job.minAuraScore}+ Aura
+                                        </Badge>
+                                    )}
+                                    <Badge variant="secondary" className="h-5 gap-1 font-normal bg-secondary/50 text-muted-foreground">
+                                        {jobTypeLabels[job.type?.toLowerCase().replace('_', '-') as keyof typeof jobTypeLabels] || job.type}
+                                    </Badge>
+                                    <span className="text-muted-foreground flex items-center gap-1">
+                                       <Clock className="h-3 w-3" /> {formatRelativeTime(job.createdAt)}
+                                    </span>
+                                </div>
+                             </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Job Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="hidden lg:block">
-                            <div className="flex items-center gap-2">
-                              <Link
-                                to={`/jobs/${job.id}`}
-                                className="text-lg font-semibold hover:text-primary transition-colors"
+                      {/* Middle: Description */}
+                      <div className="text-sm text-muted-foreground leading-relaxed pl-[4.5rem] break-words -mt-2">
+                          {job.description?.length > 150 ? (
+                              <>
+                                  {job.description.slice(0, 150).trim()}... 
+                                  <span className="ml-1 text-primary font-medium">Read more</span>
+                              </>
+                          ) : (
+                              job.description
+                          )}
+                      </div>
+
+                      {/* Bottom Row: Skills + Actions */}
+                      <div className="flex items-center justify-between gap-4 pl-[4.5rem] pt-2">
+                          {/* Skills Pills */}
+                          <div className="flex flex-wrap gap-2">
+                            {(job.requiredSkills || job.skills || []).slice(0, 4).map((skill) => (
+                                <span key={skill} className="px-2 py-1 rounded-md bg-secondary/40 text-xs font-medium text-secondary-foreground border border-transparent group-hover:border-border/60 transition-colors">
+                                  {skill}
+                                </span>
+                            ))}
+                            {(job.requiredSkills || job.skills || []).length > 4 && (
+                                <span className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                                  +{(job.requiredSkills || job.skills || []).length - 4}
+                                </span>
+                            )}
+                          </div>
+
+                          {/* Desktop Actions */}
+                          <div className="hidden sm:flex items-center gap-3">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mr-2">
+                                {job.applicationsCount > 0 && (
+                                   <span className="flex items-center gap-1 text-primary/80 bg-primary/5 px-2 py-0.5 rounded-full">
+                                       <TrendingUp className="h-3 w-3" /> {job.applicationsCount} applicants
+                                   </span>
+                                )}
+                                <span className="flex items-center gap-1 px-2 py-0.5">
+                                   <Eye className="h-3 w-3" /> {job.viewsCount || 0}
+                                </span>
+                              </div>
+                              
+                              <Button 
+                                  className="h-9 px-4 rounded-lg shadow-sm hover:shadow-md transition-all gap-2 font-medium"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    applyMutation.mutate(job.id)
+                                  }}
                               >
-                                {job.title}
-                              </Link>
-                              {isMatched && (
-                                <Badge variant="success" className="gap-1">
-                                  <Sparkles className="h-3 w-3" />
-                                  Matched
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-muted-foreground">{job.company}</p>
+                                  Quick Apply <ArrowRight className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleSaveJob(job.id)
+                                  }}
+                                  className={cn("h-9 w-9 rounded-lg border-border/60 bg-transparent hover:bg-secondary", isSaved && "text-yellow-500 border-yellow-500/20 bg-yellow-500/5")}
+                              >
+                                  {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4" />}
+                              </Button>
                           </div>
-                          
-                          {/* Salary & Type - Desktop */}
-                          <div className="hidden lg:block text-right flex-shrink-0">
-                            <p className="font-semibold text-lg text-primary">
-                              {formatSalary(job.salaryMin, job.salaryMax, job.salaryCurrency)}
-                            </p>
-                            <Badge variant="outline" className="gap-1">
-                              {jobTypeIcons[job.type]}
-                              {jobTypeLabels[job.type]}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Mobile badges */}
-                        <div className="flex flex-wrap gap-2 mt-2 lg:hidden">
-                          {isMatched && (
-                            <Badge variant="success" className="gap-1">
-                              <Sparkles className="h-3 w-3" />
-                              Matched
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="gap-1">
-                            {jobTypeIcons[job.type]}
-                            {jobTypeLabels[job.type]}
-                          </Badge>
-                        </div>
-
-                        {/* Meta */}
-                        <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {job.location}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Briefcase className="h-4 w-4" />
-                            {experienceLevelLabels[job.experienceLevel]}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {formatRelativeTime(job.createdAt)}
-                          </span>
-                          {job.minAuraScore && (
-                            <span className="flex items-center gap-1 text-primary font-medium">
-                              <Zap className="h-4 w-4" />
-                              Min {job.minAuraScore} Aura
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Skills */}
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {(job.skills || []).slice(0, 6).map((skill) => (
-                            <Badge key={skill} variant="secondary" className="text-xs">
-                              {skill}
-                            </Badge>
-                          ))}
-                          {(job.skills || []).length > 6 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{(job.skills || []).length - 6} more
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Match score bar */}
-                        {isMatched && (
-                          <div className="mt-4 pt-4 border-t">
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <span className="text-muted-foreground">Match Score</span>
-                              <span className="font-medium text-primary">{matchScore}%</span>
-                            </div>
-                            <Progress value={matchScore} className="h-2" />
-                          </div>
-                        )}
-
-                        {/* Mobile: Salary */}
-                        <div className="lg:hidden mt-4 pt-4 border-t">
-                          <p className="font-semibold text-lg text-primary">
-                            {formatSalary(job.salaryMin, job.salaryMax, job.salaryCurrency)}
-                          </p>
-                        </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex lg:flex-col gap-2 flex-shrink-0">
-                        <Button asChild className="flex-1 lg:flex-none gap-2">
-                          <Link to={`/jobs/${job.id}`}>
-                            <Eye className="h-4 w-4" />
-                            View Job
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="flex-1 lg:flex-none gap-2"
-                          onClick={() => applyMutation.mutate(job.id)}
-                          disabled={applyMutation.isPending}
-                        >
-                          {applyMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                          Quick Apply
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => toggleSaveJob(job.id)}
-                          className={cn(isSaved && "text-yellow-500")}
-                        >
-                          {isSaved ? (
-                            <Heart className="h-4 w-4 fill-current" />
-                          ) : (
-                            <BookmarkPlus className="h-4 w-4" />
-                          )}
-                        </Button>
+                      {/* Mobile Only: Salary & Actions (Stacked below) */}
+                      <div className="sm:hidden mt-2 pt-3 border-t flex flex-col gap-3">
+                          <div className="flex justify-between items-center">
+                             <p className="font-bold text-lg text-emerald-600 dark:text-emerald-400">
+                                {formatSalary(job.salaryMin, job.salaryMax, job.salaryCurrency)}
+                             </p>
+                             <div className="flex gap-2">
+                                <Badge variant="secondary" className="text-xs">{jobTypeLabels[job.type?.toLowerCase().replace('_', '-') as keyof typeof jobTypeLabels] || job.type}</Badge>
+                                {(job.minAuraScore || 0) > 0 && <Badge variant="outline" className="text-xs border-primary/30 text-primary">{job.minAuraScore}+ Aura</Badge>}
+                             </div>
+                          </div>
+                          <div className="flex gap-2">
+                             <Button 
+                               className="flex-1" 
+                               onClick={(e) => {
+                                 e.stopPropagation()
+                                 applyMutation.mutate(job.id)
+                               }}
+                             >
+                               Quick Apply
+                             </Button>
+                             <Button 
+                               variant="outline" 
+                               size="icon" 
+                               onClick={(e) => {
+                                 e.stopPropagation()
+                                 toggleSaveJob(job.id)
+                               }}
+                             >
+                                {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4" />}
+                             </Button>
+                          </div>
                       </div>
                     </div>
                   </CardContent>
