@@ -10,11 +10,13 @@ export interface AddManualSkillData {
   name: string;
   category?: SkillCategory;
   selfDeclaredLevel?: SkillLevel;
+  evidence?: Array<{ label?: string; url: string; description?: string }>;
 }
 
 export interface UpdateManualSkillData {
   selfDeclaredLevel?: SkillLevel;
   category?: SkillCategory;
+  evidence?: Array<{ label?: string; url: string; description?: string }>;
 }
 
 export interface SkillWithEvidence {
@@ -120,6 +122,7 @@ export class SkillService {
         isVerified: false,
         verifiedScore: 0,
         selfDeclaredLevel: data.selfDeclaredLevel || SkillLevel.BEGINNER,
+        evidence: data.evidence ? JSON.stringify(data.evidence) : "[]",
       }
     });
 
@@ -137,6 +140,7 @@ export class SkillService {
       data: {
         selfDeclaredLevel: data.selfDeclaredLevel,
         category: data.category,
+        evidence: data.evidence ? JSON.stringify(data.evidence) : undefined,
       }
     });
 

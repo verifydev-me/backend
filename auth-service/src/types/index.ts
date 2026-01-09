@@ -82,6 +82,7 @@ export interface UserResponse {
   isVerified: boolean;
   isOpenToWork: boolean;
   role: string;
+  tags?: string[];
 }
 
 // API Response Types

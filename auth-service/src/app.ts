@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
 // Routes
 import authRoutes from './api/v1/routes/auth.routes.js';
+import otpRoutes from './api/v1/routes/otp.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -84,6 +85,7 @@ export function createApp(): Express {
 
   // API Routes
   app.use('/api/v1/auth', authLimiter, authRoutes);
+  app.use('/api/v1/auth/otp', otpRoutes);
 
   // 404 handler
   app.use(notFoundHandler);

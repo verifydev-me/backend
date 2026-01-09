@@ -99,7 +99,7 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="group rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/10">
+    <div className="group rounded-xl border border-border/60 bg-card/40 backdrop-blur-md p-5 transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
       <div className="flex items-start justify-between mb-3">
         <div className="p-2.5 rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-110">
           <Icon className="w-5 h-5" />
@@ -155,7 +155,7 @@ function ProjectCard({ project }: { project: any }) {
   return (
     <div 
       onClick={() => navigate(`/projects/${project.id}`)}
-      className="group cursor-pointer rounded-2xl border border-border/50 bg-gradient-to-br from-card/90 via-card/80 to-card/70 backdrop-blur-xl p-5 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/15 hover:scale-[1.01]"
+      className="group cursor-pointer rounded-xl border border-border/80 bg-gradient-to-br from-card/60 via-card/40 to-card/30 backdrop-blur-md p-5 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/15 hover:scale-[1.01]"
     >
       <div className="flex items-start gap-4">
         {/* Circular Score with Glow */}
@@ -343,8 +343,8 @@ export default function Dashboard() {
   })
 
   // Activity chart data from aura history or generate sample
-  const activityData = aura?.recentGains?.length > 0 
-    ? aura.recentGains.slice(0, 7).map(g => ({
+  const activityData = (aura?.recentGains?.length ?? 0) > 0 
+    ? aura!.recentGains!.slice(0, 7).map(g => ({
         day: new Date(g.date).toLocaleDateString('en-US', { weekday: 'short' }),
         points: g.points,
       }))
@@ -368,7 +368,7 @@ export default function Dashboard() {
     }
   }
 
-  const analyzedCount = projects.filter(p => p.analysisStatus === 'COMPLETED').length
+  const analyzedCount = projects.filter(p => p.analysisStatus?.toUpperCase() === 'COMPLETED').length
   const topSkills = skills.slice(0, 5)
   const recentActivity = aura?.recentGains?.slice(0, 4) || []
 
@@ -442,7 +442,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           
           {/* Activity Chart */}
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl overflow-hidden">
+          <div className="rounded-xl border border-border/80 bg-card/80 backdrop-blur-xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-primary" />
@@ -491,7 +491,7 @@ export default function Dashboard() {
           </div>
 
           {/* Projects */}
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl overflow-hidden">
+          <div className="rounded-xl border border-border/80 bg-card/80 backdrop-blur-xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-border/30">
               <div className="flex items-center gap-3">
                 <FolderGit2 className="w-4 h-4 text-primary" />
@@ -536,7 +536,7 @@ export default function Dashboard() {
         <div className="space-y-6">
           
           {/* Level Card */}
-          <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card/80 backdrop-blur-xl p-5">
+          <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 via-card/40 to-card/40 backdrop-blur-md p-5">
             <div className="flex items-center gap-4 mb-5">
               <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
                 <Award className="w-7 h-7 text-primary" />
@@ -564,7 +564,7 @@ export default function Dashboard() {
           </div>
 
           {/* Recent Activity */}
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl overflow-hidden">
+          <div className="rounded-xl border border-border/80 bg-card/80 backdrop-blur-xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-primary" />
@@ -586,7 +586,7 @@ export default function Dashboard() {
           </div>
 
           {/* Top Skills */}
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl overflow-hidden">
+          <div className="rounded-xl border border-border/80 bg-card/80 backdrop-blur-xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-primary" />
@@ -615,7 +615,7 @@ export default function Dashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl p-5">
+          <div className="rounded-xl border border-border/60 bg-card/40 backdrop-blur-md p-5">
             <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-2">
               <Link to="/projects/new" className="block">

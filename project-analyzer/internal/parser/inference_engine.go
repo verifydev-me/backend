@@ -1377,6 +1377,166 @@ func (e *InferenceEngine) loadRules() {
 			Keywords:        []string{"mutex", "semaphore", "concurrency", "thread safety"},
 			Evidence:        []string{"Concurrency control patterns detected"},
 		},
+
+		// ============================================
+		// FRONTEND FRAMEWORK SKILLS (CRITICAL!)
+		// ============================================
+		{
+			SkillName:       "React",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalReact},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReactQuery, signals.SignalRedux, signals.SignalZustand},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"react", "hooks", "jsx", "components", "frontend"},
+			Evidence:        []string{"React framework detected"},
+		},
+		{
+			SkillName:       "Next.js",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelAdvanced,
+			RequiredSignals: []signals.InfraSignal{signals.SignalNextJS},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          9,
+			Keywords:        []string{"nextjs", "ssr", "server-side rendering", "app router"},
+			Evidence:        []string{"Next.js framework detected"},
+		},
+		{
+			SkillName:       "Vue.js",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalVue},
+			OptionalSignals: []signals.InfraSignal{},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"vue", "vuex", "composition api", "frontend"},
+			Evidence:        []string{"Vue.js framework detected"},
+		},
+		{
+			SkillName:       "Angular",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalAngular},
+			OptionalSignals: []signals.InfraSignal{},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"angular", "typescript", "rxjs", "frontend"},
+			Evidence:        []string{"Angular framework detected"},
+		},
+		{
+			SkillName:       "Tailwind CSS",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalTailwind},
+			OptionalSignals: []signals.InfraSignal{},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          7,
+			Keywords:        []string{"tailwind", "css", "utility-first", "styling"},
+			Evidence:        []string{"Tailwind CSS detected"},
+		},
+		{
+			SkillName:       "Redux State Management",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalRedux},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          7,
+			Keywords:        []string{"redux", "state management", "actions", "reducers"},
+			Evidence:        []string{"Redux state management detected"},
+		},
+		{
+			SkillName:       "Zustand State Management",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalZustand},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          7,
+			Keywords:        []string{"zustand", "state management", "lightweight"},
+			Evidence:        []string{"Zustand state management detected"},
+		},
+		{
+			SkillName:       "React Query / TanStack Query",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalReactQuery},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          7,
+			Keywords:        []string{"react-query", "tanstack", "data fetching", "caching"},
+			Evidence:        []string{"React Query / TanStack Query detected"},
+		},
+		{
+			SkillName:       "Framer Motion Animations",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalFramerMotion},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          6,
+			Keywords:        []string{"framer-motion", "animations", "gestures"},
+			Evidence:        []string{"Framer Motion animations detected"},
+		},
+		{
+			SkillName:       "Form Validation (Zod/Yup)",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalInputValidation},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          6,
+			Keywords:        []string{"zod", "yup", "validation", "schema"},
+			Evidence:        []string{"Form validation library detected"},
+		},
+		{
+			SkillName:       "Jest Testing",
+			Category:        signals.CategoryTesting,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalJest},
+			OptionalSignals: []signals.InfraSignal{signals.SignalReact},
+			MinSignalCount:  0,
+			BaseConfidence:  0.85,
+			Weight:          7,
+			Keywords:        []string{"jest", "testing", "snapshots", "mocking"},
+			Evidence:        []string{"Jest testing framework detected"},
+		},
+		{
+			SkillName:       "Cypress E2E Testing",
+			Category:        signals.CategoryTesting,
+			Level:           signals.LevelAdvanced,
+			RequiredSignals: []signals.InfraSignal{signals.SignalCypress},
+			OptionalSignals: []signals.InfraSignal{},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"cypress", "e2e", "end-to-end", "browser testing"},
+			Evidence:        []string{"Cypress E2E testing detected"},
+		},
+		{
+			SkillName:       "Playwright Testing",
+			Category:        signals.CategoryTesting,
+			Level:           signals.LevelAdvanced,
+			RequiredSignals: []signals.InfraSignal{signals.SignalPlaywright},
+			OptionalSignals: []signals.InfraSignal{},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"playwright", "e2e", "cross-browser", "automation"},
+			Evidence:        []string{"Playwright testing detected"},
+		},
 	}
 }
 
@@ -1540,14 +1700,21 @@ func (e *InferenceEngine) inferArchitecture(sigs *signals.InfrastructureSignals,
 	}
 
 	// Determine architecture type
-	// PRIORITY ORDER: Monorepo > Microservices > Event-Driven > Monolith
+	// NEW PRIORITY: Microservices > Monorepo > Event-Driven > Monolith
+	// A project CAN be both monorepo AND microservices (multiple services in one repo)
 
-	// Check for Monorepo first (frontend + backend in one repo)
-	if sigs.HasSignal(signals.SignalMonorepo) {
-		arch.Type = signals.ArchMonorepo
-	} else if sigs.HasSignal(signals.SignalMultipleServices) && sigs.ServiceCount >= 2 {
-		// Only mark as microservices if there are 2+ ACTUAL services (not infra)
+	isMonorepo := sigs.HasSignal(signals.SignalMonorepo)
+	isMicroservices := sigs.HasSignal(signals.SignalMultipleServices) && sigs.ServiceCount >= 2
+
+	if isMicroservices {
+		// Microservices takes priority - this is about architecture, not repo structure
 		arch.Type = signals.ArchMicroservice
+		// If also a monorepo, add it to patterns for context
+		if isMonorepo {
+			arch.Patterns = append(arch.Patterns, "Monorepo Structure")
+		}
+	} else if isMonorepo {
+		arch.Type = signals.ArchMonorepo
 	} else if sigs.HasSignal(signals.SignalEventSourcing) || sigs.HasSignal(signals.SignalCQRS) {
 		arch.Type = signals.ArchEventDriven
 	} else {

@@ -32,7 +32,6 @@ import {
   Pin,
   Trash2,
   RefreshCw,
-  ExternalLink,
   FolderGit2,
   Loader2,
   LayoutGrid,
@@ -50,7 +49,6 @@ import {
   BarChart3,
   Github,
   Check,
-  Eye,
 } from 'lucide-react'
 
 // GitHub repo type from available endpoint
@@ -129,7 +127,7 @@ function CircularProgress({ value, size = 56 }: { value: number, size?: number }
 // Skeleton components
 function ProjectCardSkeleton() {
   return (
-    <Card className="overflow-hidden rounded-2xl border-border/50 bg-card/50">
+    <Card className="overflow-hidden rounded-xl border border-border/80 bg-card/50">
       <CardContent className="p-5">
         <div className="flex items-start gap-4 mb-4">
           <div className="h-14 w-14 rounded-full bg-muted animate-pulse" />
@@ -151,7 +149,7 @@ function StatsSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <Card key={i} className="rounded-2xl border-border/50 bg-card/50">
+        <Card key={i} className="rounded-xl border border-border/80 bg-card/50">
           <CardContent className="p-4">
             <div className="h-4 w-20 bg-muted rounded animate-pulse mb-2" />
             <div className="h-8 w-16 bg-muted rounded animate-pulse" />
@@ -402,7 +400,7 @@ export default function Projects() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4"
         >
-          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          <Card className="rounded-xl border border-border/80 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent" />
             <CardContent className="p-5 relative">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
@@ -412,7 +410,7 @@ export default function Projects() {
               <p className="text-3xl font-bold mt-2">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          <Card className="rounded-xl border border-border/80 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
             <CardContent className="p-5 relative">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
@@ -428,7 +426,7 @@ export default function Projects() {
               )}
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          <Card className="rounded-xl border border-border/80 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent" />
             <CardContent className="p-5 relative">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
@@ -438,7 +436,7 @@ export default function Projects() {
               <p className="text-3xl font-bold mt-2">{formatNumber(stats.totalStars)}</p>
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          <Card className="rounded-xl border border-border/80 bg-card/50 backdrop-blur-sm relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent" />
             <CardContent className="p-5 relative">
               <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
@@ -470,7 +468,7 @@ export default function Projects() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-card border border-border/50 rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+              className="bg-card border border-border/50 rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">

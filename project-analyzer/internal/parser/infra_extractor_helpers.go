@@ -9,16 +9,42 @@ import (
 )
 
 // ============================================
+// PRODUCTION SAFETY LIMITS
+// ============================================
+const (
+	// MaxFileSizeRead prevents OOM by skipping files larger than 5MB
+	MaxFileSizeRead = 5 * 1024 * 1024 // 5MB
+
+	// MaxFilesScanned prevents runaway scanning on huge repos
+	MaxFilesScanned = 10000
+
+	// MaxFileResults prevents memory bloat from too many matches
+	MaxFileResults = 500
+)
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
-// findFiles finds files matching patterns
+// findFiles finds files matching patterns (with production limits)
 func (e *InfraExtractor) findFiles(patterns ...string) []string {
 	var results []string
+	filesScanned := 0
 
 	filepath.Walk(e.repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
+		}
+
+		// PRODUCTION LIMIT: Stop after too many files
+		filesScanned++
+		if filesScanned > MaxFilesScanned {
+			return filepath.SkipAll
+		}
+
+		// PRODUCTION LIMIT: Stop after too many results
+		if len(results) >= MaxFileResults {
+			return filepath.SkipAll
 		}
 
 		// Skip vendor/node_modules
@@ -43,14 +69,26 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 	return results
 }
 
-// findCodePattern searches for regex pattern in code files
+// findCodePattern searches for regex pattern in code files (with production limits)
 func (e *InfraExtractor) findCodePattern(pattern string) bool {
 	regex := regexp.MustCompile(pattern)
 	found := false
+	filesScanned := 0
 
 	filepath.Walk(e.repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || found {
 			return nil
+		}
+
+		// PRODUCTION LIMIT: Stop after too many files
+		filesScanned++
+		if filesScanned > MaxFilesScanned {
+			return filepath.SkipAll
+		}
+
+		// PRODUCTION LIMIT: Skip files too large to read safely
+		if info.Size() > MaxFileSizeRead {
+			return nil // Skip this file, continue scanning
 		}
 
 		// Skip non-code files
@@ -58,6 +96,7 @@ func (e *InfraExtractor) findCodePattern(pattern string) bool {
 		codeExts := map[string]bool{
 			".go": true, ".js": true, ".ts": true, ".py": true,
 			".java": true, ".rs": true, ".rb": true, ".cs": true,
+			".jsx": true, ".tsx": true, // Add JSX/TSX
 		}
 		if !codeExts[ext] {
 			return nil
@@ -65,7 +104,8 @@ func (e *InfraExtractor) findCodePattern(pattern string) bool {
 
 		// Skip vendor
 		if strings.Contains(path, "node_modules") ||
-			strings.Contains(path, "vendor") {
+			strings.Contains(path, "vendor") ||
+			strings.Contains(path, ".git") {
 			return filepath.SkipDir
 		}
 

@@ -341,6 +341,22 @@ export default function Settings() {
                       {section.label}
                     </motion.button>
                   ))}
+                  
+                  {/* Job Preferences Link */}
+                  {!isRecruiter && (
+                    <Link to="/settings/job-preferences">
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.35 }}
+                        whileHover={{ x: 4, transition: { duration: 0.2 } }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border/50 mt-2"
+                      >
+                        <Code2 className="h-4 w-4" />
+                        Job Preferences
+                      </motion.div>
+                    </Link>
+                  )}
                 </nav>
               </CardContent>
             </Card>
@@ -576,7 +592,7 @@ export default function Settings() {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('light')}
                         className={cn(
-                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
+                          "p-5 rounded-xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'light' 
                             ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
                             : "border-border/50 hover:border-primary/40 hover:shadow-md"
@@ -604,7 +620,7 @@ export default function Settings() {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('dark')}
                         className={cn(
-                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
+                          "p-5 rounded-xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'dark' 
                             ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
                             : "border-border/50 hover:border-primary/40 hover:shadow-md"
@@ -632,7 +648,7 @@ export default function Settings() {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setTheme('system')}
                         className={cn(
-                          "p-5 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group",
+                          "p-5 rounded-xl border-2 transition-all duration-300 relative overflow-hidden group",
                           theme === 'system' 
                             ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
                             : "border-border/50 hover:border-primary/40 hover:shadow-md"
@@ -690,7 +706,7 @@ export default function Settings() {
                           whileHover={{ scale: 1.15, y: -2 }}
                           whileTap={{ scale: 0.95 }}
                           className={cn(
-                            "h-12 w-12 rounded-2xl border-2 transition-all duration-200 shadow-md hover:shadow-xl relative group",
+                            "h-12 w-12 rounded-xl border-2 transition-all duration-200 shadow-md hover:shadow-xl relative group",
                             accentColor === c.value 
                               ? "border-foreground ring-4 ring-primary/30 ring-offset-2 ring-offset-background scale-110" 
                               : "border-transparent hover:border-foreground/20"

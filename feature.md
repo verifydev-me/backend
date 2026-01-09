@@ -11,38 +11,84 @@
 - ❌ Building resume is **time-consuming**
 - ❌ Portfolio websites are **static** and don't show real skills
 - ❌ Job hunting is **noisy** with irrelevant listings
+- ❌ No single platform to showcase **coding + DSA skills**
 
 ### For Recruiters:
 - ❌ Can't **verify** if candidate actually knows the tech
 - ❌ Resumes are **generic** and look the same
 - ❌ Finding right candidates is like **finding needle in haystack**
 - ❌ No way to filter by **actual skill level**
+- ❌ No visibility into candidate's **problem-solving ability**
 
 ---
 
 ## 💡 Solution: VerifyDev
 
-**One platform where skills are verified from actual code, resumes are auto-generated, and recruiters find the right developers instantly.**
+**One platform where skills are verified from actual code, DSA profiles are synced, resumes are auto-generated, and recruiters find the right developers instantly.**
 
 ---
 
 ## 🔥 Core Features
 
-### 1️⃣ GitHub OAuth Login
-- One-click login with GitHub
-- Auto-fetch profile data (name, avatar, bio, repos)
-- Secure token-based authentication
-- Access to public + private repos (with permission)
+### 1️⃣ Multi-Platform Authentication 🔐
+
+#### Developer Login/Signup Options:
+- **Email OTP** - Simple email-based authentication
+- **GitHub OAuth** - One-click login with GitHub
+- **Google OAuth** - Sign in with Google
+- **LinkedIn OAuth** - Professional network login
+
+> 📱 **Note:** Mobile number is NOT required for developers. Only email is needed.
+
+#### After Signup - Platform Connection:
+After successful signup, developers are directed to a **Platform Connection Page** where they can link:
+- 🐙 **GitHub** - For project analysis & code verification
+- 💻 **LeetCode** - For DSA skills verification
+- 🧠 **GeeksforGeeks** - For competitive programming stats
+- 🔗 **LinkedIn** - For professional profile sync
+- 📦 **npm** - For published packages
+- 🐍 **PyPI** - For Python packages
+- 🎨 **CodePen** - For frontend demos
+- 📝 **Dev.to** - For technical writing
 
 ---
 
-### 2️⃣ Smart Resume Builder
+### 2️⃣ DSA Verification System 🧮
 
-#### Auto-Fill from GitHub:
-- Profile picture, name, email
-- Public repositories list
-- Contribution graph data
-- Languages used
+#### LeetCode Integration:
+- Total problems solved (Easy/Medium/Hard)
+- Contest rating & ranking
+- Streak & consistency
+- Top 100 interview problems completion
+- Company-wise problem completion
+
+#### GeeksforGeeks Integration:
+- Total problems solved
+- Coding score
+- Institute rank
+- Monthly coding score
+
+#### Combined DSA Score:
+```
+┌─────────────────────────────────────────────────────────┐
+│              DSA VERIFICATION PROFILE                    │
+├─────────────────────────────────────────────────────────┤
+│  LeetCode         ████████████████░░░░  823 problems    │
+│  Contest Rating   ██████████████░░░░░░  1847 (Top 15%)  │
+│  GeeksforGeeks    ████████████░░░░░░░░  456 problems    │
+│  Combined Score   ██████████████████░░  89/100 ✅       │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3️⃣ Smart Resume Builder
+
+#### Auto-Fill from Connected Platforms:
+- **GitHub**: Profile picture, name, repos, contribution graph
+- **LeetCode**: Problem count, contest rating
+- **GeeksforGeeks**: Coding score, problem count
+- **LinkedIn**: Work experience, education
 
 #### Manual Sections:
 - **Experience** - Job history, roles, duration
@@ -50,16 +96,16 @@
 - **Core Skills** - Self-declared skills (to be verified)
 - **Projects** - Add GitHub repos for analysis
 
-#### Resume Templates (Future):
-- 🎨 Modern Dark Theme
-- 📄 Classic Professional
-- 🚀 Developer-Focused
-- 💼 Corporate Clean
-- 🎯 ATS-Optimized
+#### Resume Templates:
+- 🎨 **Modern Dark Theme** - Sleek developer-focused design
+- 📄 **Classic Professional** - Traditional corporate format
+- 🚀 **Tech Focused** - Highlights projects & skills
+- 💼 **ATS-Optimized** - Passes applicant tracking systems
+- 🎯 **Minimal** - Clean, distraction-free layout
 
 ---
 
-### 3️⃣ Project Analyzer Engine (AI-Powered) 🧠
+### 4️⃣ Project Analyzer Engine (AI-Powered) 🧠
 
 When user adds a GitHub project, the system deeply analyzes:
 
@@ -117,7 +163,34 @@ When user adds a GitHub project, the system deeply analyzes:
 
 ---
 
-### 4️⃣ Verified Skills with Percentages ✅
+### 5️⃣ AURA Score System ⚡
+
+The **AURA Score** is a comprehensive developer rating combining:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              AURA SCORE BREAKDOWN                        │
+├─────────────────────────────────────────────────────────┤
+│  Code Quality      (40%)  ████████░░  32/40 points      │
+│  DSA Skills        (25%)  ██████░░░░  18/25 points      │
+│  Project Diversity (15%)  █████░░░░░  11/15 points      │
+│  Consistency       (10%)  ████████░░   8/10 points      │
+│  Community         (10%)  ██████░░░░   6/10 points      │
+├─────────────────────────────────────────────────────────┤
+│  TOTAL AURA SCORE         ████████░░  75/100 ⚡         │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Score Components:
+- **Code Quality (40%)**: From project analysis - patterns, structure, best practices
+- **DSA Skills (25%)**: LeetCode + GeeksforGeeks combined
+- **Project Diversity (15%)**: Different tech stacks, languages
+- **Consistency (10%)**: Regular commits, streak maintenance
+- **Community (10%)**: Stars, forks, open source contributions
+
+---
+
+### 6️⃣ Verified Skills with Percentages ✅
 
 Based on project analysis, skills are assigned verified percentages:
 
@@ -143,7 +216,7 @@ Based on project analysis, skills are assigned verified percentages:
 
 ---
 
-### 5️⃣ Auto-Generated Resume 📄
+### 7️⃣ Auto-Generated Resume 📄
 
 System automatically creates a professional resume with:
 
@@ -157,7 +230,7 @@ System automatically creates a professional resume with:
 
 ---
 
-### 6️⃣ Job Discovery & Application 💼
+### 8️⃣ Job Discovery & Application 💼
 
 #### For Developers:
 - Browse curated job listings
@@ -171,16 +244,19 @@ System automatically creates a professional resume with:
 - By experience level
 - By location (remote/onsite)
 - By salary range
-- By company type
+- By AURA score range
+- By DSA rating
 
 ---
 
-### 7️⃣ Recruiter Dashboard 👔
+### 9️⃣ Recruiter Dashboard 👔
 
 #### Find Right Developers:
 - Filter by **verified skills** (not self-claimed)
 - Filter by **skill percentage** (e.g., React > 70%)
 - Filter by **code quality score**
+- Filter by **AURA score** (e.g., > 80)
+- Filter by **DSA rating** (e.g., LeetCode > 1800)
 - Filter by **experience level**
 - Filter by **location/availability**
 

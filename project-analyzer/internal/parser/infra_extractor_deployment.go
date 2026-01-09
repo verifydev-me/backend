@@ -127,7 +127,8 @@ func (e *InfraExtractor) scanDockerComposeContent(path, filename string) {
 	if err != nil {
 		return
 	}
-	contentStr := strings.ToLower(string(content))
+	contentStr := string(content)
+	contentLower := strings.ToLower(contentStr)
 
 	// Map images/services to signals
 	serviceMap := map[string]signals.InfraSignal{
@@ -158,11 +159,50 @@ func (e *InfraExtractor) scanDockerComposeContent(path, filename string) {
 		"clickhouse":    signals.SignalClickHouse,
 	}
 
-	for pattern, signal := range serviceMap {
-		if strings.Contains(contentStr, pattern) {
-			e.signals.AddSignal(signal, 0.95,
-				[]string{fmt.Sprintf("Found '%s' in %s", pattern, filename)},
-				"docker_compose")
+	// Process line by line for more accurate detection
+	// Only match services from "image:" lines or service names, NOT volume paths
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		lineLower := strings.ToLower(strings.TrimSpace(line))
+
+		// Skip comments and volume/path lines that could cause false positives
+		if strings.HasPrefix(lineLower, "#") {
+			continue
+		}
+		// Volume paths often contain /etc/nginx, /var/lib/mysql etc - SKIP
+		if strings.Contains(lineLower, "/") && !strings.HasPrefix(lineLower, "image:") {
+			continue
+		}
+
+		// Only match on "image:" lines or service definition lines (no colon followed by /)
+		for pattern, signal := range serviceMap {
+			// Match: "image: postgres:13" or "  postgres:" (service name)
+			if strings.Contains(lineLower, "image:") && strings.Contains(lineLower, pattern) {
+				e.signals.AddSignal(signal, 0.95,
+					[]string{fmt.Sprintf("Docker image '%s' in %s", pattern, filename)},
+					"docker_compose")
+			} else if strings.HasSuffix(lineLower, pattern+":") || lineLower == pattern+":" {
+				// Service name definition line like "  postgres:"
+				e.signals.AddSignal(signal, 0.90,
+					[]string{fmt.Sprintf("Service '%s' in %s", pattern, filename)},
+					"docker_compose")
+			}
+		}
+	}
+
+	// Also check for infra services mentioned as environment variables (more reliable)
+	envPatterns := map[string]signals.InfraSignal{
+		"rabbitmq_host": signals.SignalRabbitMQ,
+		"kafka_":        signals.SignalKafka,
+		"redis_host":    signals.SignalRedis,
+		"postgres_":     signals.SignalPostgres,
+		"mongo_":        signals.SignalMongoDB,
+	}
+	for pattern, signal := range envPatterns {
+		if strings.Contains(contentLower, pattern) {
+			e.signals.AddSignal(signal, 0.85,
+				[]string{fmt.Sprintf("Environment variable '%s' in %s", pattern, filename)},
+				"docker_compose_env")
 		}
 	}
 }

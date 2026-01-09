@@ -25,6 +25,7 @@ export interface User {
   role: 'developer' | 'recruiter' | 'admin'
   createdAt: string
   updatedAt: string
+  tags?: string[]
 }
 
 export type AuraLevel = 'novice' | 'rising' | 'skilled' | 'expert' | 'legend'
@@ -236,7 +237,8 @@ export interface VerifiedSkill {
   score?: number // Alternative to confidence (0-100)
   verifiedScore: number
   isVerified: boolean
-  evidence?: string[] // Human-readable proof
+  source?: 'GITHUB' | 'ANALYSIS' | 'MANUAL'
+  evidence?: { label?: string; url: string; description?: string }[] | string[] // Human-readable proof
   signals?: string[] // Underlying signals
   keywords?: string[] // Related keywords
   resumeReady?: boolean // Safe for resume
