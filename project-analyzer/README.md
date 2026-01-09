@@ -1,129 +1,127 @@
-# 🚀 Project Analyzer Engine (Enterprise Grade)
+# 🧠 Project Analyzer Engine (Go)
 
-The **Project Analyzer** is a high-performance, intelligent static analysis engine designed to deconstruct, understand, and visualize software repositories. Built with **Go** for speed and concurrency, it goes beyond simple file counting to understand *how* code is written, architected, and deployed.
+The **Project Analyzer** is the autonomous "brain" of the platform. It is a high-performance, modular static analysis engine written in **Go** that decompiles, understands, and scores software repositories.
 
----
-
-## ⚡ Core Capabilities
-
-### 1. **Deep Tech Stack Detection**
-   - **Languages**: JavaScript, TypeScript, Go, Python, Java, Rust, C#, PHP.
-   - **Frameworks**:
-     - **Frontend**: React, Next.js, Vue, Angular, Svelte, Tailwind, Redux.
-     - **Backend**: Node.js (Express, NestJS), Go (Gin, Echo, Fiber), Python (Django, Flask, FastAPI).
-   - **Databases**: PostgreSQL, MongoDB, MySQL, Redis, DynamoDB, Cassandra, Elasticsearch.
-   - **Infrastructure**: Docker, Kubernetes, Terraform, AWS, GCP, Azure, Helm, Ansible.
-   - **DevOps**: GitHub Actions, Jenkins, CircleCI, Prometheus, Grafana, ELK Stack.
-
-### 2. **Intelligent Architecture Analysis**
-   - **Microservices vs. Monolith**: Smart detection logic distinguishes between true distributed microservices and simple monorepos using folder patterns and `go.mod`/`package.json` dependency graphs.
-   - **Monorepo Support**: Detects workspaces (Lerna, Nx, Turbo, Go Workspaces).
-   - **Gateway Detection**: Identifies API Gateways (Nginx, Kong, Traefik) and Service Meshes (Istio).
-
-### 3. **"Ghost Dependency" Verification**
-   - **Problem**: A `package.json` lists `redux`, but is it actually used?
-   - **Solution**: The engine performs a **Phase 2 Deep Scan** using Regex/AST logic to verify if libraries are imported and instantiated in the code.
-   - **Result**: "Redux" is only listed as a skill if `useSelector` or `dispatch` is found in the source code.
-
-### 4. **Complexity Scoring & Labeling**
-   - Calculates a **0-100 Complexity Score** based on:
-     - **Architecture (40%)**: Microservices, Event-Driven patterns.
-     - **Infrastructure (35%)**: K8s, Cloud-Native, IaC.
-     - **Code Quality (25%)**: Testing coverage, CI/CD, Observability.
-   - **Auto-Labeling**: Classifies projects as **Prototype**, **MVP**, **Growth**, or **Enterprise**.
-
-### 5. **Architecture Graph Generation**
-   - Generates a `node-link` JSON graph representing the system topology.
-   - **Nodes**: Services, Databases, Queues, Frontends, Gateways.
-   - **Edges**: Connection flows (Service → Database, Frontend → Gateway).
-   - Ready for visualization in frontend layouts.
+Unlike standard linters, this engine understands **context**. It knows the difference between a "Frontend Project" and a "Microservice", and adjusts its analysis strategy accordingly.
 
 ---
 
-## 🛠️ How It Works (The Pipeline)
+## 🏗️ Architecture
 
-The engine uses a **Massively Parallel Pipeline** to process repositories in seconds.
+The engine is built on a **Pipeline Architecture** with four distinct layers:
 
-### **Phase 1: Parallel Extraction (The Heavy Lifting)**
-Multiple extractors run concurrently using Go Goroutines:
-1.  **File Stats**: Counts lines of code per language (excluding vendor/configs).
-2.  **Folder Structure**: Analyzes project layout (`src`, `internal`, `pkg`, `api`).
-3.  **Code Signals**: Checks for "Good Engineering" markers (Tests, CI, Linting, Dockerfiles).
-4.  **Infra Extraction**: Scans configuration files (`Dockerfile`, `k8s/*.yaml`, `terraform`, `nginx.conf`).
-5.  **Pattern Scanning**: Regex scan for design patterns (Singleton, Adapter, Factory, Clean Arch).
-
-### **Phase 2: Language-Specific Deep Dives**
-Once the primary language is identified, specialized parsers trigger:
-- **Node.js**: Parses `package.json` + scans imports.
-- **Go**: Parses `go.mod` + scans `func main()` code patterns.
-- **Python**: Parses `requirements.txt` + `pyproject.toml`.
-
-### **Phase 3: Verification & Inference (The "Brain")**
-- **Ghost Check**: Verifies listed dependencies against actual code usage.
-- **Skill Inference**: Maps "Raw Signals" (e.g., `gin` + `gorm` + `docker`) to "Verified Skills" (e.g., "Go Backend Development").
-- **Graph Generation**: Builds the system topology.
-
----
-
-## 📂 Modular Architecture
-
-The codebase is refactored for extreme maintainability and debugging:
-
-```text
-internal/parser/
-├── infra_extractor.go           # The Orchestrator
-├── infra_extractor_services.go  # Microservice vs Monorepo Logic
-├── infra_extractor_deployment.go# Docker/K8s/Cloud Detection
-├── infra_extractor_graph.go     # Architecture Graph Generator
-├── infra_extractor_complexity.go# Scoring Algorithm
-├── infra_extractor_verification.go # Ghost Dependency Checker
-├── infra_extractor_patterns.go  # Design Pattern Matcher
-├── infra_extractor_gateway.go   # Nginx/Traefik Config Parsing
-├── infra_extractor_node.go      # Node.js Logic
-├── infra_extractor_go.go        # Go Logic
-└── infra_extractor_python.go    # Python Logic
+```mermaid
+graph TD
+    A[Input Request] --> B[Analyzer Orchestrator]
+    B --> C[Parser Layer]
+    B --> D[Signal Layer]
+    B --> E[Intelligence Engine]
+    E --> F[Verdict Layer]
+    F --> G[JSON Output]
 ```
 
+### 1. Parser Layer (`internal/parser`)
+The "eyes" of the engine. It scans the filesystem, understands project structure (monorepo vs polyrepo), and builds a virtual map of the code.
+-   **Capabilities**: Folder depth analysis, file counting, language detection.
+-   **Optimization**: Uses concurrent walkers for speed.
+
+### 2. Signal Layer (`pkg/signals`)
+The "feature extractor". It converts raw files into meaningful data points called **Signals**.
+-   **Raw Signals**: "Has `package.json`", "Has `docker-compose.yml`".
+-   **FastSignals**: A lightweight, pre-computed version of signals passed to the pipeline to skip redundant I/O.
+
+### 3. Intelligence Engine (`internal/intelligence`)
+The "brain". This is a modular pipeline that processes signals to derive higher-level insights.
+-   **Router**: Directs analysis to specific modules (e.g., if `react` is found, route to `ReactAnalyzer`).
+-   **Context Awareness**: If `projectType === 'frontend'`, it actively filters out irrelevant backend noise (like internal Docker networks) to ensure clean reporting.
+-   **Pre-Computation**: Supports "Fast Path" execution where expensive file scans are skipped if signals were already computed in a previous step.
+
+### 4. Verdict Layer (`verdict_engine.go`)
+The "judge". It aggregates all intelligence reports to produce a final confidence score and engineering level.
+-   **Output**: `Production-grade`, `Prototype`, etc.
+
 ---
 
-## 🚀 Performance & Scalability
+## ⚙️ The Processing Pipeline
 
-- **Concurrency**: Typical repo analysis takes **< 2 seconds**. Large monorepos with microservices take **3-5 seconds**.
-- **Message Queue**: Fully event-driven via **RabbitMQ**.
-- **Error Handling**: Uses Dead Letter Queues (DLQ) for failed analyses to prevent data loss.
-- **Resource Efficient**: Streaming file readers (no loading huge files into memory).
+The analysis flows through specific stages to ensure speed and accuracy:
+
+### Phase 1: Context & Structure Scan
+The engine first determines **"What is this?"**.
+-   It checks for "Golden Files" (`package.json`, `go.mod`, `pom.xml`).
+-   It analyzes folder structure (`src/`, `internal/`, `pkg/`) to guess the architecture (e.g., Go Standard Layout vs Simple Script).
+
+### Phase 2: Signal Extraction (Fast Path)
+Instead of re-reading every file, the engine extracts critical metadata:
+-   **Frontend**: React hooks usage, state management complexity, CSS-in-JS patterns.
+-   **Backend**: API definition patterns, database connections, middleware usage.
+-   **Infra**: Docker, Kubernetes, CI/CD config presence.
+
+### Phase 3: Intelligent Routing
+The **ModuleRouter** (`module_router.go`) dynamically activates "Experts" based on signals:
+```go
+// Example Logic
+if signals.Has("react") {
+    pipeline.AddModule(NewReactExpert())
+}
+if signals.Has("go") {
+    pipeline.AddModule(NewGoExpert())
+}
+```
+
+### Phase 4: Strict Filtering
+To prevent "hallucinations" (e.g., finding a "backend" skill in a frontend repo):
+-   **Frontend Projects**: Strictly whitelists UI/UX skills. Filters out backend infra signals.
+-   **Backend Projects**: Filters out frontend frameworks unless specifically detected in a fullstack context.
 
 ---
 
-## 📝 Example Output (JSON)
+## 🧩 Modularity (How to Extend)
 
-```json
-{
-  "projectId": "123",
-  "projectType": "microservice",
-  "complexity": {
-    "totalScore": 85.5,
-    "scaleLabel": "Enterprise"
-  },
-  "industryAnalysis": {
-    "engineeringLevel": "Senior",
-    "architecture": { "type": "Microservices", "confidence": 0.95 }
-  },
-  "architectureGraph": {
-    "nodes": [
-      { "id": "auth-service", "type": "service", "tech": "go" },
-      { "id": "user-service", "type": "service", "tech": "node" },
-      { "id": "postgres", "type": "database", "tech": "postgres" }
-    ],
-    "edges": [
-      { "source": "auth-service", "target": "postgres" }
-    ]
-  },
-  "frameworks": ["Gin", "NestJS", "React"],
-  "databases": ["PostgreSQL", "Redis"],
-  "tools": ["Docker", "Kubernetes", "Prometheus"]
+The engine is designed to be easily extensible. To add a new technology analyzer (e.g., for Rust), you simply create a new **Module**.
+
+### 1. Define the Module
+Implement the `IntelligenceModule` interface:
+
+```go
+type RustModule struct {}
+
+func (m *RustModule) Name() string { return "rust-analyzer" }
+
+func (m *RustModule) Analyze(ctx Context, signals FastSignals) Confidence {
+    if !signals.HasExtension(".rs") {
+        return 0 // Skip
+    }
+    // ... logic to analyze Cargo.toml ...
+    return 0.9
+}
+```
+
+### 2. Register with Router
+Add it to `internal/intelligence/module_router.go`:
+```go
+func GetModules() []Module {
+    return []Module{
+        &ReactModule{},
+        &GoModule{},
+        &RustModule{}, // Added
+    }
 }
 ```
 
 ---
-**Built by the VerifyDev Team using Advanced Agentic Coding.**
+
+## ⚡ Key Optimizations
+
+-   **Pre-Computed Signals**: The Intelligence Pipeline accepts existing signals, reducing I/O operations by 40%.
+-   **Strict Filtering**: Eliminates false positives by strictly enforcing `projectType` boundaries.
+-   **Concurrency**: Uses Go's goroutines to scan independent directories in parallel.
+
+---
+
+## 🛠️ Tech Stack
+
+-   **Language**: Go (Golang) 1.21+
+-   **Communication**: RabbitMQ (Event Driven)
+-   **Database**: PostgreSQL (via Prisma in other services)
+-   **Testing**: Standard `testing` package

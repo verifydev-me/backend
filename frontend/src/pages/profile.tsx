@@ -294,33 +294,60 @@ export default function Profile() {
               </div>
             </div>
             
-            {/* Center: Info */}
-            <div className="flex-1 space-y-4 text-center lg:text-left">
-              <div>
-                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-2">
-                  <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
-                    {user.name || user.username}
-                  </h1>
-                  {user.auraScore > 100 && (
-                    <Badge className="bg-gradient-to-r from-primary to-primary/80 text-white border-0 shadow-lg shadow-primary/30">
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
+              {/* Center: Info */}
+              <div className="flex-1 space-y-4 text-center lg:text-left">
+                <div>
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-2">
+                    <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
+                      {user.name || user.username}
+                    </h1>
+                    {user.auraScore > 100 && (
+                      <Badge className="bg-gradient-to-r from-primary to-primary/80 text-white border-0 shadow-lg shadow-primary/30">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-lg text-muted-foreground">@{user.username}</p>
+                  
+                  {/* Primary Role Badge - System Inferred */}
+                  {user.primaryRole && (
+                    <div className="mt-3 flex flex-wrap gap-2 justify-center lg:justify-start">
+                      <Badge className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 px-3 py-1 text-sm shadow-md">
+                        <Code className="h-3.5 w-3.5 mr-1.5" />
+                        {user.primaryRole}
+                      </Badge>
+                      {user.nicheConfidence && user.nicheConfidence > 70 && (
+                        <Badge variant="outline" className="border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/5">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          {user.nicheConfidence}% Match
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Auto-generated Tags - Non-editable */}
+                  {user.autoTags && user.autoTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3 justify-center lg:justify-start">
+                      {user.autoTags.map((tag: string) => (
+                        <Badge key={tag} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Legacy tags display fallback */}
+                  {(!user.autoTags || user.autoTags.length === 0) && user.tags && user.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2 justify-center lg:justify-start">
+                          {user.tags.map((tag: string) => (
+                              <Badge key={tag} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                                  {tag}
+                              </Badge>
+                          ))}
+                      </div>
                   )}
                 </div>
-                <p className="text-lg text-muted-foreground">@{user.username}</p>
-                
-                {/* Auto-generated Role Tags */}
-                {user.tags && user.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2 justify-center lg:justify-start">
-                        {user.tags.map(tag => (
-                            <Badge key={tag} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                                {tag}
-                            </Badge>
-                        ))}
-                    </div>
-                )}
-              </div>
 
               {user.bio && (
                   <p className="text-foreground/80 max-w-2xl text-lg leading-relaxed">{user.bio}</p>

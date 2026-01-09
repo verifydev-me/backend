@@ -87,6 +87,10 @@ export class AuraCalculator {
    * Calculate industry skills bonus (max 15 points)
    * This rewards production-level engineering patterns
    */
+  /**
+   * Calculate industry skills bonus (max 25 points - INCREASED from 15)
+   * This rewards production-level engineering patterns heavily
+   */
   private calculateIndustryBonus(industry?: IndustryAnalysis): number {
     if (!industry || !industry.verifiedSkills) {
       return 0;
@@ -94,48 +98,57 @@ export class AuraCalculator {
 
     let bonus = 0;
 
-    // Base score from verified skills (up to 8 points)
+    // Base score from verified skills (up to 12 points - increased from 8)
     const highConfidenceSkills = industry.verifiedSkills.filter(
       (s: VerifiedSkill) => s.confidence >= 0.7 && s.resumeReady
     );
-    bonus += Math.min(highConfidenceSkills.length * 1, 8);
+    // 2 points per high confidence skill, up to 12
+    bonus += Math.min(highConfidenceSkills.length * 2, 12);
 
-    // Architecture bonus (up to 4 points)
+    // Architecture bonus (up to 8 points - increased from 4)
     if (industry.architecture) {
       switch (industry.architecture.type) {
         case 'microservices':
-          bonus += 4;
+          bonus += 8; // HUGE bonus for actual microservices
           break;
         case 'event_driven':
-          bonus += 3;
+          bonus += 6;
           break;
         case 'monorepo':   
-          bonus += 2;
+          bonus += 5;
           break;
         case 'clean_architecture':
         case 'hexagonal':
-          bonus += 2;
+          bonus += 5;
           break;
         case 'modular_monolith':
-          bonus += 1;
+          bonus += 4;
           break;
+        case 'layered':
+          bonus += 2; // Standard
+          break;
+      }
+      
+      // Bonus for service count in architecture
+      if (industry.architecture.serviceCount && industry.architecture.serviceCount > 2) {
+        bonus += 2;
       }
     }
 
-    // Engineering level bonus (up to 3 points)
+    // Engineering level bonus (up to 5 points - increased from 3)
     switch (industry.engineeringLevel) {
       case 'Production-grade':
-        bonus += 3;
+        bonus += 5;
         break;
       case 'Advanced':
-        bonus += 2;
+        bonus += 3;
         break;
       case 'Intermediate':
         bonus += 1;
         break;
     }
 
-    return Math.min(bonus, 15);
+    return Math.min(bonus, 25);
   }
 
   /**
@@ -145,96 +158,133 @@ export class AuraCalculator {
   private calculateProjectTypeBonus(signals: ProjectSignalsExtended): number {
     let bonus = 0;
 
-    // Project type bonus
+    // Project type bonus (increased values)
     switch (signals.projectType) {
       case 'microservice':
-        bonus += 5;
+        bonus += 8; // High value - complex architecture
         break;
       case 'monorepo':
-        bonus += 4; // Monorepo is valuable - organized fullstack structure
+        bonus += 6; // High value - organized fullstack structure
         break;
       case 'fullstack':
-        bonus += 4;
+        bonus += 6;
         break;
       case 'api':
       case 'backend':
-        bonus += 3;
+        bonus += 5;
         break;
       case 'frontend':
-        bonus += 2;
+        bonus += 4;
         break;
       case 'library':
       case 'cli':
-        bonus += 2;
+        bonus += 4;
         break;
     }
 
     // Docker compose with multiple services
     if (signals.codeSignals?.hasDockerCompose) {
-      bonus += 2;
+      bonus += 3;
     }
 
     // Multiple frameworks (e.g., React + Node.js)
     if (signals.frameworks?.length >= 2) {
-      bonus += 1;
+      bonus += 2;
     }
 
     // Multiple databases
     if (signals.databases?.length >= 2) {
-      bonus += 1;
+      bonus += 2;
     }
 
     // Has message queue (RabbitMQ, Kafka, etc)
     const messageQueues = ['RabbitMQ', 'Kafka', 'Redis'];
     if (signals.databases?.some(db => messageQueues.includes(db)) || 
         signals.tools?.some(t => messageQueues.includes(t))) {
-      bonus += 1;
+      bonus += 2;
     }
 
-    return Math.min(bonus, 10);
+    // CI/CD bonus
+    if (signals.codeSignals?.hasCI) {
+      bonus += 2;
+    }
+
+    return Math.min(bonus, 15); // Increased cap
   }
 
+  // Structure Score (max 20)
   // Structure Score (max 20)
   private calculateStructureScore(signals: ProjectSignals): number {
     let score = 0;
     const folder = signals.folderStructure;
+    const isMicroservice = signals.projectType === 'microservice';
+    const isBackend = signals.projectType === 'backend' || signals.projectType === 'api';
+    const isFrontend = signals.projectType === 'frontend' || signals.projectType === 'fullstack';
 
     // Basic structure (8 points)
-    if (folder.hasSrcFolder) score += 2;
-    if (folder.hasComponents) score += 1;
-    if (folder.hasUtils) score += 1;
+    // Relaxed src check: Microservices often have src inside services/
+    if (folder.hasSrcFolder || (isMicroservice && folder.hasServices)) score += 2;
+    
+    // Context-aware component check
+    if (isFrontend) {
+      if (folder.hasComponents) score += 2; 
+    } else {
+       // For backend, replace 'hasComponents' points with 'hasServices' or 'hasControllers'
+       if (folder.hasServices || folder.hasControllers || folder.hasApi) score += 2;
+    }
+
+    if (folder.hasUtils) score += 2;
     if (folder.hasTypes) score += 2;
-    if (folder.hasConfig) score += 1;
-    if (folder.hasApi) score += 1;
+    if (folder.hasConfig) score += 2;
+    if (folder.hasApi) score += 2; 
 
     // Advanced structure (7 points)
-    if (folder.hasServices) score += 2;
-    if (folder.hasModels) score += 1;
-    if (folder.hasMiddleware) score += 2;
+    if (folder.hasServices) score += 3;
+    if (folder.hasModels) score += 2;
+    if (folder.hasMiddleware) score += 3;
     if (folder.hasControllers) score += 2;
+    
+    // Microservice specific bonus
+    if (isMicroservice && folder.hasConfig && folder.hasServices) {
+      score += 3;
+    }
 
-    // Organization quality (5 points)
-    score += Math.min(Math.round(folder.organizationScore / 20), 5);
+    // Organization quality usage
+    if (folder.organizationScore > 80) score += 2;
 
     return Math.min(score, 20);
   }
 
   // Code Quality Score (max 20)
+  // Code Quality Score (max 20)
   private calculateCodeQualityScore(signals: ProjectSignals): number {
     let score = 0;
     const code = signals.codeSignals;
+    const isFrontend = signals.projectType === 'frontend';
+    const isBackend = ['backend', 'api', 'microservice'].includes(signals.projectType);
 
-    if (code.hasLinting) score += 3;
-    if (code.hasPrettier) score += 2;
-    if (code.hasTypeScript) score += 4;
+    // Linting & Formatting (Higher weight for frontend)
+    if (code.hasLinting) score += isFrontend ? 5 : 3;
+    if (code.hasPrettier) score += isFrontend ? 4 : 2;
+    
+    // Type Safety (Universal high value)
+    if (code.hasTypeScript) score += 5;
+    
+    // DevOps & Config (Higher weight for backend)
+    if (code.hasDockerfile) score += isBackend ? 5 : 2;
+    if (code.hasDockerCompose) score += isBackend ? 3 : 1;
+    if (code.hasCI) score += 3;
+    
+    // Documentation & Best Practices
     if (code.hasGitignore) score += 1;
     if (code.hasEnvExample) score += 2;
-    if (code.hasDockerfile) score += 3;
-    if (code.hasDockerCompose) score += 2;
-    if (code.hasCI) score += 2;
     if (code.hasMakefile) score += 1;
 
-    return Math.min(score, 20);
+    // Penalty for missing critical backend components
+    if (isBackend && !code.hasDockerfile) score -= 2;
+    if (isBackend && !code.hasCI) score -= 1;
+
+    return Math.max(0, Math.min(score, 20));
   }
 
   // Testing Score (max 10)
@@ -558,9 +608,10 @@ export class AuraCalculator {
     // Generate optimization suggestions
     const optimizations = this.generateOptimizations(signals);
 
-    // Framework-specific analysis
+    // Framework-specific analysis - only if React is actually detected as a framework
     let frameworkAnalysis;
-    if (signals.reactSignals) {
+    const hasReactFramework = signals.frameworks.some(f => f.toLowerCase() === 'react' || f.toLowerCase().includes('next'));
+    if (signals.reactSignals && hasReactFramework) {
       frameworkAnalysis = this.generateReactAnalysis(signals.reactSignals);
     }
 
@@ -604,8 +655,9 @@ export class AuraCalculator {
   private generateOptimizations(signals: ProjectSignals): OptimizationSuggestion[] {
     const suggestions: OptimizationSuggestion[] = [];
 
-    // Performance optimizations
-    if (signals.reactSignals) {
+    // Performance optimizations - only for React projects with React framework detected
+    const hasReactFramework = signals.frameworks.some(f => f.toLowerCase() === 'react' || f.toLowerCase().includes('next'));
+    if (signals.reactSignals && hasReactFramework) {
       const react = signals.reactSignals;
       if (!react.usesMemo && react.componentCount > 10) {
         suggestions.push({

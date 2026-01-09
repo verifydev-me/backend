@@ -9,6 +9,7 @@ export interface AddProjectDto {
   repoName: string;
   description?: string;
   defaultBranch?: string;
+  projectType?: 'backend' | 'frontend' | 'fullstack' | 'ml' | 'library';
 }
 
 export class ProjectService {
@@ -63,7 +64,8 @@ export class ProjectService {
           userId, 
           data.githubRepoUrl, 
           data.repoName, 
-          repoDetails?.default_branch || data.defaultBranch
+          repoDetails?.default_branch || data.defaultBranch,
+          data.projectType
         );
         
         await prisma.project.update({
@@ -99,7 +101,8 @@ export class ProjectService {
       userId,
       data.githubRepoUrl,
       data.repoName,
-      repoDetails?.default_branch || data.defaultBranch
+      repoDetails?.default_branch || data.defaultBranch,
+      data.projectType
     );
 
     logger.info({ projectId: project.id, userId }, 'Project added for analysis');
@@ -351,7 +354,8 @@ export class ProjectService {
     userId: string,
     repoUrl: string,
     repoName: string,
-    defaultBranch?: string
+    defaultBranch?: string,
+    projectType?: string
   ) {
     await rabbitmqPublisher.publishAnalyzeRequest({
       projectId,
@@ -359,6 +363,7 @@ export class ProjectService {
       repoUrl,
       repoName,
       defaultBranch: defaultBranch || 'main',
+      projectType,
     });
   }
 }

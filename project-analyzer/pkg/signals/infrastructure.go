@@ -354,9 +354,10 @@ const (
 	SignalFastAPI InfraSignal = "fastapi"
 
 	// Languages (detected as signals)
-	SignalGo     InfraSignal = "go"
-	SignalNode   InfraSignal = "node"
-	SignalPython InfraSignal = "python"
+	SignalGo         InfraSignal = "go"
+	SignalNode       InfraSignal = "node"
+	SignalPython     InfraSignal = "python"
+	SignalTypeScript InfraSignal = "typescript"
 )
 
 // InfrastructureSignals - All extracted infrastructure facts

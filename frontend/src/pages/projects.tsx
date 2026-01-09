@@ -49,6 +49,11 @@ import {
   BarChart3,
   Github,
   Check,
+  Server,
+  Cpu,
+  Layers,
+  Beaker,
+  Package,
 } from 'lucide-react'
 
 // GitHub repo type from available endpoint
@@ -83,6 +88,7 @@ const itemVariants = {
 type ViewMode = 'grid' | 'list'
 type SortField = 'updatedAt' | 'stars' | 'auraContribution' | 'name'
 type SortOrder = 'asc' | 'desc'
+type ProjectType = 'backend' | 'frontend' | 'fullstack' | 'ml' | 'library'
 
 // ============================================
 // CIRCULAR PROGRESS - Dashboard Component
@@ -172,6 +178,7 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
+  const [projectType, setProjectType] = useState<ProjectType>('fullstack')
   
   const queryClient = useQueryClient()
 
@@ -263,14 +270,15 @@ export default function Projects() {
 
   // Mutations
   const addSelectedReposMutation = useMutation({
-    mutationFn: async (repos: GitHubRepo[]) => {
+    mutationFn: async ({ repos, type }: { repos: GitHubRepo[], type: ProjectType }) => {
       const results = await Promise.allSettled(
         repos.map(repo => 
           post('/v1/projects', { 
             githubRepoUrl: repo.url, 
             repoName: repo.name,
             description: repo.description || undefined,
-            defaultBranch: repo.defaultBranch
+            defaultBranch: repo.defaultBranch,
+            projectType: type,
           })
         )
       )
@@ -492,6 +500,34 @@ export default function Projects() {
                 Select repositories from your GitHub account to analyze
               </p>
 
+              {/* Project Type Selection */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Project Type</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { value: 'backend', label: 'Backend', icon: Server },
+                    { value: 'frontend', label: 'Frontend', icon: Cpu },
+                    { value: 'fullstack', label: 'Fullstack', icon: Layers },
+                    { value: 'ml', label: 'ML / AI', icon: Beaker },
+                    { value: 'library', label: 'Library', icon: Package },
+                  ].map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => setProjectType(value as ProjectType)}
+                      className={cn(
+                        'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all',
+                        projectType === value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-xs font-medium">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Search repos */}
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -631,7 +667,7 @@ export default function Projects() {
                     onClick={() => {
                       const allRepos = availableReposData?.repos || []
                       const reposToAdd = allRepos.filter(r => selectedRepos.has(r.url))
-                      addSelectedReposMutation.mutate(reposToAdd)
+                      addSelectedReposMutation.mutate({ repos: reposToAdd, type: projectType })
                     }}
                     disabled={selectedRepos.size === 0 || addSelectedReposMutation.isPending}
                   >

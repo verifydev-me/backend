@@ -26,6 +26,13 @@ export interface User {
   createdAt: string
   updatedAt: string
   tags?: string[]
+  
+  // Niche System - System-inferred role and tags (non-editable)
+  primaryRole?: string // e.g., "Backend Developer", "Full Stack Engineer"
+  primaryNiche?: string // e.g., "WEB_BACKEND", "DISTRIBUTED"
+  secondaryNiche?: string
+  nicheConfidence?: number // 0-100 system confidence
+  autoTags?: string[] // System-generated tags like "Infrastructure Aware"
 }
 
 export type AuraLevel = 'novice' | 'rising' | 'skilled' | 'expert' | 'legend'
@@ -273,9 +280,68 @@ export interface IndustryAnalysis {
   }
 }
 
-// Extended Project with Industry Analysis
+// ============================================
+// AUTONOMOUS INTELLIGENCE ENGINE OUTPUT
+// ============================================
+
+export type HireSignal = 'STRONG_HIRE' | 'HIRE' | 'BORDERLINE' | 'NO_HIRE'
+
+export interface IntelligenceSuggestion {
+  category: string
+  message: string
+  impactScore: number // 1-10
+  effortScore: number // 1-10
+  priority: number    // ImpactScore / EffortScore
+}
+
+export interface IntelligenceSkill {
+  name: string
+  category: string
+  confidence: number // 0-100
+  evidence: string[]
+  resumeReady: boolean
+}
+
+export interface IntelligenceVerdict {
+  // Summary
+  projectIntentSummary: string
+  techStackSnapshot: string[]
+  
+  // Scores
+  architectureMaturity: number // 0-10
+  overallScore: number         // 0-100
+  
+  // Developer Assessment
+  developerLevel: string // JUNIOR/INTERMEDIATE/SENIOR/EXPERT
+  projectIntent: string  // LEARNING/HOBBY/PRODUCTION/ENTERPRISE
+  
+  // Signals
+  keySignals: string[]
+  strengthSignals: string[]
+  riskSignals: string[]
+  
+  // Suggestions (sorted by priority)
+  suggestions: IntelligenceSuggestion[]
+  
+  // Skills (extracted with confidence)
+  extractedSkills: IntelligenceSkill[]
+  
+  // Recruiter Output
+  seniorEngineerVerdict: string
+  hireSignal: HireSignal
+  
+  // Metadata
+  analysisTimeMs: number
+  modulesExecuted: string[]
+  modulesSkipped: string[]
+  earlyTermination: boolean
+  exitReason?: string
+}
+
+// Extended Project with Industry Analysis and Intelligence Verdict
 export interface ProjectWithIndustry extends Project {
   industryAnalysis?: IndustryAnalysis
+  intelligenceVerdict?: IntelligenceVerdict
 }
 
 // Auth Types

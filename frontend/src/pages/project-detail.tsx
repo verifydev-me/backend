@@ -4,7 +4,7 @@
  * Skills displayed with percentages (Redis 80%, TypeScript 95%, etc.)
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { AnalysisResults } from '@/components/features/project/AnalysisResults'
 import { useQuery } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { get } from '@/api/client'
 import { formatNumber, getLanguageColor, cn } from '@/lib/utils'
+import { IntelligenceVerdictCard } from '@/components/intelligence-verdict-card'
 import {
   ArrowLeft,
   ExternalLink,
@@ -22,7 +23,7 @@ import {
   GitCommit,
   Loader2,
   Code,
-  FileText,
+
   TestTube,
   Gauge,
   Activity,
@@ -104,6 +105,88 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
   high: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
   medium: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
   low: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
+}
+
+// ============================================
+// SKILLS RADAR CHART
+// ============================================
+function SkillsDistributionChart({ skills }: { skills: SkillData[] }) {
+  const data = useMemo(() => {
+    // Group skills by category and calculate average score
+    const categories: Record<string, { total: number; count: number }> = {}
+    
+    skills.forEach(skill => {
+      const cat = skill.category || 'tool'
+      // Normalize category names
+      const normalizedCat = cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()
+      
+      if (!categories[normalizedCat]) {
+        categories[normalizedCat] = { total: 0, count: 0 }
+      }
+      
+      const score = skill.confidence 
+        ? skill.confidence * 100 
+        : (skill.score || skill.verifiedScore || 0)
+        
+      categories[normalizedCat].total += score
+      categories[normalizedCat].count += 1
+    })
+    
+    return Object.entries(categories)
+      .map(([subject, stats]) => ({
+        subject,
+        A: Math.round(stats.total / stats.count),
+        fullMark: 100,
+      }))
+      .sort((a, b) => b.A - a.A) // Sort by score for better visual
+      .slice(0, 6) // Top 6 categories to avoid clutter
+  }, [skills])
+
+  if (data.length < 3) return null
+
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur h-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-primary" />
+          Skill Profile
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[250px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
+              <PolarGrid stroke="hsl(var(--border))" />
+              <PolarAngleAxis 
+                dataKey="subject" 
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+              />
+              <PolarRadiusAxis 
+                angle={30} 
+                domain={[0, 100]} 
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+              />
+              <Radar
+                name="Proficiency"
+                dataKey="A"
+                stroke="hsl(var(--primary))"
+                fill="hsl(var(--primary))"
+                fillOpacity={0.3}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  borderRadius: '12px', 
+                  backgroundColor: 'hsl(var(--card))', 
+                  borderColor: 'hsl(var(--border))' 
+                }}
+                formatter={(value: number) => [`${value}%`, 'Proficiency']}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 // ============================================
@@ -1488,6 +1571,53 @@ export default function ProjectDetail() {
         </Card>
       </div>
 
+      {/* ===== SKILL PROFILE CHART ===== */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {verifiedSkills.length > 0 && (
+          <SkillsDistributionChart skills={verifiedSkills} />
+        )}
+         {metrics && metricsData.length > 0 && (
+          <Card className="border-border/50 bg-card/50 backdrop-blur">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-indigo-500" />
+                Code Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={metricsData}>
+                  <PolarGrid stroke="hsl(var(--border))" />
+                  <PolarAngleAxis
+                    dataKey="metric"
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
+                  <PolarRadiusAxis
+                    angle={30}
+                    domain={[0, 100]}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                  />
+                  <Radar
+                    name="Score"
+                    dataKey="value"
+                    stroke="hsl(var(--indigo-500))"
+                    fill="hsl(var(--indigo-500))"
+                    fillOpacity={0.3}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      backgroundColor: 'hsl(var(--card))', 
+                      borderColor: 'hsl(var(--border))' 
+                    }}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* ===== SKILLS BREAKDOWN SECTION ===== */}
       {verifiedSkills.length > 0 && (
         <div className="space-y-4">
@@ -1603,6 +1733,11 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      {/* ===== INTELLIGENCE VERDICT (Autonomous Engine Output) ===== */}
+      {(project.intelligenceVerdict || fullAnalysis.intelligenceVerdict) && (
+        <IntelligenceVerdictCard verdict={project.intelligenceVerdict || fullAnalysis.intelligenceVerdict} />
+      )}
+
       {/* ===== ARCHITECTURE & TECH STACK ===== */}
       {fullAnalysis.industryAnalysis?.architecture && (
         <div className="grid md:grid-cols-2 gap-4">
@@ -1619,72 +1754,7 @@ export default function ProjectDetail() {
 
       {/* ===== METRICS & LANGUAGES ===== */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Metrics Radar */}
-        {metrics && metricsData.length > 0 && (
-          <Card className="border-border/50 bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Code Metrics
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={metricsData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis
-                    dataKey="metric"
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  />
-                  <PolarRadiusAxis
-                    angle={30}
-                    domain={[0, 100]}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                  />
-                  <Radar
-                    name="Score"
-                    dataKey="value"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.3}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
 
-              {/* Metric Details */}
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                  <Code className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Code Quality</span>
-                  <span className="ml-auto font-bold text-primary">
-                    {metrics.codeQuality}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Documentation</span>
-                  <span className="ml-auto font-bold text-blue-400">
-                    {metrics.documentation}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                  <TestTube className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Test Coverage</span>
-                  <span className="ml-auto font-bold text-emerald-400">
-                    {metrics.testCoverage}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                  <Gauge className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Complexity</span>
-                  <span className="ml-auto font-bold text-amber-400">
-                    {metrics.complexity}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Languages */}
         <Card className="border-border/50 bg-card/50 backdrop-blur">
