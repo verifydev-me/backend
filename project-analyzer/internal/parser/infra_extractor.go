@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
 	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
@@ -254,29 +255,81 @@ func (e *InfraExtractor) extractConfigSignals() {
 // analyzeEnvFiles extracts signals from environment files
 func (e *InfraExtractor) analyzeEnvFiles(files []string) {
 	envPatterns := map[string]signals.InfraSignal{
+		// Databases
 		"DATABASE_URL": signals.SignalPostgres,
 		"POSTGRES":     signals.SignalPostgres,
+		"PG_":          signals.SignalPostgres,
 		"MYSQL":        signals.SignalMySQL,
 		"MONGODB":      signals.SignalMongoDB,
 		"MONGO_URI":    signals.SignalMongoDB,
+		"REDIS_URL":    signals.SignalRedis,
+		"REDIS_HOST":   signals.SignalRedis,
 		"REDIS":        signals.SignalRedis,
-		"RABBITMQ":     signals.SignalRabbitMQ,
-		"AMQP":         signals.SignalRabbitMQ,
-		"KAFKA":        signals.SignalKafka,
-		"AWS_ACCESS":   signals.SignalAWS,
-		"AWS_SECRET":   signals.SignalAWS,
-		"GCP":          signals.SignalGCP,
-		"AZURE":        signals.SignalAzure,
-		"JWT_SECRET":   signals.SignalJWT,
-		"OAUTH":        signals.SignalOAuth,
-		"SENTRY_DSN":   signals.SignalSentry,
-		"DATADOG":      signals.SignalDatadog,
-		"NEW_RELIC":    signals.SignalNewRelic,
-		"PROMETHEUS":   signals.SignalPrometheus,
+
+		// Message Queues
+		"RABBITMQ":      signals.SignalRabbitMQ,
+		"AMQP_URL":      signals.SignalRabbitMQ,
+		"AMQP":          signals.SignalRabbitMQ,
+		"KAFKA_BROKERS": signals.SignalKafka,
+		"KAFKA_HOST":    signals.SignalKafka,
+		"KAFKA":         signals.SignalKafka,
+		"NATS_URL":      signals.SignalNATS,
+
+		// Cloud Providers
+		"AWS_ACCESS":                     signals.SignalAWS,
+		"AWS_SECRET":                     signals.SignalAWS,
+		"AWS_REGION":                     signals.SignalAWS,
+		"S3_BUCKET":                      signals.SignalS3,
+		"AWS_S3":                         signals.SignalS3,
+		"GCP":                            signals.SignalGCP,
+		"GOOGLE_CLOUD":                   signals.SignalGCP,
+		"GOOGLE_APPLICATION_CREDENTIALS": signals.SignalGCP,
+		"AZURE":                          signals.SignalAzure,
+
+		// Auth & Security
+		"JWT_SECRET": signals.SignalJWT,
+		"JWT_":       signals.SignalJWT,
+		"OAUTH":      signals.SignalOAuth,
+		"AUTH0":      signals.SignalOAuth2,
+		"OKTA":       signals.SignalOAuth2,
+
+		// Observability
+		"SENTRY_DSN": signals.SignalSentry,
+		"DATADOG":    signals.SignalDatadog,
+		"NEW_RELIC":  signals.SignalNewRelic,
+		"PROMETHEUS": signals.SignalPrometheus,
+		"GRAFANA":    signals.SignalGrafana,
+
+		// Third-party Services
+		"STRIPE":   signals.SignalAWS, // Using AWS as placeholder for integrations
+		"TWILIO":   signals.SignalAWS,
+		"SENDGRID": signals.SignalAWS,
+
+		// Search & Analytics
+		"ELASTICSEARCH": signals.SignalElasticsearch,
+		"ELASTIC_":      signals.SignalElasticsearch,
+		"ALGOLIA":       signals.SignalElasticsearch, // Similar category
+
+		// BaaS
+		"SUPABASE": signals.SignalSupabase,
+		"FIREBASE": signals.SignalFirebase,
+
+		// AI/LLM
+		"OPENAI_API_KEY": signals.SignalLLM,
+		"ANTHROPIC":      signals.SignalLLM,
+		"HUGGINGFACE":    signals.SignalML,
 	}
 
 	for _, file := range files {
-		content, err := os.ReadFile(filepath.Join(e.repoPath, file))
+		filePath := filepath.Join(e.repoPath, file)
+
+		// PRODUCTION SAFETY: Check file size before reading
+		info, err := os.Stat(filePath)
+		if err != nil || info.Size() > MaxFileSizeRead {
+			continue // Skip large or inaccessible files
+		}
+
+		content, err := os.ReadFile(filePath)
 		if err != nil {
 			continue
 		}

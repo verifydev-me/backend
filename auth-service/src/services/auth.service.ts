@@ -2,6 +2,7 @@ import prisma from '../prisma/client.js';
 import { GitHubService } from './github.service.js';
 import { TokenService } from './token.service.js';
 import { logger } from '../utils/logger.js';
+import { TaggingService } from './tagging.service.js';
 import type { AuthTokens, UserResponse, GitHubUser } from '../types/index.js';
 
 export class AuthService {
@@ -249,7 +250,17 @@ export class AuthService {
 
     if (!user) return null;
 
-    return this.formatUserResponse(user);
+    // Fetch skills to generate tags
+    const skills = await prisma.skill.findMany({
+      where: { userId: user.id }
+    });
+    
+    const tags = TaggingService.generateProfileTags(skills);
+
+    const formattedUser = this.formatUserResponse(user);
+    formattedUser.tags = tags;
+
+    return formattedUser;
   }
 }
 

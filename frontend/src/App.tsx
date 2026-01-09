@@ -16,9 +16,11 @@ import Dashboard from '@/pages/dashboard'
 import Projects from '@/pages/projects'
 import ProjectDetail from '@/pages/project-detail'
 import Profile from '@/pages/profile'
+import ClaimSkills from '@/pages/claim-skills'
 import Resume from '@/pages/resume'
 import Settings from '@/pages/settings'
 import PrivacySettings from '@/pages/privacy-settings'
+import JobPreferences from '@/pages/job-preferences'
 import Jobs from '@/pages/jobs'
 import JobDetail from '@/pages/job-detail'
 import Applications from '@/pages/applications'
@@ -26,9 +28,12 @@ import Notifications from '@/pages/notifications'
 import PublicProfile from '@/pages/public-profile'
 import AuthCallback from '@/pages/auth-callback'
 import AuthError from '@/pages/auth-error'
+import OtpLogin from '@/pages/auth/otp-login'
+import ConnectPlatforms from '@/pages/connect-platforms'
 import NotFound from '@/pages/not-found'
 import Onboarding from '@/pages/onboarding'
 import Login from '@/pages/login'
+import RoleSelection from '@/pages/role-selection'
 
 // Recruiter Pages
 
@@ -99,8 +104,13 @@ function App() {
           <Route path="/auth/error" element={<AuthError />} />
         </Route>
 
+        {/* Role Selection Route (No layout) */}
+        <Route path="/get-started" element={<RoleSelection />} />
+
         {/* Developer Login Route (No layout) */}
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/otp-login" element={<OtpLogin />} />
+        <Route path="/connect-platforms" element={<ConnectPlatforms />} />
 
         {/* Recruiter Auth Routes (No layout) */}
 
@@ -176,9 +186,11 @@ function App() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/claim-skills" element={<ClaimSkills />} />
           <Route path="/resume" element={<Resume />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/privacy" element={<PrivacySettings />} />
+          <Route path="/settings/job-preferences" element={<JobPreferences />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<JobDetail />} />
           <Route path="/applications" element={<Applications />} />

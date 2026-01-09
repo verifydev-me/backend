@@ -90,7 +90,7 @@ export default function Applications() {
       </div>
 
       {/* Filters & Search */}
-      <Card>
+      <Card className="border border-border/50">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
@@ -151,7 +151,7 @@ export default function Applications() {
               ))}
             </motion.div>
           ) : (
-            <Card>
+            <Card className="border border-border/50">
               <CardContent className="py-20 text-center">
                 <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <h3 className="text-lg font-semibold mb-2">

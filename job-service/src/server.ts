@@ -12,9 +12,22 @@ import v1Router from './api/v1/index.js';
 const app = express();
 
 // Security
+app.set('trust proxy', 1); // Trust the Nginx gateway
 app.use(helmet());
 app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true }));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  skip: () => env.NODE_ENV === 'development', // Skip for dev
+  message: {
+    success: false,
+    message: 'Too many requests',
+    error: { code: 'RATE_LIMIT_EXCEEDED' },
+  },
+});
+app.use(limiter);
 app.use(express.json());
 
 // Health check

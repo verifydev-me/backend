@@ -54,6 +54,7 @@ export interface UserProfile {
   // Timestamps
   createdAt: Date;
   lastLoginAt: Date | null;
+  tags?: string[];
 }
 
 export interface PublicProfile {
@@ -69,6 +70,7 @@ export interface PublicProfile {
   skills: SkillSummary[];
   projects: ProjectSummary[];
   socialLinks: SocialLinkSummary[];
+  tags?: string[];
 }
 
 export interface AuraDetailItem {

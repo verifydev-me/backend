@@ -248,7 +248,13 @@ function SkillRow({ skill }: { skill: VerifiedSkill }) {
                 {(skill.evidence || []).slice(0, 3).map((e, i) => (
                   <li key={i} className="flex items-start gap-1">
                     <span className="text-primary">•</span>
-                    <span className="line-clamp-2">{e}</span>
+                    <span className="line-clamp-2">
+                       {typeof e === 'string' ? e : (
+                        <a href={e.url} target="_blank" rel="noreferrer" className="hover:underline">
+                          {e.label || e.description || e.url}
+                        </a>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

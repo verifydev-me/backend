@@ -28,6 +28,16 @@ const envSchema = z.object({
 
   // CORS
   ALLOWED_ORIGINS: z.string().transform((val) => val.split(',')),
+
+  // SMTP Configuration for Email OTP
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().email().optional(),
+
+  // Twilio Configuration for SMS OTP
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
 });
 
 // Parse and validate environment variables

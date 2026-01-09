@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,11 +32,11 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214.3 31.8% 88%;
+    --input: 214.3 31.8% 88%;
     --ring: 239 84% 67%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     /* Custom Gradients - Light */
     --gradient-premium: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.8) 100%);
@@ -42,29 +44,29 @@
   }
 
   .dark {
-    /* Premium Black Dark Theme */
-    --background: 0 0% 4%;
+    /* Ultra-Premium Obsidian Dark Theme */
+    --background: 240 10% 2%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 7%;
+    --card: 240 10% 4.5%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 8%;
+    --popover: 240 10% 5%;
     --popover-foreground: 0 0% 98%;
 
     --primary-foreground: 0 0% 2%;
 
-    --secondary: 0 0% 12%;
+    --secondary: 240 10% 8%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 55%;
+    --muted: 240 10% 7%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 0 0% 14%;
+    --accent: 240 10% 10%;
     --accent-foreground: 0 0% 98%;
 
-    --border: 0 0% 15%;
-    --input: 0 0% 12%;
+    --border: 240 5% 15%;
+    --input: 240 5% 12%;
 
     /* Custom Gradients - Dark */
     --gradient-glow: radial-gradient(ellipse at center, hsl(var(--primary) / 0.15), transparent 70%);
@@ -105,9 +107,24 @@
   /* Grid Background for Hero */
   .bg-grid {
     background-image: 
-      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
-    background-size: 24px 24px;
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Premium Amber/Theme Grid - Inspired by user image */
+  .bg-grid-premium {
+    background-image: 
+      linear-gradient(to right, hsla(var(--primary), 0.05) 1.5px, transparent 1.5px),
+      linear-gradient(to bottom, hsla(var(--primary), 0.05) 1.5px, transparent 1.5px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(circle at center, black, transparent 95%);
+  }
+
+  /* Dot Background Utility */
+  .bg-dot {
+    background-image: radial-gradient(hsl(var(--primary) / 0.15) 1.5px, transparent 1.5px);
+    background-size: 30px 30px;
   }
 
   /* Professional Shadow System */
@@ -337,12 +354,12 @@
   }
 
   /* Hide scrollbar but keep functionality */
-  .hide-scrollbar {
+  .hide-scrollbar, .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
 
-  .hide-scrollbar::-webkit-scrollbar {
+  .hide-scrollbar::-webkit-scrollbar, .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
 

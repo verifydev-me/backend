@@ -71,8 +71,9 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalFactoryPattern, 0.8, []string{"Factory pattern implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`Singleton\s*{|sharedInstance|getInstance`) {
-		e.signals.AddSignal(signals.SignalSingletonPattern, 0.7, []string{"Singleton pattern implementation detected"}, "code")
+	// Singleton: Require explicit Singleton naming (getInstance is too generic)
+	if e.findCodePattern(`Singleton\s*(struct|class|{)|singleton\s*=\s*sync\.Once`) {
+		e.signals.AddSignal(signals.SignalSingletonPattern, 0.75, []string{"Singleton pattern implementation detected"}, "code")
 	}
 
 	if e.findCodePattern(`Observer\s*{|Subject\s*{|notifyObservers`) {
@@ -95,8 +96,9 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalFacadePattern, 0.8, []string{"Facade pattern implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`Builder\s*{|build\(\)|return\s+this`) {
-		e.signals.AddSignal(signals.SignalBuilderPattern, 0.8, []string{"Builder pattern implementation detected"}, "code")
+	// Builder: Require Builder class/struct with build() method (not generic 'return this')
+	if e.findCodePattern(`Builder\s*(struct|class|{)`) && e.findCodePattern(`\.Build\(\)|Build\(\)\s*\w+`) {
+		e.signals.AddSignal(signals.SignalBuilderPattern, 0.85, []string{"Builder pattern with Build() method detected"}, "code")
 	}
 
 	if e.findCodePattern(`DependencyInjection|DI\s+|Container\s*interface|Inject\(|@Inject`) {
@@ -190,16 +192,27 @@ func (e *InfraExtractor) extractCloudNativeSignals() {
 
 // extractMLSignals detects machine learning patterns
 func (e *InfraExtractor) extractMLSignals() {
+	// Core ML frameworks - high confidence
 	if e.findCodePattern(`tensorflow|keras|torch|pytorch|sklearn|scikit-learn`) {
 		e.signals.AddSignal(signals.SignalML, 0.9, []string{"Machine learning libraries detected"}, "code")
 	}
 
+	// Data science libraries
 	if e.findCodePattern(`pandas|numpy|dataframe`) {
 		e.signals.AddSignal(signals.SignalPandas, 0.9, []string{"Data science libraries detected"}, "code")
 	}
 
-	if e.findCodePattern(`Model|Predict|Train|Inference`) {
-		e.signals.AddSignal(signals.SignalMLPipeline, 0.7, []string{"ML pipeline terminology detected"}, "code")
+	// ML pipeline: Only trigger if ML library is also detected (avoid false positives)
+	// Words like "Model", "Train", "Predict" are too generic on their own
+	if e.signals.HasSignal(signals.SignalML) || e.signals.HasSignal(signals.SignalPandas) {
+		if e.findCodePattern(`model\.fit|model\.predict|train_test_split|Pipeline\(|fit_transform`) {
+			e.signals.AddSignal(signals.SignalMLPipeline, 0.85, []string{"ML pipeline operations detected"}, "code")
+		}
+	}
+
+	// Additional ML signals - require specific imports
+	if e.findCodePattern(`transformers|huggingface|langchain|llama_index|openai`) {
+		e.signals.AddSignal(signals.SignalLLM, 0.9, []string{"LLM/AI framework detected"}, "code")
 	}
 }
 

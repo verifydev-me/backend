@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { TaggingService } from './tagging.service.js';
 import { logger } from '../utils/logger.js';
 import type { UserProfile, PublicProfile, UpdateProfileDto, SkillSummary, ProjectSummary, SocialLinkSummary } from '../types/index.js';
 
@@ -12,6 +13,10 @@ export class ProfileService {
     });
 
     if (!user) return null;
+
+    // Generate tags from skills
+    const skills = await prisma.skill.findMany({ where: { userId } });
+    const tags = TaggingService.generateProfileTags(skills);
 
     return {
       id: user.id,
@@ -34,6 +39,7 @@ export class ProfileService {
       githubContributions: user.githubContributions,
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
+      tags,
     };
   }
 
@@ -108,6 +114,8 @@ export class ProfileService {
       username: l.username,
     }));
 
+    const tags = TaggingService.generateProfileTags(user.skills);
+
     return {
       username: user.username,
       name: user.name,
@@ -121,6 +129,7 @@ export class ProfileService {
       skills,
       projects,
       socialLinks,
+      tags,
     };
   }
 

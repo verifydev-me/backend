@@ -138,6 +138,17 @@ export default function PublicProfile() {
                   </Badge>
                 )}
               </div>
+
+              {/* Auto-generated Role Tags */}
+              {user.tags && user.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4 justify-center lg:justify-start">
+                  {user.tags.map(tag => (
+                    <Badge key={tag} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               
               {user.bio && (
                 <p className="text-lg text-muted-foreground max-w-2xl mb-6">{user.bio}</p>

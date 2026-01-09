@@ -4,6 +4,7 @@
  * Skills displayed with percentages (Redis 80%, TypeScript 95%, etc.)
  */
 
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { AnalysisResults } from '@/components/features/project/AnalysisResults'
 import { useQuery } from '@tanstack/react-query'
@@ -44,6 +45,8 @@ import {
   BookOpen,
   Cpu,
   Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import {
   RadarChart,
@@ -1228,6 +1231,7 @@ function ArchitectureGraphView({ graph }: { graph?: ArchitectureGraphData }) {
 // ============================================
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
+  const [showAllSkills, setShowAllSkills] = useState(false)
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', id],
@@ -1507,16 +1511,27 @@ export default function ProjectDetail() {
                 const bScore = b.confidence ? b.confidence * 100 : (b.score || b.verifiedScore || 0)
                 return bScore - aScore
               })
-              .slice(0, 12)
+              .slice(0, showAllSkills ? undefined : 6)
               .map((skill: SkillData, index: number) => (
                 <SkillBreakdownCard key={`${skill.name}-${index}`} skill={skill} />
               ))}
           </div>
           
-          {verifiedSkills.length > 12 && (
-            <p className="text-sm text-muted-foreground text-center">
-              Showing top 12 of {verifiedSkills.length} skills
-            </p>
+          {verifiedSkills.length > 6 && (
+            <div className="flex justify-center mt-4 pt-2 border-t border-border/30">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowAllSkills(!showAllSkills)}
+                className="gap-2 text-muted-foreground hover:text-foreground"
+              >
+                {showAllSkills ? (
+                  <>Show Less <ChevronUp className="h-4 w-4" /></>
+                ) : (
+                  <>Show All {verifiedSkills.length} Skills <ChevronDown className="h-4 w-4" /></>
+                )}
+              </Button>
+            </div>
           )}
         </div>
       )}
