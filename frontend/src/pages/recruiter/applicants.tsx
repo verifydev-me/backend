@@ -118,7 +118,7 @@ export default function ApplicantsPage() {
   const { data: applicants = [], isLoading: applicantsLoading } = useQuery({
     queryKey: ['applicants', jobId],
     queryFn: async () => {
-      const res = await get<{ applications: Applicant[] }>(`/v1/recruiter/jobs/${jobId}/applications`)
+      const res = await get<{ applications: Applicant[] }>(`/v1/recruiters/jobs/${jobId}/applications`)
       return res.applications
     },
     enabled: !!jobId,
@@ -127,7 +127,7 @@ export default function ApplicantsPage() {
   // Update application status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ applicationId, status }: { applicationId: string; status: string }) => {
-      return put(`/v1/recruiter/applications/${applicationId}/status`, { status })
+      return put(`/v1/recruiters/applications/${applicationId}/status`, { status })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applicants', jobId] })
@@ -141,7 +141,7 @@ export default function ApplicantsPage() {
   // Add recruiter note
   const addNoteMutation = useMutation({
     mutationFn: async ({ applicationId, note }: { applicationId: string; note: string }) => {
-      return put(`/v1/recruiter/applications/${applicationId}/note`, { note })
+      return put(`/v1/recruiters/applications/${applicationId}/note`, { note })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applicants', jobId] })
@@ -184,7 +184,7 @@ export default function ApplicantsPage() {
           <ArrowLeft className="w-4 h-4" />
           Back to jobs
         </Link>
-        
+
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">{job?.title}</h1>
@@ -224,7 +224,7 @@ export default function ApplicantsPage() {
                   applicant={applicant}
                   job={job!}
                   index={index}
-                  onStatusChange={(status) => 
+                  onStatusChange={(status) =>
                     updateStatusMutation.mutate({ applicationId: applicant.id, status })
                   }
                   onAddNote={() => {
@@ -431,7 +431,7 @@ function ApplicantCard({ applicant, job, index, onStatusChange, onAddNote }: App
                     <CheckCircle2 className="w-4 h-4 mr-2" />
                     Extend Offer
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => onStatusChange('REJECTED')}
                     className="text-red-600"
                   >

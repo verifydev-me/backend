@@ -72,7 +72,7 @@ export default function DashboardLayout() {
             </Button>
           )}
           {!sidebarOpen && (
-            <button 
+            <button
               onClick={toggleSidebar}
               className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-muted transition-all"
             >
@@ -91,7 +91,7 @@ export default function DashboardLayout() {
                 to={item.href}
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200 group relative',
-                  'border border-transparent', 
+                  'border border-transparent',
                   isActive
                     ? 'bg-primary/5 text-primary border-primary/20 shadow-[0_2px_10px_-3px_rgba(var(--primary),0.2)]'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-border/30'
@@ -184,7 +184,7 @@ export default function DashboardLayout() {
           <div className="absolute inset-0 bg-grid-premium opacity-40 mix-blend-overlay pointer-events-none" />
           <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
-          
+
           <div className="max-w-7xl mx-auto w-full h-full relative z-10">
             <Outlet />
           </div>

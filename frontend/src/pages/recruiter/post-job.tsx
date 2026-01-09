@@ -161,7 +161,7 @@ export default function JobPostingPage() {
         salaryMin: data.salaryMin,
         salaryMax: data.salaryMax,
         salaryCurrency: data.currency,
-        requiredSkills: requiredSkills.map(skill => ({ skillName: skill, minScore: 0, isRequired: true })),
+        requiredSkills: requiredSkills,
         preferredSkills: preferredSkills,
         responsibilities: responsibilities.filter((r: string) => r.trim()).join('\n'),
         requirements: qualifications.filter((q: string) => q.trim()).join('\n'),
@@ -484,12 +484,12 @@ export default function JobPostingPage() {
                 Nice-to-have skills that give candidates an edge
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 {POPULAR_SKILLS.filter(s => !requiredSkills.includes(s)).map(skill => (
                   <Badge
                     key={skill}
-                    variant={preferredSkills.includes(skill) ? 'secondary' : 'outline'}
+                    variant={preferredSkills.includes(skill) ? 'default' : 'outline'}
                     className="cursor-pointer"
                     onClick={() =>
                       preferredSkills.includes(skill)
@@ -498,9 +498,26 @@ export default function JobPostingPage() {
                     }
                   >
                     {skill}
+                    {preferredSkills.includes(skill) && <X className="ml-1 w-3 h-3" />}
                   </Badge>
                 ))}
               </div>
+
+              {preferredSkills.length > 0 && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm font-medium mb-2">Selected Preferred Skills:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {preferredSkills.map(skill => (
+                      <Badge key={skill} className="gap-1">
+                        {skill}
+                        <button type="button" onClick={() => removePreferredSkill(skill)}>
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger.js';
+import { env } from '../config/env.js';
 
 // ============================================
 // TYPES
@@ -8,18 +9,33 @@ import { logger } from '../utils/logger.js';
 export interface ApplicationForRecruiter {
   id: string;
   jobId: string;
-  jobTitle: string;
   userId: string;
-  candidateName: string;
-  candidateUsername: string;
-  candidateAvatar?: string;
-  matchScore: number;
   status: ApplicationStatus;
-  resumeUrl?: string;
-  coverLetter?: string;
   appliedAt: Date;
-  reviewedAt?: Date;
+  matchScore: number;
+  note?: string; // Cover letter or note from candidate
   recruiterNotes?: string;
+
+  // Enriched User Data
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    username?: string;
+    avatarUrl?: string;
+    location?: string;
+    title?: string;
+    githubUsername?: string;
+  };
+
+  // Aura & Match Details
+  aura?: {
+    overallScore: number;
+    level: string;
+    isVerified: boolean;
+  };
+  matchedSkills?: string[];
+  missingSkills?: string[];
 }
 
 export type ApplicationStatus = 'PENDING' | 'REVIEWING' | 'SHORTLISTED' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'WITHDRAWN';
@@ -31,69 +47,21 @@ export interface ApplicationFilters {
   order?: 'asc' | 'desc';
 }
 
-// ============================================
-// MOCK DATABASE
-// ============================================
-
-const applicationsDb: Map<string, ApplicationForRecruiter> = new Map();
-
-// Seed demo applications
-function seedDemoApplications() {
-  const demoApps: ApplicationForRecruiter[] = [
-    {
-      id: 'app_1',
-      jobId: 'job_1',
-      jobTitle: 'Senior React Developer',
-      userId: 'user_demo_1',
-      candidateName: 'John Doe',
-      candidateUsername: 'johndoe',
-      candidateAvatar: 'https://avatars.githubusercontent.com/u/1',
-      matchScore: 92,
-      status: 'PENDING',
-      resumeUrl: 'https://verifydev.io/resume/johndoe.pdf',
-      coverLetter: 'I am excited to apply for this position...',
-      appliedAt: new Date('2026-01-04'),
-    },
-    {
-      id: 'app_2',
-      jobId: 'job_1',
-      jobTitle: 'Senior React Developer',
-      userId: 'user_demo_2',
-      candidateName: 'Jane Smith',
-      candidateUsername: 'janesmith',
-      candidateAvatar: 'https://avatars.githubusercontent.com/u/2',
-      matchScore: 78,
-      status: 'SHORTLISTED',
-      resumeUrl: 'https://verifydev.io/resume/janesmith.pdf',
-      appliedAt: new Date('2026-01-03'),
-      reviewedAt: new Date('2026-01-04'),
-    },
-    {
-      id: 'app_3',
-      jobId: 'job_3',
-      jobTitle: 'Go Backend Developer',
-      userId: 'user_demo_3',
-      candidateName: 'Bob Wilson',
-      candidateUsername: 'bobwilson',
-      matchScore: 85,
-      status: 'INTERVIEW',
-      resumeUrl: 'https://verifydev.io/resume/bobwilson.pdf',
-      appliedAt: new Date('2026-01-02'),
-      reviewedAt: new Date('2026-01-03'),
-      recruiterNotes: 'Strong Go experience. Schedule for technical round.',
-    },
-  ];
-
-  demoApps.forEach(app => applicationsDb.set(app.id, app));
+interface ApplicationStats {
+  total: number;
+  byStatus: Record<ApplicationStatus, number>;
+  avgMatchScore: number;
 }
 
-seedDemoApplications();
+// Service URLs
+const JOB_SERVICE_URL = env.JOB_SERVICE_URL;
+const USER_SERVICE_URL = env.USER_SERVICE_URL;
 
 // ============================================
 // APPLICATION MANAGEMENT SERVICE
 // ============================================
 
-export class ApplicationManagementService {
+export class ApplicationService {
   /**
    * Get all applications for an organization's jobs
    */
@@ -103,39 +71,10 @@ export class ApplicationManagementService {
     page = 1,
     limit = 20
   ): Promise<{ applications: ApplicationForRecruiter[]; total: number }> {
-    logger.debug({ organizationId, filters }, 'Fetching organization applications');
-
-    let applications = Array.from(applicationsDb.values());
-
-    // Filter by job
-    if (filters.jobId) {
-      applications = applications.filter(app => app.jobId === filters.jobId);
-    }
-
-    // Filter by status
-    if (filters.status) {
-      applications = applications.filter(app => app.status === filters.status);
-    }
-
-    // Sort
-    const sortBy = filters.sortBy || 'appliedAt';
-    const order = filters.order || 'desc';
-
-    applications.sort((a, b) => {
-      if (sortBy === 'matchScore') {
-        return order === 'desc' ? b.matchScore - a.matchScore : a.matchScore - b.matchScore;
-      } else {
-        return order === 'desc' 
-          ? b.appliedAt.getTime() - a.appliedAt.getTime()
-          : a.appliedAt.getTime() - b.appliedAt.getTime();
-      }
-    });
-
-    const total = applications.length;
-    const start = (page - 1) * limit;
-    const paginatedApps = applications.slice(start, start + limit);
-
-    return { applications: paginatedApps, total };
+    // For now, this is not fully implemented with backend support for "organization-wide" fetch in job-service
+    // This would require a new endpoint in job-service or iterating jobs.
+    // Leaving as empty for now or implementing if needed by specific routes.
+    return { applications: [], total: 0 };
   }
 
   /**
@@ -143,21 +82,107 @@ export class ApplicationManagementService {
    */
   static async getJobApplications(
     jobId: string,
-    filters: Omit<ApplicationFilters, 'jobId'> = {}
+    options: Omit<ApplicationFilters, 'jobId'> & { page?: number; limit?: number } = {}
   ): Promise<{ applications: ApplicationForRecruiter[]; stats: ApplicationStats }> {
-    logger.debug({ jobId, filters }, 'Fetching job applications');
+    const { page = 1, limit = 20, status, sortBy, order } = options;
+    logger.debug({ jobId, status, page, limit }, 'Fetching job applications from job-service');
 
-    const result = await this.getOrganizationApplications('', { ...filters, jobId }, 1, 1000);
-    const stats = this.calculateStats(result.applications);
+    try {
+      // 1. Fetch applications from Job Service
+      const response = await axios.get(`${JOB_SERVICE_URL}/api/v1/applications/job/${jobId}`, {
+        params: { status },
+        timeout: 10000
+      });
 
-    return { applications: result.applications, stats };
-  }
+      if (!response.data.success) {
+        throw new Error('Failed to fetch applications from job-service');
+      }
 
-  /**
-   * Get single application
-   */
-  static async getApplicationById(applicationId: string): Promise<ApplicationForRecruiter | null> {
-    return applicationsDb.get(applicationId) || null;
+      const rawApplications = response.data.data || [];
+
+      // 2. Enrich with User Data (Bulk or Parallel)
+      // Extract unique user IDs
+      const userIds = [...new Set(rawApplications.map((app: any) => app.userId))];
+
+      // Fetch profiles in parallel (optimally user-service should have a bulk endpoint)
+      const userProfiles = new Map();
+      await Promise.all(
+        userIds.map(async (userId) => {
+          const profile = await this.getUserProfile(userId as string);
+          if (profile) {
+            userProfiles.set(userId, profile);
+          }
+        })
+      );
+
+      // 3. Transform to ApplicationForRecruiter
+      const applications: ApplicationForRecruiter[] = rawApplications.map((app: any) => {
+        const userProfile = userProfiles.get(app.userId) || {};
+
+        return {
+          id: app.id,
+          jobId: app.jobId,
+          userId: app.userId,
+          status: app.status,
+          appliedAt: new Date(app.appliedAt),
+          matchScore: app.matchScore || 0,
+          note: app.coverLetter,
+          recruiterNotes: app.recruiterNotes,
+
+          user: {
+            id: app.userId,
+            name: userProfile.name || app.candidateName || 'Unknown Candidate',
+            email: userProfile.email || app.candidateEmail || '',
+            username: userProfile.username,
+            avatarUrl: userProfile.avatarUrl, // This maps to 'candidateAvatar' in previous mock, but frontend wants nested
+            location: userProfile.location,
+            title: userProfile.title,
+            githubUsername: userProfile.username // Assuming username is github username or stored separately
+          },
+
+          aura: {
+            overallScore: app.candidateAura || userProfile.auraScore || 0,
+            level: 'Novice', // You might calculate this
+            isVerified: userProfile.isVerified || false
+          },
+
+          matchedSkills: [], // job-service might not return this detailed breakdown yet
+          missingSkills: []
+        };
+      });
+
+      // 4. Client-side Sorting & Pagination (since we fetched all from job-service job endpoint)
+      // Note: If job-service supports pagination, we should pass it there.
+      // Based on typical patterns, we'll do in-memory for now if job-service returns all.
+
+      const stats = this.calculateStats(applications);
+
+      // Sort
+      applications.sort((a, b) => {
+        if (sortBy === 'matchScore') {
+          return order === 'asc' ? a.matchScore - b.matchScore : b.matchScore - a.matchScore;
+        }
+        // Default latest first
+        return b.appliedAt.getTime() - a.appliedAt.getTime();
+      });
+
+      // Paginate
+      const start = (page - 1) * limit;
+      const paginatedApps = applications.slice(start, start + limit);
+
+      return { applications: paginatedApps, stats };
+
+    } catch (error) {
+      logger.error({ error, jobId }, 'Failed to get job applications');
+      return {
+        applications: [],
+        stats: {
+          total: 0,
+          byStatus: { PENDING: 0, REVIEWING: 0, SHORTLISTED: 0, INTERVIEW: 0, OFFER: 0, REJECTED: 0, WITHDRAWN: 0 },
+          avgMatchScore: 0
+        }
+      };
+    }
   }
 
   /**
@@ -170,21 +195,39 @@ export class ApplicationManagementService {
   ): Promise<ApplicationForRecruiter | null> {
     logger.info({ applicationId, status }, 'Updating application status');
 
-    const application = applicationsDb.get(applicationId);
-    if (!application) return null;
+    try {
+      const response = await axios.patch(`${JOB_SERVICE_URL}/api/v1/applications/${applicationId}/status`, {
+        status,
+        notes
+      });
 
-    application.status = status;
-    application.reviewedAt = new Date();
-    if (notes) {
-      application.recruiterNotes = notes;
+      if (response.data.success) {
+        // Return mapped application
+        // We might need to fetch the full object again or map the response
+        // For simplicity, just return what job-service returns, mapped lightly
+        const app = response.data.data;
+        // Check if we need to fetch user profile again? Maybe just minimally map
+        return {
+          id: app.id,
+          jobId: app.jobId,
+          userId: app.userId,
+          status: app.status,
+          appliedAt: new Date(app.appliedAt),
+          matchScore: app.matchScore || 0,
+          recruiterNotes: app.recruiterNotes,
+          user: {
+            id: app.userId,
+            name: app.candidateName,
+            email: app.candidateEmail
+            // Other fields missing if not fetched, but usually status update doesn't need full redraw
+          }
+        } as ApplicationForRecruiter;
+      }
+      return null;
+    } catch (error) {
+      logger.error({ error, applicationId }, 'Failed to update application status');
+      return null;
     }
-
-    applicationsDb.set(applicationId, application);
-
-    // TODO: Send notification to candidate
-    // await this.notifyCandidate(application.userId, status);
-
-    return application;
   }
 
   /**
@@ -194,111 +237,53 @@ export class ApplicationManagementService {
     applicationId: string,
     notes: string
   ): Promise<ApplicationForRecruiter | null> {
-    const application = applicationsDb.get(applicationId);
-    if (!application) return null;
+    try {
+      const response = await axios.post(`${JOB_SERVICE_URL}/api/v1/applications/${applicationId}/notes`, {
+        notes
+      });
 
-    application.recruiterNotes = notes;
-    applicationsDb.set(applicationId, application);
-
-    return application;
-  }
-
-  /**
-   * Bulk update application statuses
-   */
-  static async bulkUpdateStatus(
-    applicationIds: string[],
-    status: ApplicationStatus
-  ): Promise<{ updated: number; failed: number }> {
-    logger.info({ count: applicationIds.length, status }, 'Bulk updating applications');
-
-    let updated = 0;
-    let failed = 0;
-
-    for (const id of applicationIds) {
-      const app = applicationsDb.get(id);
-      if (app) {
-        app.status = status;
-        app.reviewedAt = new Date();
-        applicationsDb.set(id, app);
-        updated++;
-      } else {
-        failed++;
+      if (response.data.success) {
+        const app = response.data.data;
+        return {
+          id: app.id,
+          jobId: app.jobId,
+          userId: app.userId,
+          status: app.status,
+          appliedAt: new Date(app.appliedAt),
+          matchScore: app.matchScore || 0,
+          recruiterNotes: app.recruiterNotes,
+          user: {
+            id: app.userId,
+            name: app.candidateName,
+            email: app.candidateEmail
+          }
+        } as ApplicationForRecruiter;
       }
-    }
-
-    return { updated, failed };
-  }
-
-  /**
-   * Get candidate full profile for application
-   */
-  static async getCandidateProfile(userId: string): Promise<any | null> {
-    try {
-      const response = await axios.get(
-        `http://user-service:3002/api/v1/u/${userId}`,
-        { timeout: 5000 }
-      );
-      return response.data?.data?.profile;
+      return null;
     } catch (error) {
-      logger.error({ error, userId }, 'Failed to fetch candidate profile');
+      logger.error({ error, applicationId }, 'Failed to add notes');
       return null;
     }
-  }
-
-  /**
-   * Download candidate resume
-   */
-  static async getResumeUrl(userId: string): Promise<string | null> {
-    try {
-      const response = await axios.get(
-        `http://resume-service:8003/api/v1/resume/user/${userId}/url`,
-        { timeout: 5000 }
-      );
-      return response.data?.url;
-    } catch (error) {
-      logger.error({ error, userId }, 'Failed to fetch resume URL');
-      return null;
-    }
-  }
-
-  /**
-   * Get dashboard stats for recruiter
-   */
-  static async getDashboardStats(organizationId: string): Promise<DashboardStats> {
-    const allApps = Array.from(applicationsDb.values());
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const stats: DashboardStats = {
-      totalApplications: allApps.length,
-      newToday: allApps.filter(app => app.appliedAt >= today).length,
-      pending: allApps.filter(app => app.status === 'PENDING').length,
-      shortlisted: allApps.filter(app => app.status === 'SHORTLISTED').length,
-      interviewing: allApps.filter(app => app.status === 'INTERVIEW').length,
-      offered: allApps.filter(app => app.status === 'OFFER').length,
-      avgMatchScore: allApps.length > 0 
-        ? Math.round(allApps.reduce((sum, app) => sum + app.matchScore, 0) / allApps.length)
-        : 0,
-      topCandidates: allApps
-        .filter(app => app.status !== 'REJECTED' && app.status !== 'WITHDRAWN')
-        .sort((a, b) => b.matchScore - a.matchScore)
-        .slice(0, 5)
-        .map(app => ({
-          id: app.userId,
-          name: app.candidateName,
-          matchScore: app.matchScore,
-          jobTitle: app.jobTitle,
-        })),
-    };
-
-    return stats;
   }
 
   // ============================================
   // PRIVATE HELPERS
   // ============================================
+
+  private static async getUserProfile(userId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${userId}`, {
+        timeout: 5000
+      });
+      if (response.data.success) {
+        return response.data.data.candidate;
+      }
+      return null;
+    } catch (error) {
+      logger.warn({ userId, error: (error as Error).message }, 'Failed to fetch user profile');
+      return null;
+    }
+  }
 
   private static calculateStats(applications: ApplicationForRecruiter[]): ApplicationStats {
     const byStatus: Record<ApplicationStatus, number> = {
@@ -314,44 +299,20 @@ export class ApplicationManagementService {
     let totalMatchScore = 0;
 
     for (const app of applications) {
-      byStatus[app.status]++;
+      if (byStatus[app.status] !== undefined) {
+        byStatus[app.status]++;
+      }
       totalMatchScore += app.matchScore;
     }
 
     return {
       total: applications.length,
       byStatus,
-      avgMatchScore: applications.length > 0 
-        ? Math.round(totalMatchScore / applications.length) 
+      avgMatchScore: applications.length > 0
+        ? Math.round(totalMatchScore / applications.length)
         : 0,
     };
   }
 }
 
-// ============================================
-// ADDITIONAL TYPES
-// ============================================
-
-interface ApplicationStats {
-  total: number;
-  byStatus: Record<ApplicationStatus, number>;
-  avgMatchScore: number;
-}
-
-interface DashboardStats {
-  totalApplications: number;
-  newToday: number;
-  pending: number;
-  shortlisted: number;
-  interviewing: number;
-  offered: number;
-  avgMatchScore: number;
-  topCandidates: {
-    id: string;
-    name: string;
-    matchScore: number;
-    jobTitle: string;
-  }[];
-}
-
-export default ApplicationManagementService;
+export default ApplicationService;

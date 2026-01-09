@@ -12,7 +12,7 @@ RUN apk add --no-cache openssl openssl-dev libc6-compat
 
 # Install dependencies (including devDependencies for build)
 COPY package*.json ./
-RUN npm ci && npm cache clean --force
+RUN npm install && npm cache clean --force
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma/
@@ -63,5 +63,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 EXPOSE 3001
 
 # Use dumb-init to handle signals properly
-CMD ["dumb-init", "node", "dist/server.js"]
+CMD ["dumb-init", "node", "-r", "module-alias/register", "dist/server.js"]
+
 

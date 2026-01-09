@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { CandidateService } from '../../../domain/candidate.service.js';
+import { ApplicationService } from '../../../domain/application.service.js';
 import { MatchingService, type JobRequirements } from '../../../domain/matching.service.js';
 import { logger } from '../../../utils/logger.js';
 import type { RecruiterRequest, ApiResponse } from '../../../types/index.js';
@@ -345,15 +346,15 @@ export class RecruiterController {
       }
 
       const { jobId } = req.params;
-      const { 
-        requiredSkills = [], 
+      const {
+        requiredSkills = [],
         niceToHaveSkills = [],
-        minAuraScore = 0, 
-        minCoreCount = 0, 
+        minAuraScore = 0,
+        minCoreCount = 0,
         experienceLevel,
         location,
         locationType,
-        limit = 20 
+        limit = 20
       } = req.body;
 
       const jobRequirements: JobRequirements = {
@@ -421,12 +422,12 @@ export class RecruiterController {
       }
 
       const { userId } = req.params;
-      const { 
+      const {
         jobId,
-        requiredSkills = [], 
+        requiredSkills = [],
         niceToHaveSkills = [],
-        minAuraScore = 0, 
-        minCoreCount = 0, 
+        minAuraScore = 0,
+        minCoreCount = 0,
         experienceLevel,
         location,
         locationType,
@@ -477,6 +478,122 @@ export class RecruiterController {
     } catch (error) {
       logger.error({ error }, 'Failed to calculate match');
       res.status(500).json({ success: false, message: 'Failed to calculate match', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /jobs/:jobId/applications
+   * Get applications for a specific job
+   */
+  static async getJobApplications(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { jobId } = req.params;
+      const { status, page, limit } = req.query;
+
+      const result = await ApplicationService.getJobApplications(jobId, {
+        status: status as any,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20
+      });
+
+      res.json({
+        success: true,
+        message: 'Applications retrieved',
+        data: {
+          applications: result.applications,
+          stats: result.stats
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get applications');
+      res.status(500).json({ success: false, message: 'Failed to get applications', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+  /**
+   * PUT /applications/:applicationId/status
+   * Update application status
+   */
+  static async updateApplicationStatus(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { applicationId } = (req as any).params;
+      const { status } = (req as any).body;
+
+      if (!status) {
+        res.status(400).json({ success: false, message: 'Status is required', error: { code: 'VALIDATION_ERROR' } });
+        return;
+      }
+
+      const application = await ApplicationService.updateApplicationStatus(applicationId, status);
+
+      if (!application) {
+        res.status(404).json({ success: false, message: 'Application not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Application status updated',
+        data: { application },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to update application status');
+      res.status(500).json({ success: false, message: 'Failed to update status', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * PUT /applications/:applicationId/note
+   * Add recruiter note to application
+   */
+  static async addApplicationNote(
+    req: RecruiterRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.recruiter) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { applicationId } = (req as any).params;
+      const { note } = (req as any).body;
+
+      if (note === undefined) {
+        res.status(400).json({ success: false, message: 'Note is required', error: { code: 'VALIDATION_ERROR' } });
+        return;
+      }
+
+      const application = await ApplicationService.addRecruiterNotes(applicationId, note);
+
+      if (!application) {
+        res.status(404).json({ success: false, message: 'Application not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Note added',
+        data: { application },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to add note');
+      res.status(500).json({ success: false, message: 'Failed to add note', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 }
