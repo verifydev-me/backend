@@ -8,10 +8,11 @@ const router = express.Router();
 // Apply to a job
 router.post('/', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const application = await applicationService.createApplication({
-      ...req.body,
-      userId: req.user!.userId,
-    });
+    const application = await applicationService.apply(
+      req.user!.userId,
+      req.body.jobId,
+      req.body
+    );
     res.status(201).json({ success: true, data: application });
   } catch (error) {
     next(error);
@@ -21,10 +22,8 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
 // Get user's applications
 router.get('/my-applications', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { status } = req.query;
     const applications = await applicationService.getUserApplications(
-      req.user!.userId,
-      status as any
+      req.user!.userId
     );
     res.json({ success: true, data: applications });
   } catch (error) {
@@ -39,12 +38,12 @@ router.get('/:id', async (req: AuthenticatedRequest, res, next) => {
     if (!application) {
       return res.status(404).json({ success: false, error: 'Application not found' });
     }
-    
+
     // Check authorization
-    if (application.userId !== req.user!.userId && application.job.recruiterId !== req.user!.userId) {
+    if (application.userId !== req.user!.userId && application.job?.recruiterId !== req.user!.userId) {
       return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
-    
+
     res.json({ success: true, data: application });
   } catch (error) {
     next(error);
@@ -54,11 +53,11 @@ router.get('/:id', async (req: AuthenticatedRequest, res, next) => {
 // Withdraw application
 router.post('/:id/withdraw', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const application = await applicationService.withdrawApplication(
+    const result = await applicationService.withdraw(
       req.params.id,
       req.user!.userId
     );
-    res.json({ success: true, data: application });
+    res.json({ success: true, data: { withdrawn: result } });
   } catch (error) {
     next(error);
   }
@@ -70,7 +69,6 @@ router.get('/job/:jobId', async (req: AuthenticatedRequest, res, next) => {
     const { status } = req.query;
     const applications = await applicationService.getJobApplications(
       req.params.jobId,
-      req.user!.userId,
       status as any
     );
     res.json({ success: true, data: applications });
@@ -83,9 +81,8 @@ router.get('/job/:jobId', async (req: AuthenticatedRequest, res, next) => {
 router.patch('/:id/status', async (req: AuthenticatedRequest, res, next) => {
   try {
     const { status, notes } = req.body;
-    const application = await applicationService.updateApplicationStatus(
+    const application = await applicationService.updateStatus(
       req.params.id,
-      req.user!.userId,
       status,
       notes
     );
@@ -98,12 +95,10 @@ router.patch('/:id/status', async (req: AuthenticatedRequest, res, next) => {
 // Add recruiter notes (recruiter only)
 router.post('/:id/notes', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { notes, rating } = req.body;
-    const application = await applicationService.addRecruiterNotes(
+    const { notes } = req.body;
+    const application = await applicationService.addNote(
       req.params.id,
-      req.user!.userId,
-      notes,
-      rating
+      notes
     );
     res.json({ success: true, data: application });
   } catch (error) {

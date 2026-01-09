@@ -59,7 +59,7 @@ function transformPrismaJobToJob(prismaJob: PrismaJob): Job {
 
 function transformApplication(app: PrismaApplication, prismaJob?: PrismaJob | null): ApplicationWithMatch {
   const job = prismaJob ? transformPrismaJobToJob(prismaJob) : undefined;
-  
+
   return {
     id: app.id,
     jobId: app.jobId,
@@ -117,7 +117,7 @@ export class ApplicationService {
         `http://user-service:3002/api/v1/users/${userId}/skills-summary`,
         { timeout: 5000 }
       );
-      
+
       const userData = userDataResponse.data.data;
       const userSkills: UserSkill[] = userData?.skills || [];
       const userAura: number = userData?.auraScore || 0;
@@ -126,13 +126,13 @@ export class ApplicationService {
       const skillMatches = (job.requiredSkills || []).filter(reqSkill =>
         userSkills.some(us => us.name.toLowerCase() === reqSkill.toLowerCase())
       );
-      const skillScore = job.requiredSkills.length > 0 
-        ? (skillMatches.length / job.requiredSkills.length) * 100 
+      const skillScore = job.requiredSkills.length > 0
+        ? (skillMatches.length / job.requiredSkills.length) * 100
         : 50;
-      const auraScore = job.minAuraScore > 0 
-        ? Math.min(100, (userAura / job.minAuraScore) * 100) 
+      const auraScore = job.minAuraScore > 0
+        ? Math.min(100, (userAura / job.minAuraScore) * 100)
         : 100;
-      
+
       matchScore = Math.round(skillScore * 0.7 + auraScore * 0.3);
     } catch (error) {
       logger.warn({ error, userId }, 'Could not fetch user skills for match calculation');
@@ -206,7 +206,7 @@ export class ApplicationService {
    * Get applications for a job (recruiter view)
    */
   async getJobApplications(
-    jobId: string, 
+    jobId: string,
     status?: ApplicationStatus,
     sortBy: 'matchScore' | 'appliedAt' = 'matchScore'
   ): Promise<ApplicationWithMatch[]> {
@@ -219,8 +219,8 @@ export class ApplicationService {
 
     const applications = await prisma.application.findMany({
       where,
-      orderBy: sortBy === 'matchScore' 
-        ? { matchScore: 'desc' } 
+      orderBy: sortBy === 'matchScore'
+        ? { matchScore: 'desc' }
         : { appliedAt: 'desc' },
     });
 
@@ -246,8 +246,8 @@ export class ApplicationService {
    * Update application status (recruiter action)
    */
   async updateStatus(
-    applicationId: string, 
-    status: ApplicationStatus, 
+    applicationId: string,
+    status: ApplicationStatus,
     notes?: string
   ): Promise<ApplicationWithMatch | null> {
     logger.info({ applicationId, status }, 'Updating application status');
@@ -262,9 +262,25 @@ export class ApplicationService {
       });
 
       const job = await prisma.job.findUnique({ where: { id: application.jobId } });
-      
+
       // TODO: Send notification to user about status change
-      
+
+      return transformApplication(application, job);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Add recruiter note
+   */
+  async addNote(applicationId: string, note: string): Promise<ApplicationWithMatch | null> {
+    try {
+      const application = await prisma.application.update({
+        where: { id: applicationId },
+        data: { recruiterNotes: note }
+      });
+      const job = await prisma.job.findUnique({ where: { id: application.jobId } });
       return transformApplication(application, job);
     } catch {
       return null;
@@ -300,8 +316,8 @@ export class ApplicationService {
   /**
    * Check if user can apply to job
    */
-  async canApply(userId: string, jobId: string): Promise<{ 
-    can: boolean; 
+  async canApply(userId: string, jobId: string): Promise<{
+    can: boolean;
     reason?: string;
     matchScore?: number;
   }> {

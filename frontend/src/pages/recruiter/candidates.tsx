@@ -132,7 +132,7 @@ export default function CandidateSearchPage() {
   const totalCandidates = candidatesData?.meta?.total ?? 0
   const totalPages = candidatesData?.meta?.totalPages ?? 0
   const shortlist = Array.isArray(shortlistData) ? shortlistData : []
-  
+
   const shortlistedIds = new Set(shortlist.map(c => c?.id).filter(Boolean))
 
   const handleFilterChange = (key: keyof CandidateSearchFilters, value: any) => {
@@ -171,12 +171,12 @@ export default function CandidateSearchPage() {
         <GradientOrb className="w-[800px] h-[800px] -top-[200px] -left-[200px] bg-gradient-to-br from-violet-600/30 via-purple-500/20 to-transparent" />
         <GradientOrb className="w-[600px] h-[600px] top-1/2 -right-[100px] bg-gradient-to-bl from-cyan-500/25 via-blue-500/15 to-transparent" />
         <GradientOrb className="w-[500px] h-[500px] -bottom-[100px] left-1/3 bg-gradient-to-tr from-pink-500/20 via-rose-500/10 to-transparent" />
-        
+
         {/* Mesh gradient overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/20 via-transparent to-transparent" />
-        
+
         {/* Animated grid */}
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `linear-gradient(rgba(139, 92, 246, 0.3) 1px, transparent 1px),
@@ -184,12 +184,12 @@ export default function CandidateSearchPage() {
             backgroundSize: '60px 60px',
           }}
         />
-        
+
         {/* Floating particles */}
         <FloatingParticles />
-        
+
         {/* Mouse spotlight */}
-        <div 
+        <div
           className="absolute w-[600px] h-[600px] rounded-full pointer-events-none transition-all duration-300 ease-out"
           style={{
             background: 'radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%)',
@@ -201,7 +201,7 @@ export default function CandidateSearchPage() {
 
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Premium Header with Shimmer */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
@@ -210,7 +210,7 @@ export default function CandidateSearchPage() {
           <div>
             <div className="flex items-center gap-4 mb-4">
               {/* Animated icon container */}
-              <motion.div 
+              <motion.div
                 className="relative"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400 }}
@@ -220,11 +220,11 @@ export default function CandidateSearchPage() {
                   <Users className="w-7 h-7 text-white" />
                 </div>
               </motion.div>
-              
+
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold">
                   <span className="bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
-                    Find 
+                    Find
                   </span>
                   <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]">
                     {" "}Verified{" "}
@@ -240,17 +240,17 @@ export default function CandidateSearchPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Premium CTA Button */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button 
-              asChild 
+            <Button
+              asChild
               className="relative overflow-hidden group h-14 px-8 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-400 hover:via-orange-400 hover:to-red-400 shadow-2xl shadow-orange-500/30 border-0"
             >
               <Link to="/recruiter/shortlist">
                 {/* Shine effect */}
                 <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                
+
                 <Star className="mr-2 w-5 h-5 fill-current" />
                 <span className="font-semibold">My Shortlist</span>
                 <Badge className="ml-3 bg-white/20 text-white border-0">
@@ -301,7 +301,7 @@ export default function CandidateSearchPage() {
 
         <div className="flex gap-8">
           {/* Filters Sidebar - Desktop */}
-          <motion.aside 
+          <motion.aside
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
@@ -312,15 +312,15 @@ export default function CandidateSearchPage() {
               <div className="relative group">
                 {/* Animated gradient border */}
                 <div className="absolute -inset-[1px] bg-gradient-to-r from-violet-500 via-cyan-500 to-pink-500 rounded-3xl opacity-30 group-hover:opacity-60 blur-sm transition-opacity duration-500" />
-                <div className="absolute -inset-[1px] bg-gradient-to-r from-violet-500 via-cyan-500 to-pink-500 rounded-3xl opacity-50 animate-spin-slow [animation-duration:8s]" style={{ backgroundSize: '300% 300%' }} />
-                
+                <div className="absolute -inset-[1px] bg-gradient-to-r from-violet-500 via-cyan-500 to-pink-500 rounded-3xl opacity-50" style={{ backgroundSize: '300% 300%' }} />
+
                 <Card className="relative border-0 bg-black/40 backdrop-blur-2xl rounded-3xl overflow-hidden">
                   {/* Inner glow */}
                   <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-                  
+
                   <CardHeader className="pb-4 pt-6">
                     <div className="flex items-center gap-3">
-                      <motion.div 
+                      <motion.div
                         className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-violet-500/30"
                         whileHover={{ rotate: 180 }}
                         transition={{ duration: 0.5 }}
@@ -376,7 +376,7 @@ export default function CandidateSearchPage() {
           {/* Results */}
           <main className="flex-1">
             {/* Premium Search Bar */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35 }}
@@ -422,7 +422,7 @@ export default function CandidateSearchPage() {
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={{ delay: i * 0.05 }}
                     >
-                      <Badge 
+                      <Badge
                         className="gap-2 py-2 px-4 rounded-xl bg-gradient-to-r from-violet-500/30 to-indigo-500/30 text-violet-200 border border-violet-500/40 hover:border-violet-400/60 transition-all cursor-pointer group"
                         onClick={() => toggleSkill(skill)}
                       >
@@ -432,9 +432,9 @@ export default function CandidateSearchPage() {
                       </Badge>
                     </motion.div>
                   ))}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={clearFilters}
                     className="text-muted-foreground hover:text-white"
                   >
@@ -445,7 +445,7 @@ export default function CandidateSearchPage() {
             </AnimatePresence>
 
             {/* Results Header */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
@@ -519,7 +519,7 @@ export default function CandidateSearchPage() {
                 >
                   Previous
                 </Button>
-                
+
                 <div className="flex items-center gap-1.5 px-4">
                   {[...Array(Math.min(5, totalPages))].map((_, i) => {
                     const page = i + 1
@@ -529,11 +529,10 @@ export default function CandidateSearchPage() {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleFilterChange('page', page)}
-                        className={`w-10 h-10 rounded-xl font-medium transition-all ${
-                          filters.page === page 
-                            ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-lg shadow-violet-500/30' 
-                            : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
-                        }`}
+                        className={`w-10 h-10 rounded-xl font-medium transition-all ${filters.page === page
+                          ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-lg shadow-violet-500/30'
+                          : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
+                          }`}
                       >
                         {page}
                       </motion.button>
@@ -553,7 +552,7 @@ export default function CandidateSearchPage() {
                     </>
                   )}
                 </div>
-                
+
                 <Button
                   variant="outline"
                   disabled={filters.page === totalPages}
@@ -572,13 +571,13 @@ export default function CandidateSearchPage() {
 }
 
 // Premium Stat Card with 3D hover effect
-function PremiumStatCard({ 
-  icon, 
-  label, 
-  value, 
+function PremiumStatCard({
+  icon,
+  label,
+  value,
   gradient,
   delay
-}: { 
+}: {
   icon: React.ReactNode
   label: string
   value: number
@@ -587,10 +586,10 @@ function PremiumStatCard({
 }) {
   const x = useMotionValue(0)
   const y = useMotionValue(0)
-  
+
   const rotateX = useTransform(y, [-100, 100], [5, -5])
   const rotateY = useTransform(x, [-100, 100], [-5, 5])
-  
+
   const springRotateX = useSpring(rotateX, { stiffness: 300, damping: 30 })
   const springRotateY = useSpring(rotateY, { stiffness: 300, damping: 30 })
 
@@ -614,17 +613,17 @@ function PremiumStatCard({
       <div className="relative">
         {/* Glow effect */}
         <div className={`absolute -inset-1 bg-gradient-to-r ${gradient} rounded-2xl opacity-0 group-hover:opacity-40 blur-xl transition-opacity duration-500`} />
-        
+
         <Card className="relative border-0 bg-white/5 backdrop-blur-xl rounded-2xl overflow-hidden border border-white/10 group-hover:border-white/20 transition-all">
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          
+
           <CardContent className="p-5 relative">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
                 <span className="text-white">{icon}</span>
               </div>
               <div>
-                <motion.p 
+                <motion.p
                   className="text-3xl font-bold"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -680,9 +679,9 @@ function FiltersContent({
             onKeyDown={(e) => e.key === 'Enter' && onAddCustomSkill()}
             className="bg-white/5 border-white/20 rounded-xl focus:border-violet-500/50 focus:ring-violet-500/20"
           />
-          <Button 
-            variant="outline" 
-            size="icon" 
+          <Button
+            variant="outline"
+            size="icon"
             onClick={onAddCustomSkill}
             className="shrink-0 bg-gradient-to-r from-violet-500/20 to-indigo-500/20 border-violet-500/30 hover:from-violet-500/30 hover:to-indigo-500/30 rounded-xl"
           >
@@ -699,11 +698,10 @@ function FiltersContent({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onToggleSkill(skill)}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
-                selectedSkills.includes(skill)
-                  ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-lg shadow-violet-500/30 border-0'
-                  : 'border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40'
-              }`}
+              className={`px-3 py-1.5 text-xs rounded-lg transition-all ${selectedSkills.includes(skill)
+                ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-lg shadow-violet-500/30 border-0'
+                : 'border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40'
+                }`}
             >
               {skill}
             </motion.button>
@@ -728,7 +726,7 @@ function FiltersContent({
           max={100}
           step={5}
           onValueChange={([value]) => onFilterChange('minAuraScore', value)}
-          className="[&>span]:bg-gradient-to-r [&>span]:from-yellow-500 [&>span]:to-orange-500"
+          className="[&>span]:bg-gradient-to-r [&>span]:from-yellow-500 [&>span]:to-orange-500 [&_[role=slider]]:rounded-full [&_[role=slider]]:focus-visible:ring-offset-0 [&_[role=slider]]:focus-visible:ring-2 [&_[role=slider]]:focus-visible:ring-yellow-500/50"
         />
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>Beginner</span>
@@ -751,7 +749,7 @@ function FiltersContent({
       </div>
 
       {/* Open to Work Toggle */}
-      <motion.div 
+      <motion.div
         whileHover={{ scale: 1.02 }}
         className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-teal-500/10 border border-emerald-500/20 hover:border-emerald-500/40 transition-colors"
       >
@@ -769,9 +767,9 @@ function FiltersContent({
       </motion.div>
 
       {/* Clear Filters */}
-      <Button 
-        variant="outline" 
-        className="w-full h-12 rounded-xl bg-white/5 border-white/20 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all" 
+      <Button
+        variant="outline"
+        className="w-full h-12 rounded-xl bg-white/5 border-white/20 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all"
         onClick={onClearFilters}
       >
         <X className="mr-2 w-4 h-4" />
@@ -791,11 +789,11 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
     <div className="group relative">
       {/* Animated border gradient */}
       <div className="absolute -inset-[1px] bg-gradient-to-r from-violet-500/30 via-cyan-500/30 to-pink-500/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      
+
       <Card className="relative overflow-hidden border-0 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 group-hover:border-white/20 transition-all duration-300">
         {/* Shine effect on hover */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-        
+
         <CardContent className="pt-6 pb-4 relative">
           <div className="flex items-start gap-4">
             {/* Avatar with animated ring */}
@@ -808,7 +806,7 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
                 </AvatarFallback>
               </Avatar>
               {candidate.isOpenToWork && (
-                <motion.div 
+                <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 shadow-lg shadow-emerald-500/50"
@@ -817,7 +815,7 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
                 </motion.div>
               )}
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-lg font-bold truncate group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-violet-400 group-hover:to-cyan-400 group-hover:bg-clip-text transition-all">
@@ -839,7 +837,7 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
                 </p>
               )}
             </div>
-            
+
             <AuraBadge score={candidate.auraScore} level={candidate.auraLevel} />
           </div>
 
@@ -883,11 +881,11 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
             )}
           </div>
         </CardContent>
-        
+
         <CardFooter className="border-t border-white/5 pt-4 pb-4 flex gap-3 bg-white/[0.02]">
-          <Button 
-            asChild 
-            variant="outline" 
+          <Button
+            asChild
+            variant="outline"
             className="flex-1 h-11 rounded-xl bg-white/5 border-white/20 hover:bg-gradient-to-r hover:from-violet-500/20 hover:to-indigo-500/20 hover:border-violet-500/40 group/btn transition-all"
           >
             <Link to={`/recruiter/candidates/${candidate.id}`}>
@@ -902,11 +900,10 @@ function PremiumCandidateCard({ candidate, isShortlisted, onShortlist }: {
               size="icon"
               onClick={onShortlist}
               disabled={isShortlisted}
-              className={`h-11 w-11 rounded-xl ${
-                isShortlisted 
-                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40' 
-                  : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/30'
-              }`}
+              className={`h-11 w-11 rounded-xl ${isShortlisted
+                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/30'
+                }`}
             >
               {isShortlisted ? (
                 <Check className="w-5 h-5" />
@@ -930,15 +927,15 @@ function EmptyState({ onClear }: { onClear: () => void }) {
     >
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-transparent to-cyan-500/10 rounded-3xl" />
-        
+
         <Card className="relative text-center py-20 border-0 bg-black/40 backdrop-blur-xl rounded-3xl border border-white/10">
           <CardContent>
             <motion.div
-              animate={{ 
+              animate={{
                 y: [0, -10, 0],
                 rotateZ: [0, 5, -5, 0]
               }}
-              transition={{ 
+              transition={{
                 duration: 4,
                 repeat: Infinity,
                 ease: "easeInOut"
@@ -954,8 +951,8 @@ function EmptyState({ onClear }: { onClear: () => void }) {
               Try adjusting your filters or search for different skills to discover verified talent.
             </p>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={onClear}
                 className="h-12 px-8 rounded-xl bg-white/5 border-white/20 hover:bg-violet-500/20 hover:border-violet-500/40 hover:text-white"
               >

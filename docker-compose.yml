@@ -14,7 +14,7 @@ services:
       - recruiter-service
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,7 +30,7 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +49,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -69,7 +69,7 @@ services:
       - minio_data:/data
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -134,7 +134,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3004
-      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_jobs
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
     volumes:
@@ -152,10 +152,13 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3005
-      - DATABASE_URL=${MONGODB_CONNECTION_STRING}_recruiters
+      - DATABASE_URL=${MONGODB_CONNECTION_STRING}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-recruiteraccesskey32characters!!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    volumes:
+      - ./recruiter-service/src:/app/src
+      - ./recruiter-service/prisma:/app/prisma
     restart: unless-stopped
     networks:
       - verifydev-network
@@ -226,6 +229,7 @@ volumes:
   redis_data:
   rabbitmq_data:
   minio_data:
+
 
 networks:
   verifydev-network:

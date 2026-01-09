@@ -56,6 +56,28 @@ router.get('/shortlist', authenticateRecruiter, RecruiterController.getShortlist
 // ==================== SMART MATCHING ====================
 
 /**
+ * @route   GET /api/v1/jobs/:jobId/applications
+ * @desc    Get applications for a specific job
+ * @access  Private (Recruiter)
+ */
+// ... (existing route)
+router.get('/jobs/:jobId/applications', authenticateRecruiter, RecruiterController.getJobApplications);
+
+/**
+ * @route   PUT /api/v1/applications/:applicationId/status
+ * @desc    Update application status
+ * @access  Private (Recruiter)
+ */
+router.put('/applications/:applicationId/status', authenticateRecruiter, RecruiterController.updateApplicationStatus);
+
+/**
+ * @route   PUT /api/v1/applications/:applicationId/note
+ * @desc    Add recruiter note
+ * @access  Private (Recruiter)
+ */
+router.put('/applications/:applicationId/note', authenticateRecruiter, RecruiterController.addApplicationNote);
+
+/**
  * @route   POST /api/v1/jobs/:jobId/suggested-candidates
  * @desc    Get candidates matching a job's requirements with match scores
  * @access  Private (Recruiter)

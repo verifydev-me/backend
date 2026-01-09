@@ -1,25 +1,25 @@
 // Job Types and Enums
 
-export type JobType = 
-  | 'FULL_TIME' 
-  | 'PART_TIME' 
-  | 'CONTRACT' 
-  | 'INTERNSHIP' 
+export type JobType =
+  | 'FULL_TIME'
+  | 'PART_TIME'
+  | 'CONTRACT'
+  | 'INTERNSHIP'
   | 'FREELANCE'
 
-export type ExperienceLevel = 
-  | 'ENTRY' 
-  | 'JUNIOR' 
-  | 'MID' 
-  | 'SENIOR' 
-  | 'LEAD' 
+export type ExperienceLevel =
+  | 'ENTRY'
+  | 'JUNIOR'
+  | 'MID'
+  | 'SENIOR'
+  | 'LEAD'
   | 'PRINCIPAL'
 
-export type JobStatus = 
-  | 'DRAFT' 
-  | 'ACTIVE' 
-  | 'PAUSED' 
-  | 'CLOSED' 
+export type JobStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'CLOSED'
   | 'EXPIRED'
 
 export interface JobSkill {
@@ -75,7 +75,7 @@ export interface CreateJobRequest {
   salaryMin?: number
   salaryMax?: number
   salaryCurrency?: string
-  requiredSkills: JobSkill[]
+  requiredSkills: string[]
   preferredSkills?: string[]
   minAuraScore?: number
   minCoreCount?: number
@@ -154,19 +154,19 @@ export function getJobStatusColor(status: JobStatus): string {
 }
 
 export function formatSalaryRange(
-  min?: number, 
-  max?: number, 
+  min?: number,
+  max?: number,
   currency: string = 'USD'
 ): string {
   if (!min && !max) return 'Not specified'
-  
+
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })
-  
+
   if (min && max) {
     return `${formatter.format(min)} - ${formatter.format(max)}`
   }
@@ -185,7 +185,7 @@ export function getDaysAgo(date: Date | string): number {
 
 export function formatPostedDate(date: Date | string): string {
   const days = getDaysAgo(date)
-  
+
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days} days ago`
