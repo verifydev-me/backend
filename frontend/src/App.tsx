@@ -25,6 +25,7 @@ import Jobs from '@/pages/jobs'
 import JobDetail from '@/pages/job-detail'
 import Applications from '@/pages/applications'
 import Notifications from '@/pages/notifications'
+import Messages from '@/pages/messages'
 import PublicProfile from '@/pages/public-profile'
 import AuthCallback from '@/pages/auth-callback'
 import AuthError from '@/pages/auth-error'
@@ -163,16 +164,17 @@ function App() {
           } />
           <Route path="/recruiter/settings" element={<Settings />} />
           <Route path="/recruiter/settings/privacy" element={<PrivacySettings />} />
+          <Route path="/recruiter/messages" element={<Messages />} />
         </Route>
 
         {/* Onboarding Route */}
-        <Route 
-          path="/onboarding" 
+        <Route
+          path="/onboarding"
           element={
             <ProtectedRoute>
               <Onboarding />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* Protected Routes */}
@@ -196,6 +198,7 @@ function App() {
           <Route path="/jobs/:id" element={<JobDetail />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/messages" element={<Messages />} />
         </Route>
 
         {/* 404 */}

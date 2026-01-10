@@ -1,18 +1,46 @@
 import { AuthenticatedRequest } from "../../types/index.js";
 import express from 'express';
 import { MessageService } from '../../domain/message.service.js';
+import { authenticate } from '../../middlewares/authenticate.js';
 
 const messageService = new MessageService();
 const router = express.Router();
+
+// Apply authentication to all message routes
+router.use(authenticate);
 
 // Send message
 router.post('/', async (req: AuthenticatedRequest, res, next) => {
   try {
     const isRecruiter = req.user.role === 'recruiter';
+
+    // Determine receiver ID and Type
+    // Support both generic receiverId and specific candidateId/recruiterId
+    const receiverId = req.body.receiverId || (isRecruiter ? req.body.candidateId : req.body.recruiterId);
+    if (!receiverId) {
+      return res.status(400).json({ success: false, message: 'Receiver ID is required' });
+    }
+
+    const receiverType = isRecruiter ? 'CANDIDATE' : 'RECRUITER';
+
+    // Map content from body if needed (legacy frontend support)
+    const content = req.body.content || req.body.body;
+    if (!content) {
+      return res.status(400).json({ success: false, message: 'Message content is required' });
+    }
+
     const message = await messageService.sendMessage({
-      ...req.body,
       senderId: req.user!.userId,
       senderType: isRecruiter ? 'RECRUITER' : 'CANDIDATE',
+      senderName: req.body.senderName,
+      receiverId,
+      receiverType,
+      receiverName: req.body.receiverName || req.body.candidateName,
+      content,
+      subject: req.body.subject,
+      jobId: req.body.jobId,
+      applicationId: req.body.applicationId,
+      attachments: req.body.attachments,
     });
     res.status(201).json({ success: true, data: message });
   } catch (error) {

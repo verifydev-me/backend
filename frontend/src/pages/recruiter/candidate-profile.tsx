@@ -3,6 +3,7 @@
  * Ultra Premium Design with Animations and Glassmorphism
  */
 
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import { useFullCandidateProfile, useShortlistCandidate } from '@/hooks/use-recr
 import { downloadCandidateResume } from '@/api/services/recruiter.service'
 import { AuraScore } from '@/components/aura-score'
 import { SkillCard, SkillBadge } from '@/components/skill-card'
+import { SendMessageDialog } from '@/components/messaging/send-message-dialog'
 import {
   ArrowLeft,
   MapPin,
@@ -51,6 +53,7 @@ export default function CandidateProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const { data: profileData, isLoading } = useFullCandidateProfile(userId || '')
   const shortlistMutation = useShortlistCandidate()
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
 
   // Extract candidate from response (backend nests it under 'candidate')
   const candidate = (profileData as any)?.candidate || profileData;
@@ -62,7 +65,7 @@ export default function CandidateProfilePage() {
   if (!candidate) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center p-12 rounded-3xl glass-premium border border-white/10 max-w-md"
@@ -108,7 +111,7 @@ export default function CandidateProfilePage() {
 
   // Calculate stats
   const totalStars = projects.reduce((acc: number, p: any) => acc + (p.stars || 0), 0);
-  const avgQuality = projects.length > 0 
+  const avgQuality = projects.length > 0
     ? Math.round(projects.reduce((acc: number, p: any) => acc + (p.qualityScore || 0), 0) / projects.length)
     : 0;
 
@@ -161,7 +164,7 @@ export default function CandidateProfilePage() {
                       </AvatarFallback>
                     </Avatar>
                     {(candidate.isOpenToWork || (candidate as any).openToWork) && (
-                      <motion.span 
+                      <motion.span
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-4 py-1.5 text-xs font-semibold rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-green-500/30"
@@ -170,7 +173,7 @@ export default function CandidateProfilePage() {
                       </motion.span>
                     )}
                   </div>
-                  
+
                   {/* Aura Score Display */}
                   <div className="mt-8">
                     <AuraScore
@@ -193,9 +196,9 @@ export default function CandidateProfilePage() {
                       Verified Profile
                     </Badge>
                   </div>
-                  
+
                   <p className="text-xl text-muted-foreground mb-6">@{candidate.username || 'anonymous'}</p>
-                  
+
                   {/* Contact Info Grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     {candidate.location && (
@@ -277,7 +280,7 @@ export default function CandidateProfilePage() {
 
                   {/* Action Buttons */}
                   <div className="flex flex-wrap gap-4">
-                    <Button 
+                    <Button
                       onClick={handleShortlist}
                       className="relative overflow-hidden group bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-xl shadow-violet-500/25"
                       size="lg"
@@ -286,8 +289,8 @@ export default function CandidateProfilePage() {
                       <BookmarkPlus className="mr-2 w-5 h-5" />
                       Add to Shortlist
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="lg"
                       onClick={handleDownloadResume}
                       className="glass-premium border-white/20 hover:bg-white/10 hover:border-white/30"
@@ -295,9 +298,10 @@ export default function CandidateProfilePage() {
                       <Download className="mr-2 w-5 h-5" />
                       Download Resume
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="lg"
+                      onClick={() => setIsMessageDialogOpen(true)}
                       className="glass-premium border-white/20 hover:bg-white/10 hover:border-white/30"
                     >
                       <MessageSquare className="mr-2 w-5 h-5" />
@@ -454,28 +458,28 @@ export default function CandidateProfilePage() {
             >
               <Tabs defaultValue="skills" className="w-full">
                 <TabsList className="grid w-full grid-cols-4 p-1 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="skills"
                     className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500/20 data-[state=active]:to-indigo-500/20 data-[state=active]:border-violet-500/30"
                   >
                     <Code2 className="w-4 h-4 mr-2" />
                     Skills
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="projects"
                     className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500/20 data-[state=active]:to-blue-500/20 data-[state=active]:border-cyan-500/30"
                   >
                     <Github className="w-4 h-4 mr-2" />
                     Projects
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="experience"
                     className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-green-500/20 data-[state=active]:border-emerald-500/30"
                   >
                     <Briefcase className="w-4 h-4 mr-2" />
                     Experience
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="education"
                     className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500/20 data-[state=active]:to-rose-500/20 data-[state=active]:border-pink-500/30"
                   >
@@ -702,21 +706,30 @@ export default function CandidateProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Send Message Dialog */}
+      <SendMessageDialog
+        open={isMessageDialogOpen}
+        onOpenChange={setIsMessageDialogOpen}
+        candidateId={candidate?.id || userId || ''}
+        candidateName={candidate?.name || candidate?.username || 'Candidate'}
+        candidateAvatar={candidate?.avatarUrl}
+      />
     </div>
   )
 }
 
 // === SUB-COMPONENTS ===
 
-function StatCard({ 
-  icon, 
-  label, 
-  value, 
-  total, 
+function StatCard({
+  icon,
+  label,
+  value,
+  total,
   suffix = '',
-  gradient, 
-  delay 
-}: { 
+  gradient,
+  delay
+}: {
   icon: React.ReactNode
   label: string
   value: number
@@ -753,12 +766,12 @@ function StatCard({
   )
 }
 
-function AuraMetric({ 
-  label, 
-  value, 
+function AuraMetric({
+  label,
+  value,
   icon,
-  color 
-}: { 
+  color
+}: {
   label: string
   value: number
   icon: React.ReactNode
@@ -770,7 +783,7 @@ function AuraMetric({
     emerald: 'from-emerald-500 to-green-500 text-emerald-400',
     pink: 'from-pink-500 to-rose-500 text-pink-400',
   }
-  
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -794,21 +807,20 @@ function AuraMetric({
   )
 }
 
-function InsightItem({ 
-  icon, 
-  text, 
-  highlight 
-}: { 
+function InsightItem({
+  icon,
+  text,
+  highlight
+}: {
   icon: React.ReactNode
   text: string
   highlight: boolean
 }) {
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-      highlight 
-        ? 'bg-gradient-to-r from-violet-500/10 via-transparent to-transparent border-l-2 border-violet-500' 
-        : 'bg-white/5'
-    }`}>
+    <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${highlight
+      ? 'bg-gradient-to-r from-violet-500/10 via-transparent to-transparent border-l-2 border-violet-500'
+      : 'bg-white/5'
+      }`}>
       <span className={highlight ? 'text-violet-400' : 'text-muted-foreground'}>{icon}</span>
       <span className={`text-sm ${highlight ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>{text}</span>
     </div>
@@ -817,7 +829,7 @@ function InsightItem({
 
 function ProjectCard({ project }: { project: any }) {
   const technologies = project.technologies || [];
-  
+
   return (
     <div className="group p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-primary/30 transition-all hover:bg-white/[0.07]">
       <div className="flex items-start justify-between mb-3">
@@ -842,7 +854,7 @@ function ProjectCard({ project }: { project: any }) {
           </div>
         )}
       </div>
-      
+
       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
         {project.language && (
           <span className="flex items-center gap-1.5">
@@ -861,7 +873,7 @@ function ProjectCard({ project }: { project: any }) {
           </span>
         )}
       </div>
-      
+
       {technologies.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {technologies.slice(0, 6).map((tech: string, idx: number) => (
@@ -885,12 +897,12 @@ function ExperienceCard({ experience, isLast }: { experience: any; isLast: boole
       {!isLast && (
         <div className="absolute left-[11px] top-8 bottom-0 w-[2px] bg-gradient-to-b from-emerald-500/50 to-transparent" />
       )}
-      
+
       {/* Timeline Dot */}
       <div className="absolute left-0 top-1 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
         <Briefcase className="w-3 h-3 text-white" />
       </div>
-      
+
       <div className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 transition-colors">
         <h4 className="text-lg font-semibold mb-1">{experience.title}</h4>
         <p className="text-sm text-emerald-400 mb-2">{experience.company}</p>
@@ -917,12 +929,12 @@ function EducationCard({ education, isLast }: { education: any; isLast: boolean 
       {!isLast && (
         <div className="absolute left-[11px] top-8 bottom-0 w-[2px] bg-gradient-to-b from-pink-500/50 to-transparent" />
       )}
-      
+
       {/* Timeline Dot */}
       <div className="absolute left-0 top-1 w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/30">
         <GraduationCap className="w-3 h-3 text-white" />
       </div>
-      
+
       <div className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-pink-500/30 transition-colors">
         <h4 className="text-lg font-semibold mb-1">{education.degree}</h4>
         <p className="text-sm text-pink-400 mb-2">{education.institution}</p>
@@ -934,11 +946,11 @@ function EducationCard({ education, isLast }: { education: any; isLast: boolean 
   )
 }
 
-function EmptyState({ 
-  icon, 
-  title, 
-  description 
-}: { 
+function EmptyState({
+  icon,
+  title,
+  description
+}: {
   icon: React.ReactNode
   title: string
   description: string
@@ -959,7 +971,7 @@ function CandidateProfileSkeleton() {
     <div className="container mx-auto px-4 py-8">
       {/* Back Button Skeleton */}
       <Skeleton className="h-10 w-40 mb-8 rounded-xl" />
-      
+
       {/* Hero Skeleton */}
       <Card className="mb-8 border-0 bg-white/5">
         <CardContent className="p-8">
@@ -984,7 +996,7 @@ function CandidateProfileSkeleton() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Stats Skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[...Array(4)].map((_, i) => (
@@ -1001,7 +1013,7 @@ function CandidateProfileSkeleton() {
           </Card>
         ))}
       </div>
-      
+
       {/* Content Skeleton */}
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-6">

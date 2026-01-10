@@ -12,7 +12,7 @@ import type {
   SendMessageRequest,
 } from '@/types/message';
 
-const BASE_URL = '/messages';
+const BASE_URL = '/v1/messages';
 
 // ============================================
 // MESSAGE CRUD
@@ -106,14 +106,14 @@ export const getConversations = async (): Promise<{
   // Note: This endpoint may need to be added to backend
   // For now, we'll derive conversations from inbox
   const inbox = await getInbox({ limit: 100 });
-  
+
   // Group messages by sender/receiver
   const conversationsMap = new Map<string, Conversation>();
-  
+
   inbox.data.forEach((message) => {
     const otherUserId = message.senderId;
     const otherUser = message.sender;
-    
+
     if (!conversationsMap.has(otherUserId)) {
       conversationsMap.set(otherUserId, {
         userId: otherUserId,
@@ -229,7 +229,7 @@ export const getTimeAgo = (dateString: string): string => {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  
+
   return date.toLocaleDateString();
 };
 

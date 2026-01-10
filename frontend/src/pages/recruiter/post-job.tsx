@@ -74,6 +74,7 @@ export default function JobPostingPage() {
   const [qualifications] = useState<string[]>([''])
   const [benefits, setBenefits] = useState<string[]>([''])
   const [customSkill, setCustomSkill] = useState('')
+  const [customPreferredSkill, setCustomPreferredSkill] = useState('')
 
   const form = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),
@@ -115,6 +116,13 @@ export default function JobPostingPage() {
     if (customSkill.trim() && !requiredSkills.includes(customSkill.trim())) {
       addRequiredSkill(customSkill.trim())
       setCustomSkill('')
+    }
+  }
+
+  const addCustomSkillToPreferred = () => {
+    if (customPreferredSkill.trim() && !preferredSkills.includes(customPreferredSkill.trim())) {
+      addPreferredSkill(customPreferredSkill.trim())
+      setCustomPreferredSkill('')
     }
   }
 
@@ -485,6 +493,18 @@ export default function JobPostingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add custom skill..."
+                  value={customPreferredSkill}
+                  onChange={(e) => setCustomPreferredSkill(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomSkillToPreferred())}
+                />
+                <Button type="button" variant="outline" onClick={addCustomSkillToPreferred}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 {POPULAR_SKILLS.filter(s => !requiredSkills.includes(s)).map(skill => (
                   <Badge

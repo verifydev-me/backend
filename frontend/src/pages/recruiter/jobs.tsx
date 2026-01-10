@@ -50,7 +50,7 @@ interface Job {
   type: string
   level: string
   status: 'ACTIVE' | 'PAUSED' | 'CLOSED' | 'DRAFT'
-  applicantCount: number
+  applicationsCount: number
   createdAt: string
   requiredSkills: string[]
 }
@@ -87,7 +87,7 @@ export default function RecruiterJobsPage() {
     return matchesSearch && matchesStatus
   })
 
-  const totalApplicants = jobs.reduce((sum, job) => sum + job.applicantCount, 0)
+  const totalApplicants = jobs.reduce((sum, job) => sum + job.applicationsCount, 0)
   const activeJobs = jobs.filter(j => j.status === 'ACTIVE').length
 
   return (
@@ -238,7 +238,7 @@ function JobCard({ job, index }: { job: Job; index: number }) {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <Link 
+                <Link
                   to={`/recruiter/jobs/${job.id}/applicants`}
                   className="text-xl font-semibold hover:underline"
                 >
@@ -282,7 +282,7 @@ function JobCard({ job, index }: { job: Job; index: number }) {
             <div className="flex items-center gap-4">
               <Link to={`/recruiter/jobs/${job.id}/applicants`}>
                 <div className="text-center px-4 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                  <p className="text-2xl font-bold">{job.applicantCount}</p>
+                  <p className="text-2xl font-bold">{job.applicationsCount}</p>
                   <p className="text-xs text-muted-foreground">Applicants</p>
                 </div>
               </Link>

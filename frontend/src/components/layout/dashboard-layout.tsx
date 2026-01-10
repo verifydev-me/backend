@@ -23,6 +23,7 @@ import {
   Search,
   Sparkles,
   LogOut,
+  MessageSquare,
 } from 'lucide-react'
 
 const navigation = [
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Resume', href: '/resume', icon: ScrollText },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Applications', href: '/applications', icon: FileText },
+  { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Career Profile', href: '/profile', icon: User },
   { name: 'Quick Apply', href: '/settings/job-preferences', icon: Sparkles },
   { name: 'Settings', href: '/settings', icon: Settings },

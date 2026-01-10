@@ -14,6 +14,7 @@ import {
   Menu,
   Building,
   LogOut,
+  MessageSquare,
 } from 'lucide-react'
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Find Candidates', href: '/recruiter/candidates', icon: Users },
   { name: 'My Jobs', href: '/recruiter/jobs', icon: Briefcase },
   { name: 'Post Job', href: '/recruiter/post-job', icon: Plus },
+  { name: 'Messages', href: '/recruiter/messages', icon: MessageSquare },
   { name: 'Settings', href: '/recruiter/settings', icon: Settings },
 ]
 
@@ -77,7 +79,7 @@ export default function RecruiterLayout() {
             </Button>
           )}
           {!sidebarOpen && (
-            <button 
+            <button
               onClick={toggleSidebar}
               className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-muted transition-all"
             >
@@ -99,15 +101,15 @@ export default function RecruiterLayout() {
         {/* Navigation */}
         <nav className="flex flex-col gap-2.5 p-3 mt-4 overflow-y-auto scrollbar-none flex-1">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href || 
-                           (item.href !== '/recruiter/dashboard' && location.pathname.startsWith(item.href))
+            const isActive = location.pathname === item.href ||
+              (item.href !== '/recruiter/dashboard' && location.pathname.startsWith(item.href))
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200 group relative',
-                  'border border-transparent', 
+                  'border border-transparent',
                   isActive
                     ? 'bg-primary/5 text-primary border-primary/20 shadow-[0_2px_10px_-3px_rgba(var(--primary),0.2)]'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-border/30'
@@ -182,7 +184,7 @@ export default function RecruiterLayout() {
           <div className="flex h-14 items-center justify-between px-6">
             {/* Left side - Page Title */}
             <div />
-            
+
             {/* Right side - User Actions */}
             <div className="flex items-center gap-4">
               <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10" asChild>
@@ -211,7 +213,7 @@ export default function RecruiterLayout() {
           <div className="absolute inset-0 bg-grid-premium opacity-40 mix-blend-overlay pointer-events-none" />
           <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
-          
+
           <div className="max-w-7xl mx-auto w-full h-full relative z-10">
             <Outlet />
           </div>

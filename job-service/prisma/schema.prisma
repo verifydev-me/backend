@@ -189,6 +189,10 @@ model Message {
   subject     String?
   content     String
   attachments String[] @default([])
+  
+  // Names for display (stored at send time)
+  senderName   String? @map("sender_name")
+  receiverName String? @map("receiver_name")
 
   // Status
   isRead Boolean   @default(false) @map("is_read")

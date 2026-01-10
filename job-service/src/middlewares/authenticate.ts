@@ -55,12 +55,14 @@ export async function authenticate(
         req.user = {
           userId: decoded.recruiterId,
           sessionId: decoded.organizationId, // Use organizationId as sessionId
+          role: 'recruiter',
         };
       } else {
         // User token
         req.user = {
           userId: decoded.userId,
           sessionId: decoded.sessionId,
+          role: 'user',
         };
       }
 

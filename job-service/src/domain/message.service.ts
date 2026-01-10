@@ -4,8 +4,10 @@ import type { Message, SenderType } from '../../node_modules/.prisma/job-client/
 export interface CreateMessageDTO {
   senderId: string;
   senderType: SenderType;
+  senderName?: string;
   receiverId: string;
   receiverType: SenderType;
+  receiverName?: string;
   jobId?: string;
   applicationId?: string;
   subject?: string;
