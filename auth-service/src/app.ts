@@ -1,10 +1,7 @@
 import express, { Express } from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
-
-import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
