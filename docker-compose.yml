@@ -11,6 +11,8 @@ services:
       - user-service
       - job-service
       - recruiter-service
+      - resume-service
+      - project-analyzer
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost/health" ]
