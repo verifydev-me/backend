@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -16,7 +15,7 @@ const app = express();
 // Security
 app.use(helmet());
 // app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true })); // Gateway handles CORS
-// app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200000 })); // Disabled for seeding
+// Rate limiting removed - Gateway handles it
 app.use(express.json());
 
 // Health check

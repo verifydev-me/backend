@@ -1,7 +1,6 @@
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import { logger } from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
@@ -15,42 +14,7 @@ export function createApp(): Express {
   // Security middleware
   app.use(helmet());
 
-  // CORS - Disabled because Gateway handles it
-  // app.use(
-  //   cors({
-  //     origin: env.ALLOWED_ORIGINS,
-  //     credentials: true,
-  //     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  //     allowedHeaders: ['Content-Type', 'Authorization'],
-  //   })
-  // );
 
-  // Rate limiting (DISABLED FOR TESTING - TODO: Re-enable in production)
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    skip: () => true, // TESTING: Skip rate limiting
-    message: {
-      success: false,
-      message: 'Too many requests, please try again later',
-      error: { code: 'RATE_LIMIT_EXCEEDED' },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use(limiter);
-
-  // Stricter rate limit for auth endpoints (DISABLED FOR TESTING)
-  const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20, // 20 auth attempts per hour
-    skip: () => true, // TESTING: Skip rate limiting
-    message: {
-      success: false,
-      message: 'Too many authentication attempts',
-      error: { code: 'AUTH_RATE_LIMIT' },
-    },
-  });
 
   // Body parsing
   app.use(express.json({ limit: '10kb' }));
@@ -81,7 +45,7 @@ export function createApp(): Express {
   });
 
   // API Routes
-  app.use('/api/v1/auth', authLimiter, authRoutes);
+  app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/auth/otp', otpRoutes);
 
   // 404 handler

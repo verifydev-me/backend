@@ -1,7 +1,5 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -27,28 +25,8 @@ export function createApp(): Express {
   // Security
   app.use(helmet());
 
-  // CORS
-  app.use(
-    cors({
-      origin: env.ALLOWED_ORIGINS,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
-
-  // Rate limiting (DISABLED FOR TESTING - TODO: Re-enable in production)
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    skip: () => true, // TESTING: Skip rate limiting
-    message: {
-      success: false,
-      message: 'Too many requests',
-      error: { code: 'RATE_LIMIT_EXCEEDED' },
-    },
-  });
-  app.use(limiter);
+  // CORS removed - Gateway handles it
+  // Rate limiting removed - Gateway handles it
 
   // Body parsing
   app.use(express.json({ limit: '10kb' }));

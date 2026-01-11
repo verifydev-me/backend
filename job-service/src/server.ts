@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -15,18 +14,7 @@ app.set('trust proxy', 1); // Trust the Nginx gateway
 app.use(helmet());
 // app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true })); // Gateway handles CORS
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  skip: () => env.NODE_ENV === 'development', // Skip for dev
-  message: {
-    success: false,
-    message: 'Too many requests',
-    error: { code: 'RATE_LIMIT_EXCEEDED' },
-  },
-});
-app.use(limiter);
+// Rate limiting removed - Gateway handles it
 app.use(express.json());
 
 // Health check
