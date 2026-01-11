@@ -1,0 +1,26 @@
+{
+  "name": "aura-processor",
+  "version": "1.0.0",
+  "description": "VerifyDev Aura Processor - Consumes signals, calculates aura, updates user",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.0",
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.3.1",
+    "pino": "^8.17.1",
+    "pino-pretty": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.4",
+    "@types/node": "^20.10.5",
+    "prisma": "^5.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,370 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/job-client"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== JOB MODELS ====================
+
+model Job {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Organization/Recruiter who posted
+  recruiterId String    @map("recruiter_id") @db.ObjectId
+  recruiter   Recruiter @relation(fields: [recruiterId], references: [id])
+
+  // Job Details
+  title            String
+  description      String
+  requirements     String
+  responsibilities String
+  benefits         String?
+
+  // Classification
+  type     JobType         @default(FULL_TIME)
+  level    ExperienceLevel @default(MID)
+  category JobCategory     @default(GENERAL) // Simple category for filtering
+
+  // Location
+  location   String
+  isRemote   Boolean     @default(false) @map("is_remote")
+  remoteType RemoteType? @map("remote_type")
+
+  // Compensation
+  salaryMin      Int?         @map("salary_min")
+  salaryMax      Int?         @map("salary_max")
+  salaryCurrency String       @default("INR") @map("salary_currency")
+  salaryPeriod   SalaryPeriod @default(YEARLY) @map("salary_period")
+  showSalary     Boolean      @default(true) @map("show_salary")
+
+  // Skills - Simple string arrays (no levels, no percentages)
+  requiredSkills  String[] @default([]) @map("required_skills")
+  preferredSkills String[] @default([]) @map("preferred_skills")
+
+  // Experience Requirements
+  minExperience Int? @map("min_experience") // Years
+  maxExperience Int? @map("max_experience")
+  minAuraScore  Int  @default(0) @map("min_aura_score")
+  minCoreCount  Int  @default(1) @map("min_core_count")
+
+  // Education
+  minEducation EducationLevel? @map("min_education")
+
+  // Status & Stats
+  status            JobStatus @default(DRAFT)
+  applicationsCount Int       @default(0) @map("applications_count")
+  viewsCount        Int       @default(0) @map("views_count")
+  matchedCount      Int       @default(0) @map("matched_count")
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  publishedAt DateTime? @map("published_at")
+  expiresAt   DateTime? @map("expires_at")
+  closedAt    DateTime? @map("closed_at")
+
+  // Relations
+  applications Application[]
+  interviews   Interview[]
+  messages     Message[]
+  savedByUsers SavedJob[]
+
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+model Application {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // References
+  jobId  String @map("job_id") @db.ObjectId
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  // Application Details
+  coverLetter  String? @map("cover_letter")
+  resumeUrl    String? @map("resume_url")
+  portfolioUrl String? @map("portfolio_url")
+
+  // Candidate Info Snapshot (at time of application)
+  candidateName           String   @map("candidate_name")
+  candidateEmail          String   @map("candidate_email")
+  candidatePhone          String?  @map("candidate_phone")
+  candidateAura           Int      @default(0) @map("candidate_aura")
+  candidateCores          Int      @default(1) @map("candidate_cores")
+  candidateSkills         String[] @default([]) @map("candidate_skills")
+  candidateProjects       Json?    @map("candidate_projects")
+  candidateExperience     Json?    @map("candidate_experience")
+  candidateCertifications Json?    @map("candidate_certifications")
+
+  // Status & Workflow
+  status ApplicationStatus @default(PENDING)
+  stage  String? // Custom workflow stage
+
+  // Matching & Scoring
+  matchScore      Int?  @map("match_score") // 0-100
+  matchBreakdown  Json? @map("match_breakdown")
+  skillMatchScore Int?  @map("skill_match_score")
+  auraMatchScore  Int?  @map("aura_match_score")
+
+  // Recruiter Feedback
+  recruiterNotes String? @map("recruiter_notes")
+  rating         Int? // 1-5 stars
+  reviewedBy     String? @map("reviewed_by")
+
+  // Interview Link
+  interviewScheduled Boolean @default(false) @map("interview_scheduled")
+
+  // Timestamps
+  appliedAt     DateTime  @default(now()) @map("applied_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  reviewedAt    DateTime? @map("reviewed_at")
+  shortlistedAt DateTime? @map("shortlisted_at")
+  rejectedAt    DateTime? @map("rejected_at")
+
+  // Relations
+  interviews Interview[]
+  messages   Message[]
+
+  @@unique([jobId, userId])
+  @@map("applications")
+}
+
+model Interview {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // References
+  applicationId String      @map("application_id") @db.ObjectId
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  jobId         String      @map("job_id") @db.ObjectId
+  job           Job         @relation(fields: [jobId], references: [id])
+  userId        String      @map("user_id")
+  recruiterId   String      @map("recruiter_id")
+
+  // Interview Details
+  title       String
+  description String?
+  type        InterviewType @default(VIDEO)
+  round       Int           @default(1)
+
+  // Scheduling
+  scheduledAt DateTime? @map("scheduled_at")
+  duration    Int       @default(60) // minutes
+  meetingUrl  String?   @map("meeting_url")
+  location    String?
+
+  // Status
+  status InterviewStatus @default(SCHEDULED)
+
+  // Feedback
+  feedback         String?
+  rating           Int? // 1-5
+  interviewerNotes String? @map("interviewer_notes")
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  @@map("interviews")
+}
+
+model Message {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // References
+  jobId         String?      @map("job_id") @db.ObjectId
+  job           Job?         @relation(fields: [jobId], references: [id])
+  applicationId String?      @map("application_id") @db.ObjectId
+  application   Application? @relation(fields: [applicationId], references: [id])
+
+  // Participants
+  senderId     String     @map("sender_id")
+  senderType   SenderType @map("sender_type")
+  receiverId   String     @map("receiver_id")
+  receiverType SenderType @map("receiver_type")
+
+  // Message
+  subject     String?
+  content     String
+  attachments String[] @default([])
+
+  // Names for display (stored at send time)
+  senderName   String? @map("sender_name")
+  receiverName String? @map("receiver_name")
+
+  // Status
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at")
+
+  // Timestamps
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@map("messages")
+}
+
+model SavedJob {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @map("user_id")
+  jobId  String @map("job_id") @db.ObjectId
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  notes String?
+
+  savedAt DateTime @default(now()) @map("saved_at")
+
+  @@unique([userId, jobId])
+  @@map("saved_jobs")
+}
+
+model Recruiter {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Auth
+  email        String @unique
+  passwordHash String @map("password_hash")
+
+  // Profile
+  name        String
+  title       String?
+  phone       String?
+  avatarUrl   String? @map("avatar_url")
+  bio         String?
+  linkedinUrl String? @map("linkedin_url")
+
+  // Organization
+  organizationName    String  @map("organization_name")
+  organizationWebsite String? @map("organization_website")
+  organizationLogo    String? @map("organization_logo")
+  organizationSize    String? @map("organization_size")
+  industry            String?
+
+  // Verification
+  isVerified Boolean   @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+
+  // Status
+  isActive  Boolean @default(true) @map("is_active")
+  isPremium Boolean @default(false) @map("is_premium")
+
+  // Stats
+  jobsPosted        Int @default(0) @map("jobs_posted")
+  activeJobs        Int @default(0) @map("active_jobs")
+  totalApplications Int @default(0) @map("total_applications")
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  // Relations
+  jobs Job[]
+
+  @@map("recruiters")
+}
+
+// ==================== ENUMS ====================
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum ExperienceLevel {
+  ENTRY
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+  PRINCIPAL
+}
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+  EXPIRED
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  SHORTLISTED
+  INTERVIEW
+  OFFER
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewType {
+  PHONE
+  VIDEO
+  IN_PERSON
+  TECHNICAL
+  HR
+  FINAL
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  CONFIRMED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum RemoteType {
+  FULL_REMOTE
+  HYBRID
+  OFFICE_ONLY
+}
+
+enum SalaryPeriod {
+  HOURLY
+  MONTHLY
+  YEARLY
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  DIPLOMA
+  BACHELORS
+  MASTERS
+  PHD
+}
+
+enum SenderType {
+  CANDIDATE
+  RECRUITER
+  SYSTEM
+}
+
+// ==================== JOB CATEGORY ENUM ====================
+
+enum JobCategory {
+  FRONTEND
+  BACKEND
+  FULLSTACK
+  MOBILE
+  DEVOPS
+  DATA_ENGINEERING
+  MACHINE_LEARNING
+  SECURITY
+  DESIGN
+  QA
+  GENERAL
+}

@@ -1,0 +1,207 @@
+services:
+  gateway:
+    build: ./gateway
+    container_name: verifydev-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./gateway/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - auth-service
+      - user-service
+      - job-service
+      - recruiter-service
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - verifydev-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: verifydev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - verifydev-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: verifydev-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - verifydev-network
+
+  auth-service:
+    build: ./auth-service
+    container_name: verifydev-auth
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - REDIS_URL=redis://redis:6379
+      - GITHUB_CLIENT_ID=Ov23li8KrcXPVTwLxWUE
+      - GITHUB_CLIENT_SECRET=2fe9da8ae5e1f9d0fa331b35dab2e5896845e4d5
+      - GITHUB_CALLBACK_URL=http://192.168.31.236/api/v1/auth/github/callback
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-supersecretrefreshkey32characters}
+      - FRONTEND_URL=http://192.168.31.236:3000
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost,http://192.168.31.236
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  user-service:
+    build: ./user-service
+    container_name: verifydev-user
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  job-service:
+    build:
+      context: ./job-service
+      dockerfile: Dockerfile.dev
+    container_name: verifydev-job
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    volumes:
+      - ./job-service/src:/app/src
+      - ./job-service/prisma:/app/prisma
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  recruiter-service:
+    build: ./recruiter-service
+    container_name: verifydev-recruiter
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+    volumes:
+      - ./recruiter-service/src:/app/src
+      - ./recruiter-service/prisma:/app/prisma
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  aura-processor:
+    build: ./aura-processor
+    container_name: verifydev-aura
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - CONSUME_QUEUE=project.analyzed
+      - EXCHANGE_NAME=project.events
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  # ==================== GO SERVICES ====================
+  project-analyzer:
+    build: ./project-analyzer
+    container_name: verifydev-analyzer
+    ports:
+      - "8001:8001"
+    environment:
+      - ENV=development
+      - PORT=8001
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - EXCHANGE_NAME=project.events
+      - CONSUME_QUEUE=project.analyze.request
+      - PUBLISH_QUEUE=project.analyzed
+      - CLONE_DIR=/tmp/repos
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      - /tmp/repos:/tmp/repos
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+  resume-service:
+    build: ./resume-service
+    container_name: verifydev-resume
+    ports:
+      - "8003:8003"
+    environment:
+      - ENV=development
+      - PORT=8003
+      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+
+
+networks:
+  verifydev-network:
+    driver: bridge
