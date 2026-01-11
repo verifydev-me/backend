@@ -72,8 +72,8 @@ services:
       - GITHUB_CALLBACK_URL=https://api.verifydev.me/api/v1/auth/github/callback
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-supersecretrefreshkey32characters}
-      - FRONTEND_URL=https://verifydev.vercel.app
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,https://verifydev.vercel.app,https://api.verifydev.me
+      - FRONTEND_URL=https://verifydev.me
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,https://verifydev.vercel.app,https://api.verifydev.me,https://verifydev.me,https://www.verifydev.me
     depends_on:
       redis:
         condition: service_healthy
