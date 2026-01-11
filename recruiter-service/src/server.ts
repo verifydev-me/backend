@@ -16,7 +16,7 @@ const app = express();
 
 // Security
 app.use(helmet());
-app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true }));
+// app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true })); // Gateway handles CORS
 // app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200000 })); // Disabled for seeding
 app.use(express.json());
 

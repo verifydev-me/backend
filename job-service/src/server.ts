@@ -14,7 +14,7 @@ const app = express();
 // Security
 app.set('trust proxy', 1); // Trust the Nginx gateway
 app.use(helmet());
-app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true }));
+// app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true })); // Gateway handles CORS
 
 // Rate limiting
 const limiter = rateLimit({

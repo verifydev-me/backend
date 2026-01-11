@@ -18,15 +18,15 @@ export function createApp(): Express {
   // Security middleware
   app.use(helmet());
 
-  // CORS
-  app.use(
-    cors({
-      origin: env.ALLOWED_ORIGINS,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
+  // CORS - Disabled because Gateway handles it
+  // app.use(
+  //   cors({
+  //     origin: env.ALLOWED_ORIGINS,
+  //     credentials: true,
+  //     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  //     allowedHeaders: ['Content-Type', 'Authorization'],
+  //   })
+  // );
 
   // Rate limiting (DISABLED FOR TESTING - TODO: Re-enable in production)
   const limiter = rateLimit({
