@@ -172,6 +172,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Setup SSH for health check
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
       - name: Wait for services to stabilize
         run: sleep 60
 
@@ -195,15 +202,6 @@ jobs:
               exit 1
             fi
           EOF
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Setup SSH for health check
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
       - name: Verify all critical services
         run: |
