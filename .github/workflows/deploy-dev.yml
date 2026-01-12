@@ -42,16 +42,24 @@ jobs:
           ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             
-            # Navigate to project directory
-            cd ~/verifydev-backend || exit 1
+            # Create and navigate to project directory
+            mkdir -p ~/verifydev-backend
+            cd ~/verifydev-backend
             
-            # Pull latest code from dev branch
+            # Handle repository setup
             if [ -d ".git" ]; then
               echo "Updating existing repository..."
               git fetch origin
               git checkout dev
+              git reset --hard origin/dev
               git pull origin dev
             else
+              # Check if directory has files but no git repo
+              if [ "$(ls -A)" ]; then
+                echo "Directory exists but is not a git repository. Cleaning up..."
+                rm -rf ./*
+                rm -rf ./.??*
+              fi
               echo "Cloning repository..."
               git clone -b dev https://github.com/${{ github.repository }} .
             fi
