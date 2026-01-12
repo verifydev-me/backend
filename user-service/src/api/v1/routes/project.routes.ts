@@ -12,6 +12,13 @@ const router = Router();
 router.get('/available', authenticate, ProjectController.getAvailableRepos);
 
 /**
+ * @route   GET /api/v1/projects/new
+ * @desc    Get user's available GitHub repos to add (alias for /available)
+ * @access  Private
+ */
+router.get('/new', authenticate, ProjectController.getAvailableRepos);
+
+/**
  * @route   POST /api/v1/projects
  * @desc    Add a new project for analysis
  * @access  Private
