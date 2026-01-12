@@ -63,7 +63,7 @@ router.get('/me/skills', authenticate, UserController.getMySkills);
  * @desc    Get user settings
  * @access  Private
  */
-router.get('/settings', authenticate, UserController.getSettings);
+router.get('/settings', authenticate, UserController.getSettings); 
 
 /**
  * @route   PUT /api/v1/users/settings
