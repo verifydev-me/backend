@@ -50,7 +50,7 @@ jobs:
             if [ ! -f ~/.ssh/github_deploy_key ]; then
               echo "Setting up GitHub deploy key..."
               cat > ~/.ssh/github_deploy_key << 'KEYEOF'
-          ${{ secrets.GITHUB_DEPLOY_KEY }}
+          ${{ secrets.DEPLOY_SSH_KEY }}
           KEYEOF
               chmod 600 ~/.ssh/github_deploy_key
               

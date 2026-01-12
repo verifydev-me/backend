@@ -18,7 +18,7 @@ Add these 5 secrets:
 2. **HOST**: Azure VM IP or hostname (e.g., `20.123.45.67`)
 3. **SSH_PRIVATE_KEY**: Your private SSH key (entire content including headers)
 4. **USERNAME**: SSH username (e.g., `azureuser` or `ubuntu`)
-5. **GITHUB_DEPLOY_KEY**: ✨ **NEW** - Private SSH key for GitHub access (See GITHUB_DEPLOY_KEY_SETUP.md)
+5. **DEPLOY_SSH_KEY**: ✨ **NEW** - Private SSH key for GitHub access (See GITHUB_DEPLOY_KEY_SETUP.md)
 
 ## 🚀 How to Deploy
 
