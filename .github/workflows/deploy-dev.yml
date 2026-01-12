@@ -37,10 +37,43 @@ jobs:
           ENVEOF
           EOF
 
+      - name: Setup GitHub Deploy Key on Server
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            
+            # Add GitHub to known_hosts
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+            
+            # Setup GitHub deploy key if not already present
+            if [ ! -f ~/.ssh/github_deploy_key ]; then
+              echo "Setting up GitHub deploy key..."
+              cat > ~/.ssh/github_deploy_key << 'KEYEOF'
+          ${{ secrets.GITHUB_DEPLOY_KEY }}
+          KEYEOF
+              chmod 600 ~/.ssh/github_deploy_key
+              
+              # Configure SSH to use deploy key for GitHub
+              cat > ~/.ssh/config << 'SSHEOF'
+          Host github.com
+            HostName github.com
+            User git
+            IdentityFile ~/.ssh/github_deploy_key
+            StrictHostKeyChecking no
+          SSHEOF
+              chmod 600 ~/.ssh/config
+            fi
+          EOF
+
       - name: Deploy application
         run: |
           ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
+            
+            # Ensure GitHub is in known_hosts
+            mkdir -p ~/.ssh
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
             
             # Create and navigate to project directory
             mkdir -p ~/verifydev-backend
@@ -61,7 +94,7 @@ jobs:
                 rm -rf ./.??*
               fi
               echo "Cloning repository..."
-              git clone -b dev https://github.com/${{ github.repository }} .
+              git clone -b dev git@github.com:${{ github.repository }}.git .
             fi
             
             # Stop existing containers
