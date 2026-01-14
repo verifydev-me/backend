@@ -310,6 +310,7 @@ model Project {
   // ========== ANALYSIS ==========
   analysisStatus AnalysisStatus @default(PENDING) @map("analysis_status")
   analyzedAt     DateTime?      @map("analyzed_at")
+  basePath       String?        @map("base_path") // Subfolder path for analysis (e.g. /backend)
 
   // ========== SCORES ==========
   codeQualityScore Int @default(0) @map("code_quality_score")

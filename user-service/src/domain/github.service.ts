@@ -14,10 +14,16 @@ export interface GitHubRepo {
   language: string | null;
   stargazers_count: number;
   forks_count: number;
+  size: number; // Size in KB from GitHub API
   owner: {
     login: string;
     id: number;
   };
+}
+
+export interface GitHubBranch {
+  name: string;
+  protected: boolean;
 }
 
 export class GitHubService {
@@ -201,6 +207,69 @@ export class GitHubService {
     } catch (error) {
       logger.error({ error, repoUrl }, 'Error fetching repo languages');
       return {};
+    }
+  }
+
+  /**
+   * Get branches for a repository
+   */
+  static async getRepoBranches(repoUrl: string, userToken?: string): Promise<GitHubBranch[]> {
+    try {
+      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (!match) {
+        return [];
+      }
+
+      const [, owner, repoName] = match;
+      const cleanRepoName = repoName.replace(/\.git$/, '');
+
+      const headers = this.getAuthHeaders(userToken);
+      const response = await fetch(`${GITHUB_API}/repos/${owner}/${cleanRepoName}/branches?per_page=30`, { headers });
+
+      if (!response.ok) {
+        logger.warn({ repoUrl, status: response.status }, 'Failed to fetch repo branches');
+        return [];
+      }
+
+      return (await response.json()) as GitHubBranch[];
+    } catch (error) {
+      logger.error({ error, repoUrl }, 'Error fetching repo branches');
+      return [];
+    }
+  }
+
+  /**
+   * Get contents of a repo path
+   */
+  static async getRepoContents(repoUrl: string, path: string = '', userToken?: string): Promise<any[]> {
+    try {
+      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (!match) {
+        return [];
+      }
+
+      const [, owner, repoName] = match;
+      const cleanRepoName = repoName.replace(/\.git$/, '');
+
+      const headers = this.getAuthHeaders(userToken);
+      // Ensure path doesn't start with slash for API
+      const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+      const apiUrl = `${GITHUB_API}/repos/${owner}/${cleanRepoName}/contents/${cleanPath}`;
+
+      const response = await fetch(apiUrl, { headers });
+
+      if (!response.ok) {
+        // 404 means empty or invalid path
+        if (response.status === 404) return [];
+        logger.warn({ repoUrl, path, status: response.status }, 'Failed to fetch repo contents');
+        return [];
+      }
+
+      const contents = await response.json();
+      return Array.isArray(contents) ? contents : [contents];
+    } catch (error) {
+      logger.error({ error, repoUrl, path }, 'Error fetching repo contents');
+      return [];
     }
   }
 

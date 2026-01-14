@@ -3,6 +3,8 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -86,8 +88,8 @@ func (a *Analyzer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 			Str("projectId", req.ProjectID).
 			Msg("❌ Analysis failed")
 
-		// Requeue for retry (RabbitMQ will handle max retries via DLQ)
-		msg.Nack(false, true)
+		// Don't requeue to avoid infinite loop - let DLX handle it
+		msg.Nack(false, false)
 		return
 	}
 
@@ -110,7 +112,8 @@ func (a *Analyzer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 // analyze performs the actual code analysis
 func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*signals.ProjectSignals, error) {
 	// 1. Clone repository
-	repoPath, err := a.gitClient.CloneRepo(req.RepoURL, req.ProjectID, req.DefaultBranch)
+	// 1. Clone repository
+	repoPath, err := a.gitClient.CloneRepo(ctx, req.RepoURL, req.ProjectID, req.DefaultBranch, req.GitHubToken, req.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +148,20 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	fileParser := parser.NewFileParser(repoPath)
-	infraExtractor := parser.NewInfraExtractor(repoPath, userProjectType)
+	// Determine analysis root (subfolder support)
+	analysisRoot := repoPath
+	if req.BasePath != "" {
+		analysisRoot = filepath.Join(repoPath, req.BasePath)
+		log.Info().Str("basePath", req.BasePath).Msg("Using subfolder for analysis")
+		// Verify subfolder exists
+		if _, err := os.Stat(analysisRoot); os.IsNotExist(err) {
+			log.Warn().Str("basePath", req.BasePath).Msg("Subfolder does not exist, falling back to root")
+			analysisRoot = repoPath
+		}
+	}
+
+	fileParser := parser.NewFileParser(analysisRoot)
+	infraExtractor := parser.NewInfraExtractor(analysisRoot, userProjectType)
 
 	// ============================================
 	// PARALLEL EXECUTION: Phase 1 (Project-Type-Aware)

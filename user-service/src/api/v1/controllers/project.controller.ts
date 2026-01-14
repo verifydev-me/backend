@@ -10,6 +10,7 @@ const addProjectSchema = z.object({
   description: z.string().max(500).optional().nullable().transform(val => val || undefined),
   defaultBranch: z.string().max(100).optional().nullable().transform(val => val || undefined),
   projectType: z.enum(['backend', 'frontend', 'fullstack', 'ml', 'library']).optional(),
+  basePath: z.string().max(200).optional().nullable().transform(val => val || undefined),
 });
 
 // Batch analysis - max 3 projects at a time
@@ -49,6 +50,74 @@ export class ProjectController {
     } catch (error) {
       logger.error({ error }, 'Failed to get available repos');
       res.status(500).json({ success: false, message: 'Failed to get repos', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /projects/branches?repo=<url>
+   * Get branches for a specific repo
+   */
+  static async getBranches(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const repoUrl = req.query.repo as string;
+      if (!repoUrl) {
+        res.status(400).json({ success: false, message: 'Missing repo URL', error: { code: 'VALIDATION_ERROR' } });
+        return;
+      }
+
+      const branches = await ProjectService.getBranches(repoUrl, req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Branches retrieved',
+        data: { branches },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get branches');
+      res.status(500).json({ success: false, message: 'Failed to get branches', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /projects/repo/contents?repo=<url>&path=<path>
+   * Get repo contents for path selector
+   */
+  static async getRepoContents(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const repoUrl = req.query.repo as string;
+      const path = (req.query.path as string) || '';
+      
+      if (!repoUrl) {
+        res.status(400).json({ success: false, message: 'Missing repo URL', error: { code: 'VALIDATION_ERROR' } });
+        return;
+      }
+
+      const contents = await ProjectService.getRepoContents(repoUrl, path, req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Contents retrieved',
+        data: { contents },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get contents');
+      res.status(500).json({ success: false, message: 'Failed to get contents', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 

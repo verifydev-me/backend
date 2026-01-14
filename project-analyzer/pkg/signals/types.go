@@ -13,6 +13,10 @@ type AnalyzeRequest struct {
 	// UserProjectType - User-specified project type for context-aware scoring
 	// Values: backend, frontend, fullstack, ml, library
 	UserProjectType string `json:"projectType,omitempty"`
+	// GitHubToken - User's OAuth token for cloning private repos
+	GitHubToken string `json:"githubToken,omitempty"`
+	// BasePath - Specific subfolder to analyze (e.g. /backend)
+	BasePath string `json:"basePath,omitempty"`
 }
 
 // ProjectType - Type of project detected

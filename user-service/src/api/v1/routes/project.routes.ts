@@ -13,6 +13,14 @@ const router = Router();
 router.get('/available', authenticate, ProjectController.getAvailableRepos);
 
 /**
+ * @route   GET /api/v1/projects/branches
+ * @desc    Get branches for a specific repo
+ * @access  Private
+ */
+router.get('/repo/branches', authenticate, ProjectController.getBranches);
+router.get('/repo/contents', authenticate, ProjectController.getRepoContents);
+
+/**
  * @route   GET /api/v1/projects/new
  * @desc    Get user's available GitHub repos to add (alias for /available)
  * @access  Private

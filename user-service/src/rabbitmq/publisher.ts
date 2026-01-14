@@ -68,6 +68,8 @@ class RabbitMQPublisher {
     repoName: string;
     defaultBranch: string;
     projectType?: string;
+    githubToken?: string;
+    basePath?: string;
   }): Promise<boolean> {
     if (!this.channel || !this.isConnected) {
       logger.warn('RabbitMQ not connected, cannot publish');

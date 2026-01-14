@@ -10,6 +10,7 @@ export interface AddProjectDto {
   description?: string;
   defaultBranch?: string;
   projectType?: 'backend' | 'frontend' | 'fullstack' | 'ml' | 'library';
+  basePath?: string;
 }
 
 export class ProjectService {
@@ -65,7 +66,9 @@ export class ProjectService {
           data.githubRepoUrl, 
           data.repoName, 
           repoDetails?.default_branch || data.defaultBranch,
-          data.projectType
+          data.projectType,
+          userToken, // Pass token for private repos
+          data.basePath
         );
         
         await prisma.project.update({
@@ -92,6 +95,7 @@ export class ProjectService {
         stars: repoDetails?.stargazers_count || 0,
         forks: repoDetails?.forks_count || 0,
         language: repoDetails?.language || undefined,
+        basePath: data.basePath,
       },
     });
 
@@ -102,7 +106,9 @@ export class ProjectService {
       data.githubRepoUrl,
       data.repoName,
       repoDetails?.default_branch || data.defaultBranch,
-      data.projectType
+      data.projectType,
+      userToken, // Pass GitHub token for private repo cloning
+      data.basePath
     );
 
     logger.info({ projectId: project.id, userId }, 'Project added for analysis');
@@ -156,6 +162,8 @@ export class ProjectService {
       stars: repo.stargazers_count,
       forks: repo.forks_count,
       defaultBranch: repo.default_branch,
+      sizeKB: repo.size || 0, // Size in KB from GitHub API
+      sizeMB: Math.round((repo.size || 0) / 1024), // Size in MB for UI
       isAdded: addedUrls.has(repo.html_url.toLowerCase()),
     }));
     
@@ -166,6 +174,39 @@ export class ProjectService {
     }, 'Available repos prepared');
     
     return result;
+  }
+
+  /**
+   * Get branches for a specific repo
+   */
+  static async getBranches(repoUrl: string, userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubAccessToken: true, username: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Pass token for authentication (needed for private repos)
+    return GitHubService.getRepoBranches(repoUrl, user.githubAccessToken || undefined);
+  }
+
+  /**
+   * Get contents of a repo (folders/files)
+   */
+  static async getRepoContents(repoUrl: string, path: string, userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubAccessToken: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return GitHubService.getRepoContents(repoUrl, path, user.githubAccessToken || undefined);
   }
 
   /**
@@ -216,7 +257,8 @@ export class ProjectService {
       analysis,
       null, // legacyFullAnalysis removed
       project.githubRepoUrl,
-      projectOwner?.githubAccessToken || undefined
+      projectOwner?.githubAccessToken || undefined,
+      project.basePath || undefined
     );
 
     if (!mergedFullAnalysis.techStack) {
@@ -418,7 +460,9 @@ export class ProjectService {
     repoUrl: string,
     repoName: string,
     defaultBranch?: string,
-    projectType?: string
+    projectType?: string,
+    githubToken?: string,
+    basePath?: string
   ) {
     await rabbitmqPublisher.publishAnalyzeRequest({
       projectId,
@@ -427,6 +471,8 @@ export class ProjectService {
       repoName,
       defaultBranch: defaultBranch || 'main',
       projectType,
+      githubToken,
+      basePath,
     });
   }
 }
@@ -638,7 +684,8 @@ async function buildLanguageBreakdown(
   projectAnalysis: any,
   legacyFullAnalysis: any,
   repoUrl: string,
-  githubToken?: string
+  githubToken?: string,
+  basePath?: string
 ) {
   const normalize = (lang: any) => {
     if (!lang) return null;
@@ -657,8 +704,8 @@ async function buildLanguageBreakdown(
   let languages: Array<{ name: string; percentage: number | null }> = [];
   let languageMap: Record<string, number> = {};
 
-  // Prefer live GitHub language stats when available
-  if (repoUrl) {
+  // Prefer live GitHub language stats when available (ONLY if no subfolder analysis)
+  if (repoUrl && !basePath) {
     const repoLanguages = await GitHubService.getRepoLanguages(repoUrl, githubToken);
     const totalBytes = Object.values(repoLanguages).reduce((acc, value) => acc + value, 0);
 
