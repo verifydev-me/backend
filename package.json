@@ -1,0 +1,14 @@
+{
+  "name": "verify-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "proto:generate": "bash scripts/generate-proto.sh",
+    "test:grpc": "bash scripts/test-grpc.sh",
+    "test:load": "ts-node scripts/load-test.ts"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3"
+  }
+}

@@ -21,17 +21,18 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "./src",
+    "baseUrl": "..",
+    "rootDir": "..",
     "paths": {
-      "@/*": ["./*"],
-      "@config/*": ["./config/*"],
-      "@api/*": ["./api/*"],
-      "@domain/*": ["./domain/*"],
-      "@middlewares/*": ["./middlewares/*"],
-      "@utils/*": ["./utils/*"],
-      "@types/*": ["./types/*"]
+      "@/*": ["user-service/src/*"],
+      "@config/*": ["user-service/src/config/*"],
+      "@api/*": ["user-service/src/api/*"],
+      "@domain/*": ["user-service/src/domain/*"],
+      "@middlewares/*": ["user-service/src/middlewares/*"],
+      "@utils/*": ["user-service/src/utils/*"],
+      "@types/*": ["user-service/src/types/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -9,14 +9,11 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
 ## 📋 Quick Links
 
 - [Architecture Overview](#architecture-overview)
+- [Communication Architecture](#-communication-architecture-hybrid-http--grpc) - **gRPC Implementation**
+- [Performance Analysis](./PERFORMANCE.md) - **Latency Metrics & Benchmarks**
 - [Services](#services)
-- [Tech Stack](#tech-stack)
 - [API Routes](#api-routes)
-- [Message Queues](#message-queues)
-- [Authentication](#authentication)
-- [Project Analysis](#project-analysis)
 - [Getting Started](#getting-started)
-- [Deployment](#deployment)
 
 ---
 
@@ -28,7 +25,7 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
                                     │ (Next.js/React  │
                                     │    Native)      │
                                     └────────┬────────┘
-                                             │
+                                             │ JSON/HTTP
                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                           NGINX API GATEWAY                                 │
@@ -39,22 +36,33 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
 │  │  • SSL Termination         • Error Handling       • Health Checks    │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────┬──────────────────────────────────────┘
-                                      │
+                                      │ HTTP/JSON (proxy_pass)
           ┌───────────────────────────┼───────────────────────────┐
           │                           │                           │
           ▼                           ▼                           ▼
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
 │  Auth Service   │       │  User Service   │       │  Job Service    │
-│   (Port 3001)   │       │   (Port 3002)   │       │   (Port 3004)   │
-│                 │       │                 │       │                 │
+│   HTTP :3001    │       │   HTTP :3002    │       │   HTTP :3004    │
+│                 │       │   gRPC :50051   │       │                 │
 │ • GitHub OAuth  │       │ • User Profile  │       │ • Job Listings  │
 │ • JWT Tokens    │       │ • Skills CRUD   │       │ • Applications  │
 │ • Sessions      │       │ • Projects      │       │ • Recruiter API │
 │ • OTP Auth      │       │ • Experience    │       │ • Messages      │
 └─────────────────┘       └────────┬────────┘       └─────────────────┘
                                    │
-                                   │ (RabbitMQ)
+                                   │ ⚡ gRPC (Binary Protocol Buffers)
+                                   │    Inter-service communication
                                    ▼
+                    ┌──────────────────────────────┐
+                    │     Recruiter Service        │
+                    │        HTTP :3005            │
+                    │        gRPC :50054           │
+                    │                              │
+                    │  • Candidate Search (gRPC)   │
+                    │  • BatchGetUsers (gRPC)      │
+                    │  • Profile Fetch (gRPC)      │
+                    └──────────────────────────────┘
+                                   
                     ┌──────────────────────────────┐
                     │     Project Analyzer (Go)    │
                     │         (Port 8001)          │
@@ -95,22 +103,145 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Protocol Legend:**
+- `JSON/HTTP` - Frontend to Gateway and Gateway to Services
+- `⚡ gRPC` - Service-to-Service (low latency, binary)
+- `RabbitMQ` - Async event-driven communication
+
 ---
+
+
+## 🚄 Communication Architecture (Hybrid HTTP + gRPC)
+
+The backend uses a **Hybrid Communication Pattern** optimized for **low latency** and **scalability**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           COMMUNICATION FLOW                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   Frontend/Mobile (Next.js, React Native)                                    │
+│          │                                                                   │
+│          │  JSON/HTTP REST (Human-readable, debuggable)                      │
+│          ▼                                                                   │
+│   ┌──────────────────────────────────────────────────────────┐               │
+│   │              API GATEWAY (Nginx - Port 8000)             │               │
+│   │  • CORS Handling      • Rate Limiting    • Load Balance  │               │
+│   │  • SSL Termination    • Request Routing  • Compression   │               │
+│   └──────────────────────────────────────────────────────────┘               │
+│          │                                                                   │
+│          │  HTTP/JSON (proxy_pass) ─ Simple, Compatible                      │
+│          ▼                                                                   │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐                │
+│   │   Auth   │  │   User   │  │   Job    │  │  Recruiter   │                │
+│   │ :3001    │  │ :3002    │  │ :3004    │  │   :3005      │                │
+│   └──────────┘  └────┬─────┘  └──────────┘  └──────┬───────┘                │
+│                      │                             │                         │
+│                      │   gRPC (Binary Protocol Buffers)                      │
+│                      │   ⚡ Low latency, High throughput                     │
+│                      ▼                             │                         │
+│               ┌────────────┐                       │                         │
+│               │ gRPC :50051│◄──────────────────────┘                         │
+│               └────────────┘                                                 │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Architecture?
+
+| Layer | Protocol | Why? |
+|-------|----------|------|
+| **Frontend → Gateway** | JSON/HTTP | Human-readable, debuggable, browser-native |
+| **Gateway → Services** | HTTP/JSON | Nginx compatibility, simple routing, easy monitoring |
+| **Service ↔ Service** | **gRPC** | ⚡ Binary protocol, 10x faster, streaming, strict contracts |
+
+### gRPC Implementation (Service-to-Service)
+
+gRPC is used for **internal service communication** where performance matters most:
+
+```
+┌────────────────────┐     gRPC     ┌────────────────────┐
+│ Recruiter Service  │ ───────────► │   User Service     │
+│     :3005          │  (Binary)    │     :50051         │
+│                    │              │                    │
+│ • BatchGetUsers()  │              │ • GetUser()        │
+│ • SearchCandidates │              │ • BatchGetUsers()  │
+│ • GetUserProfile() │              │ • SearchCandidates │
+└────────────────────┘              └────────────────────┘
+```
+
+#### Benefits of gRPC for Internal Calls:
+- **⚡ 10x Lower Latency**: Binary Protocol Buffers vs JSON parsing
+- **📦 Smaller Payload**: ~30% smaller than JSON
+- **📋 Strict Contracts**: Proto files are the single source of truth
+- **🔄 Streaming**: Bi-directional streaming for real-time updates
+- **🔁 Built-in Retries**: Automatic retry with exponential backoff
+
+### Core Components
+
+1. **Proto Definitions (`backend/proto/`)**
+   - Source of truth for service-to-service contracts
+   - Organized by domain: `user/`, `job/`, `recruiter/`, `common/`
+   - Dynamic loading with `@grpc/proto-loader` (no compilation step)
+
+2. **Shared Utilities (`backend/shared/`)**
+   - `GrpcServer`: Standardized server setup with keepalive, error handling
+   - `GrpcClient`: Connection pooling, automatic retries, timeouts
+   - `GrpcClientPool`: Singleton pattern for connection reuse
+
+3. **Port Configuration**
+   | Service | HTTP Port | gRPC Port |
+   |---------|-----------|-----------|
+   | User Service | 3002 | 50051 |
+   | Recruiter Service | 3005 | 50054 |
+   | Job Service | 3004 | 50052* |
+   
+   *Planned
+
+### Implementation Example
+
+**Recruiter Service calling User Service via gRPC:**
+
+```typescript
+// recruiter-service/src/grpc/user-client.ts
+import { GrpcClient } from '../../../shared/grpc-client';
+
+const userClient = new GrpcClient(UserServiceProto, {
+  address: 'user-service:50051',
+  serviceName: 'UserService',
+  maxRetries: 3,
+  timeout: 10000,
+});
+
+// Get multiple users in ONE call (instead of N HTTP calls)
+const users = await batchGetUsers(['user1', 'user2', 'user3']);
+// ⚡ Single TCP connection, binary payload, parallel fetch
+```
+
+> 📘 **Detailed Guide**: See [GRPC_IMPLEMENTATION_GUIDE.md](./GRPC_IMPLEMENTATION_GUIDE.md) for step-by-step tutorial.
+
+---
+
+
 
 ## 🔧 Services
 
-| Service | Port | Language | Description |
-|---------|------|----------|-------------|
-| **Gateway** | 8000 | Nginx | API Gateway - routing, CORS, rate limiting |
-| **Auth Service** | 3001 | TypeScript | GitHub OAuth, JWT, sessions |
-| **User Service** | 3002 | TypeScript | Profiles, skills, projects, experience |
-| **Job Service** | 3004 | TypeScript | Jobs, applications, recruiter management |
-| **Recruiter Service** | 3005 | TypeScript | Candidate search, interviews, messaging |
-| **Resume Service** | 8003 | Go | PDF resume generation |
-| **Project Analyzer** | 8001 | Go | GitHub analysis, tech detection, AI |
-| **Aura Processor** | - | TypeScript | Score calculations (worker) |
-| **Redis** | 6379 | - | Session cache, rate limiting |
-| **RabbitMQ** | 5672 | - | Message queue for async tasks |
+| Service | HTTP Port | gRPC Port | Language | Description |
+|---------|-----------|-----------|----------|-------------|
+| **Gateway** | 8000 | - | Nginx | API Gateway - routing, CORS, rate limiting |
+| **Auth Service** | 3001 | - | TypeScript | GitHub OAuth, JWT tokens, sessions |
+| **User Service** | 3002 | **50051** | TypeScript | Profiles, skills, projects, experience |
+| **Job Service** | 3004 | 50052* | TypeScript | Jobs, applications, recruiter management |
+| **Recruiter Service** | 3005 | **50054** | TypeScript | Candidate search, interviews, messaging |
+| **Chat Service** | 3006 | - | TypeScript | Real-time messaging (Socket.IO) |
+| **Resume Service** | 8003 | - | Go | PDF resume generation |
+| **Project Analyzer** | 8001 | - | Go | GitHub analysis, tech detection, AI |
+| **Aura Processor** | - | - | TypeScript | Score calculations (worker) |
+| **Redis** | 6379 | - | - | Session cache, rate limiting |
+| **RabbitMQ** | 5672 | - | - | Message queue for async tasks |
+
+*Planned | **Active gRPC server
+
 
 ---
 

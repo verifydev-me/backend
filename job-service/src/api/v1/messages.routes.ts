@@ -12,7 +12,7 @@ router.use(authenticate);
 // Send message
 router.post('/', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
 
     // Determine receiver ID and Type
     // Support both generic receiverId and specific candidateId/recruiterId
@@ -51,7 +51,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
 // Send bulk message to multiple receivers
 router.post('/bulk', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     if (!isRecruiter) {
       return res.status(403).json({ success: false, message: 'Only recruiters can send bulk messages' });
     }
@@ -91,7 +91,7 @@ router.post('/bulk', async (req: AuthenticatedRequest, res, next) => {
 // Get inbox
 router.get('/inbox', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     const messages = await messageService.getInbox(req.user!.userId, isRecruiter);
     res.json({ success: true, data: messages });
   } catch (error) {
@@ -102,7 +102,7 @@ router.get('/inbox', async (req: AuthenticatedRequest, res, next) => {
 // Get sent messages
 router.get('/sent', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     const messages = await messageService.getSentMessages(req.user!.userId, isRecruiter);
     res.json({ success: true, data: messages });
   } catch (error) {
@@ -138,7 +138,7 @@ router.post('/:id/read', async (req: AuthenticatedRequest, res, next) => {
 // Mark all as read
 router.post('/mark-all-read', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     const count = await messageService.markAllAsRead(req.user!.userId, isRecruiter);
     res.json({ success: true, data: { markedCount: count } });
   } catch (error) {
@@ -149,7 +149,7 @@ router.post('/mark-all-read', async (req: AuthenticatedRequest, res, next) => {
 // Get unread count
 router.get('/unread-count', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     const count = await messageService.getUnreadCount(req.user!.userId, isRecruiter);
     res.json({ success: true, data: { count } });
   } catch (error) {

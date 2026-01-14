@@ -105,12 +105,78 @@ model Skill {
 }
 
 enum SkillCategory {
-  LANGUAGE // JavaScript, Go, Python
-  FRAMEWORK // React, Express, Gin
-  DATABASE // PostgreSQL, MongoDB, Redis
-  DEVOPS // Docker, K8s, CI/CD
-  TOOL // Git, VS Code
-  SOFT_SKILL // Communication, Leadership
+  // Core categories
+  LANGUAGE         @map("language")
+  LANGUAGE_LEGACY  @map("LANGUAGE")
+  FRAMEWORK        @map("framework")
+  FRAMEWORK_LEGACY @map("FRAMEWORK")
+  LIBRARY          @map("library")
+  LIBRARY_LEGACY   @map("LIBRARY")
+  DATABASE         @map("database")
+  DATABASE_LEGACY  @map("DATABASE")
+
+  // DevOps & Infrastructure
+  DEVOPS                  @map("devops")
+  DEVOPS_LEGACY           @map("DEVOPS")
+  INFRASTRUCTURE          @map("infrastructure")
+  INFRASTRUCTURE_LEGACY   @map("INFRASTRUCTURE")
+  WEBSERVER               @map("webserver")
+  WEBSERVER_LEGACY        @map("WEBSERVER")
+  CI_CD                   @map("ci_cd")
+  CI_CD_LEGACY            @map("CI_CD")
+  CONTAINERIZATION        @map("containerization")
+  CONTAINERIZATION_LEGACY @map("CONTAINERIZATION")
+  ORCHESTRATION           @map("orchestration")
+  ORCHESTRATION_LEGACY    @map("ORCHESTRATION")
+  CLOUD                   @map("cloud")
+  CLOUD_LEGACY            @map("CLOUD")
+
+  // Tools & Testing
+  TOOL              @map("tool")
+  TOOL_LEGACY       @map("TOOL")
+  TESTING           @map("testing")
+  TESTING_LEGACY    @map("TESTING")
+  BUILD_TOOL        @map("build_tool")
+  BUILD_TOOL_LEGACY @map("BUILD_TOOL")
+  LINTING           @map("linting")
+  LINTING_LEGACY    @map("LINTING")
+
+  // Messaging & Caching
+  MESSAGING        @map("messaging")
+  MESSAGING_LEGACY @map("MESSAGING")
+  CACHE            @map("cache")
+  CACHE_LEGACY     @map("CACHE")
+  SEARCH           @map("search")
+  SEARCH_LEGACY    @map("SEARCH")
+
+  // Architecture & Patterns
+  ARCHITECTURE        @map("architecture")
+  ARCHITECTURE_LEGACY @map("ARCHITECTURE")
+
+  // Machine Learning & AI
+  ML        @map("ml")
+  ML_LEGACY @map("ML")
+
+  // Observability & Monitoring
+  OBSERVABILITY        @map("observability")
+  OBSERVABILITY_LEGACY @map("OBSERVABILITY")
+
+  // Patterns
+  PATTERN        @map("pattern")
+  PATTERN_LEGACY @map("PATTERN")
+
+  // Optimization categories (from aura-calculator)
+  PERFORMANCE          @map("performance")
+  PERFORMANCE_LEGACY   @map("PERFORMANCE")
+  SECURITY             @map("security")
+  SECURITY_LEGACY      @map("SECURITY")
+  STRUCTURE            @map("structure")
+  STRUCTURE_LEGACY     @map("STRUCTURE")
+  DOCUMENTATION        @map("documentation")
+  DOCUMENTATION_LEGACY @map("DOCUMENTATION")
+
+  // Soft skills
+  SOFT_SKILL
   OTHER
 }
 
@@ -138,7 +204,6 @@ model Project {
   // ========== ANALYSIS ==========
   analysisStatus AnalysisStatus @default(PENDING) @map("analysis_status")
   analysisId     String?        @map("analysis_id") @db.ObjectId
-  fullAnalysis   Json?          @map("full_analysis")
   analyzedAt     DateTime?      @map("analyzed_at")
 
   // ========== SCORES ==========
@@ -155,7 +220,9 @@ model Project {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ========== RELATIONS ==========
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis ProjectAnalysis?
 
   @@unique([userId, githubRepoUrl])
   @@index([userId])
@@ -169,6 +236,346 @@ enum AnalysisStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ==========================================================================================================
+// PROJECT ANALYSIS MODEL - PRODUCTION GRADE
+// Matches Go Engine (project-analyzer) Output Exactly
+// ==========================================================================================================
+
+model ProjectAnalysis {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String @unique @map("project_id") @db.ObjectId
+
+  // ========== PROJECT TYPE (from Go: ProjectType) ==========
+  projectType ProjectType @default(OTHER) @map("project_type")
+
+  // ========== CODE SIGNALS (from Go: CodeSignals struct) ==========
+  hasReadme        Boolean @default(false) @map("has_readme")
+  hasLicense       Boolean @default(false) @map("has_license")
+  hasGitignore     Boolean @default(false) @map("has_gitignore")
+  hasEnvExample    Boolean @default(false) @map("has_env_example")
+  hasDockerfile    Boolean @default(false) @map("has_dockerfile")
+  hasDockerCompose Boolean @default(false) @map("has_docker_compose")
+  hasCI            Boolean @default(false) @map("has_ci")
+  hasLinting       Boolean @default(false) @map("has_linting")
+  hasPrettier      Boolean @default(false) @map("has_prettier")
+  hasTypeScript    Boolean @default(false) @map("has_typescript")
+  hasMakefile      Boolean @default(false) @map("has_makefile")
+  testFilesCount   Int     @default(0) @map("test_files_count")
+  commentDensity   Float   @default(0) @map("comment_density")
+
+  // ========== FOLDER STRUCTURE (from Go: FolderAnalysis struct) ==========
+  hasSrcFolder      Boolean  @default(false) @map("has_src_folder")
+  hasComponents     Boolean  @default(false) @map("has_components")
+  hasUtils          Boolean  @default(false) @map("has_utils")
+  hasTests          Boolean  @default(false) @map("has_tests")
+  hasTypes          Boolean  @default(false) @map("has_types")
+  hasConfig         Boolean  @default(false) @map("has_config")
+  hasDocs           Boolean  @default(false) @map("has_docs")
+  hasApi            Boolean  @default(false) @map("has_api")
+  hasModels         Boolean  @default(false) @map("has_models")
+  hasServices       Boolean  @default(false) @map("has_services")
+  hasMiddleware     Boolean  @default(false) @map("has_middleware")
+  hasControllers    Boolean  @default(false) @map("has_controllers")
+  hasInternal       Boolean  @default(false) @map("has_internal")
+  hasPkg            Boolean  @default(false) @map("has_pkg")
+  hasCmd            Boolean  @default(false) @map("has_cmd")
+  hasGateway        Boolean  @default(false) @map("has_gateway")
+  maxDepth          Int      @default(0) @map("max_depth")
+  topLevelFolders   String[] @default([]) @map("top_level_folders")
+  organizationScore Int      @default(0) @map("organization_score")
+
+  // ========== TECH STACK (from Go: Frameworks, Databases, Tools arrays) ==========
+  primaryLanguage String   @default("Unknown") @map("primary_language")
+  frameworks      String[] @default([])
+  databases       String[] @default([])
+  tools           String[] @default([])
+  infrastructure  String[] @default([])
+
+  // ========== METRICS (from Go: TotalFiles, TotalLines) ==========
+  totalFiles Int @default(0) @map("total_files")
+  totalLines Int @default(0) @map("total_lines")
+
+  // ========== COMPLEXITY SCORE (from Go: ComplexityScore struct) ==========
+  complexityTotalScore          Float  @default(0) @map("complexity_total_score")
+  complexityArchitectureScore   Float  @default(0) @map("complexity_architecture_score")
+  complexityInfrastructureScore Float  @default(0) @map("complexity_infrastructure_score")
+  complexityCodeQualityScore    Float  @default(0) @map("complexity_code_quality_score")
+  complexityScaleLabel          String @default("Unknown") @map("complexity_scale_label")
+
+  // ========== ARCHITECTURE (from Go: IndustryAnalysis.Architecture) ==========
+  architectureType          ArchitectureType? @map("architecture_type")
+  architectureCommunication String[]          @default([]) @map("architecture_communication")
+  architecturePatterns      String[]          @default([]) @map("architecture_patterns")
+  architectureServiceNames  String[]          @default([]) @map("architecture_service_names")
+  architectureGateway       String?           @map("architecture_gateway")
+  serviceCount              Int               @default(0) @map("service_count")
+  customServiceCount        Int               @default(0) @map("custom_service_count")
+  thirdPartyServiceCount    Int               @default(0) @map("third_party_service_count")
+  customServiceNames        String[]          @default([]) @map("custom_service_names")
+  thirdPartyServiceNames    String[]          @default([]) @map("third_party_service_names")
+  engineeringLevel          EngineeringLevel? @map("engineering_level")
+
+  // ========== GIT FORENSICS (from Go: GitForensics struct) ==========
+  gitCommitCount        Int     @default(0) @map("git_commit_count")
+  gitFirstCommitDate    String? @map("git_first_commit_date")
+  gitLastCommitDate     String? @map("git_last_commit_date")
+  gitLargestCommitRatio Float   @default(0) @map("git_largest_commit_ratio")
+  gitRefactorCount      Int     @default(0) @map("git_refactor_count")
+  gitPrimaryAuthorPct   Float   @default(0) @map("git_primary_author_pct")
+  gitIsPremiumFeature   Boolean @default(false) @map("git_is_premium_feature")
+
+  // ========== AUTHORSHIP VERDICT (from Go: AuthorshipVerdict struct) ==========
+  authorshipLevel      String?  @map("authorship_level")
+  authorshipConfidence String?  @map("authorship_confidence")
+  authorshipReasons    String[] @default([]) @map("authorship_reasons")
+
+  // ========== INTELLIGENCE VERDICT (from Go: IntelligenceVerdict struct) ==========
+  verdictProjectIntent   String   @default("") @map("verdict_project_intent")
+  verdictTechStack       String[] @default([]) @map("verdict_tech_stack")
+  verdictArchMaturity    Int      @default(0) @map("verdict_arch_maturity")
+  verdictOverallScore    Float    @default(0) @map("verdict_overall_score")
+  verdictDeveloperLevel  String?  @map("verdict_developer_level")
+  verdictKeySignals      String[] @default([]) @map("verdict_key_signals")
+  verdictStrengthSignals String[] @default([]) @map("verdict_strength_signals")
+  verdictRiskSignals     String[] @default([]) @map("verdict_risk_signals")
+  verdictSeniorVerdict   String   @default("") @map("verdict_senior_verdict")
+  verdictHireSignal      String?  @map("verdict_hire_signal")
+  verdictAnalysisTimeMs  Int      @default(0) @map("verdict_analysis_time_ms")
+  verdictModulesExecuted String[] @default([]) @map("verdict_modules_executed")
+  verdictModulesSkipped  String[] @default([]) @map("verdict_modules_skipped")
+
+  // ========== SCORES (Computed by aura-calculator) ==========
+  overallScore       Int @default(0) @map("overall_score")
+  structureScore     Int @default(0) @map("structure_score")
+  codeQualityScore   Int @default(0) @map("code_quality_score")
+  testingScore       Int @default(0) @map("testing_score")
+  documentationScore Int @default(0) @map("documentation_score")
+  bestPracticesScore Int @default(0) @map("best_practices_score")
+
+  // ========== BEST PRACTICES ==========
+  bestPracticesFollowed String[] @default([]) @map("best_practices_followed")
+  bestPracticesMissing  String[] @default([]) @map("best_practices_missing")
+  improvements          String[] @default([])
+
+  // ========== METADATA ==========
+  analyzerVersion String   @default("3.0.0") @map("analyzer_version")
+  processingTime  Int?     @map("processing_time")
+  analyzedAt      DateTime @default(now()) @map("analyzed_at")
+
+  // ========== DIMENSIONAL ANALYSIS (from Go: pkg/dimensions) ==========
+  // Dimension Scores (0-100)
+  fundamentalsScore             Int?   @map("fundamentals_score")
+  fundamentalsConfidence        Float? @map("fundamentals_confidence")
+  engineeringDepthScore         Int?   @map("engineering_depth_score")
+  engineeringDepthConfidence    Float? @map("engineering_depth_confidence")
+  productionReadinessScore      Int?   @map("production_readiness_score")
+  productionReadinessConfidence Float? @map("production_readiness_confidence")
+  testingMaturityScore          Int?   @map("testing_maturity_score")
+  testingMaturityConfidence     Float? @map("testing_maturity_confidence")
+  architectureScore             Int?   @map("architecture_dimension_score")
+  architectureConfidence        Float? @map("architecture_confidence")
+  infraDevOpsScore              Int?   @map("infra_devops_score")
+  infraDevOpsConfidence         Float? @map("infra_devops_confidence")
+
+  // Verdict (from Go: pkg/verdict)
+  verdictSummary       String?          @map("dimensional_verdict_summary")
+  experienceLevel      ExperienceLevel? @map("experience_level")
+  experienceYearRange  String?          @map("experience_year_range")
+  experienceConfidence Float?           @map("experience_confidence")
+  verdictStrengths     String[]         @default([]) @map("dimensional_strengths")
+  verdictGrowthAreas   String[]         @default([]) @map("dimensional_growth_areas")
+  verdictJustification String?          @map("verdict_justification")
+
+  // Trust Analysis (from Go: pkg/trust)
+  trustLevel        TrustLevel?  @map("trust_level")
+  trustScore        Int?         @map("trust_score")
+  effortClass       EffortClass? @map("effort_class")
+  estimatedHours    Int?         @map("estimated_hours")
+  averageCommitSize Float?       @map("average_commit_size")
+  commitFrequency   Float?       @map("commit_frequency")
+  authenticityScore Int?         @map("authenticity_score")
+  authenticityFlags String[]     @default([]) @map("authenticity_flags")
+  hasOriginalWork   Boolean?     @map("has_original_work")
+
+  // ========== RELATIONS ==========
+  project          Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  verifiedSkills   AnalysisVerifiedSkill[]
+  languageStats    AnalysisLanguageStat[]
+  infraSignals     AnalysisInfraSignal[]
+  suggestions      AnalysisSuggestion[]
+  dimensionSignals DimensionSignal[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectType])
+  @@index([architectureType])
+  @@index([engineeringLevel])
+  @@index([overallScore])
+  @@map("project_analyses")
+}
+
+// ==================== LANGUAGE STATS (from Go: LanguageStats array) ====================
+
+model AnalysisLanguageStat {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  name       String
+  lines      Int    @default(0)
+  files      Int    @default(0)
+  percentage Float  @default(0)
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("analysis_language_stats")
+}
+
+// ==================== INFRA SIGNALS (from Go: InfrastructureSignals) ====================
+
+model AnalysisInfraSignal {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  signal     String
+  confidence Float    @default(0)
+  source     String?
+  evidence   String[] @default([])
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("analysis_infra_signals")
+}
+
+// ==================== VERIFIED SKILLS (from Go: IndustryAnalysis.VerifiedSkills) ====================
+
+model AnalysisVerifiedSkill {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  name          String
+  category      String
+  level         String   @default("basic")
+  confidence    Float    @default(0)
+  evidence      String[] @default([])
+  keywords      String[] @default([])
+  resumeReady   Boolean  @default(false) @map("resume_ready")
+  usageVerified Boolean  @default(false) @map("usage_verified") // NEW
+  usageStrength Float    @default(0.0) @map("usage_strength") // NEW
+  weight        Int      @default(1)
+  auraPoints    Int      @default(0) @map("aura_points")
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([category])
+  @@map("analysis_verified_skills")
+}
+
+// ==================== SUGGESTIONS (from Go: IntelligenceVerdict.Suggestions) ====================
+
+model AnalysisSuggestion {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  category    String
+  message     String
+  impactScore Int    @default(0) @map("impact_score")
+  effortScore Int    @default(0) @map("effort_score")
+  priority    Int    @default(0)
+  evidence    String @default("")
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([priority])
+  @@map("analysis_suggestions")
+}
+
+// ==================== ENUMS ====================
+
+enum ProjectType {
+  FRONTEND
+  BACKEND
+  FULLSTACK
+  MICROSERVICES
+  MONOLITH
+  MONOREPO
+  LIBRARY
+  CLI
+  API
+  MOBILE
+  ML
+  OTHER
+  UNKNOWN
+}
+
+enum ArchitectureType {
+  MICROSERVICES
+  MONOLITH
+  MODULAR_MONOLITH
+  MONOREPO
+  EVENT_DRIVEN
+  LAYERED
+  CLEAN_ARCHITECTURE
+  HEXAGONAL
+  SERVERLESS
+  UNKNOWN
+}
+
+enum EngineeringLevel {
+  BASIC
+  INTERMEDIATE
+  ADVANCED
+  PRODUCTION
+}
+
+// ==================== DIMENSIONAL ANALYSIS ENUMS ====================
+
+enum ExperienceLevel {
+  INTERN
+  JUNIOR
+  MID_LEVEL
+  SENIOR
+  STAFF
+  PRINCIPAL
+}
+
+enum TrustLevel {
+  UNVERIFIED
+  LOW
+  MEDIUM
+  HIGH
+  VERIFIED
+}
+
+enum EffortClass {
+  MINIMAL
+  LOW
+  MODERATE
+  SIGNIFICANT
+  SUBSTANTIAL
+  MAJOR
+}
+
+// ==================== DIMENSION SIGNALS ====================
+
+model DimensionSignal {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  dimension String // fundamentals, engineeringDepth, etc.
+  signal    String // e.g., "has_readme", "uses_docker"
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([dimension])
+  @@map("dimension_signals")
 }
 
 // ==================== EXPERIENCE MODEL ====================

@@ -145,7 +145,12 @@ func (a *NextJSAnalyzer) Analyze(repoPath string) *StackAnalysisResult {
 	if hasAppDir || hasSrcAppDir {
 		confidencePoints += 0.1
 	}
-	result.Confidence = min(confidencePoints, 1.0)
+
+	// Cap at 1.0
+	if confidencePoints > 1.0 {
+		confidencePoints = 1.0
+	}
+	result.Confidence = confidencePoints
 
 	return result
 }

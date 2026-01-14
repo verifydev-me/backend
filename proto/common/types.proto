@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package common;
+
+// ==================== COMMON TYPES ====================
+
+// Timestamp message
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// Pagination request
+message PaginationRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+// Pagination response
+message PaginationResponse {
+  int32 page = 1;
+  int32 limit = 2;
+  int32 total = 3;
+  int32 total_pages = 4;
+}
+
+// Location
+message Location {
+  string city = 1;
+  string state = 2;
+  string country = 3;
+  string timezone = 4;
+}
+
+// Skill
+message Skill {
+  string id = 1;
+  string name = 2;
+  string category = 3;
+  int32 proficiency_level = 4; // 1-5
+  int32 years_of_experience = 5;
+  bool verified = 6;
+  float confidence_score = 7; // 0.0-1.0
+}
+
+// Experience
+message Experience {
+  string id = 1;
+  string company = 2;
+  string title = 3;
+  string description = 4;
+  Timestamp start_date = 5;
+  Timestamp end_date = 6;
+  bool current = 7;
+  repeated string technologies = 8;
+}
+
+// Education
+message Education {
+  string id = 1;
+  string institution = 2;
+  string degree = 3;
+  string field_of_study = 4;
+  Timestamp start_date = 5;
+  Timestamp end_date = 6;
+  float gpa = 7;
+}
+
+// Project
+message Project {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string repo_url = 4;
+  string default_branch = 5;
+  repeated string tech_stack = 6;
+  repeated Skill skills_detected = 7;
+  int32 stars = 8;
+  int32 forks = 9;
+  string status = 10; // PENDING, ANALYZING, COMPLETED, FAILED
+  float quality_score = 11;
+  Timestamp created_at = 12;
+  Timestamp updated_at = 13;
+}
+
+// Social Links
+message SocialLinks {
+  string github = 1;
+  string linkedin = 2;
+  string twitter = 3;
+  string portfolio = 4;
+  string blog = 5;
+}
+
+// User Profile
+message UserProfile {
+  string bio = 1;
+  string title = 2;
+  Location location = 3;
+  SocialLinks social_links = 4;
+  repeated string interests = 5;
+  string availability = 6; // AVAILABLE, NOT_AVAILABLE, OPEN_TO_OFFERS
+  int32 years_of_experience = 7;
+  string resume_url = 8;
+}
+
+// Job Location Type
+enum LocationType {
+  LOCATION_TYPE_UNSPECIFIED = 0;
+  REMOTE = 1;
+  ONSITE = 2;
+  HYBRID = 3;
+}
+
+// Employment Type
+enum EmploymentType {
+  EMPLOYMENT_TYPE_UNSPECIFIED = 0;
+  FULL_TIME = 1;
+  PART_TIME = 2;
+  CONTRACT = 3;
+  INTERNSHIP = 4;
+}
+
+// Experience Level
+enum ExperienceLevel {
+  EXPERIENCE_LEVEL_UNSPECIFIED = 0;
+  ENTRY = 1;
+  JUNIOR = 2;
+  MID = 3;
+  SENIOR = 4;
+  LEAD = 5;
+  PRINCIPAL = 6;
+}
+
+// Application Status
+enum ApplicationStatus {
+  APPLICATION_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  REVIEWING = 2;
+  SHORTLISTED = 3;
+  INTERVIEWING = 4;
+  OFFERED = 5;
+  ACCEPTED = 6;
+  REJECTED = 7;
+  WITHDRAWN = 8;
+}

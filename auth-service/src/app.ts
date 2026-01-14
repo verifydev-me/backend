@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { logger } from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { generalRateLimiter } from './middlewares/rateLimit.js';
 
 // Routes
 import authRoutes from './api/v1/routes/auth.routes.js';
@@ -14,7 +15,8 @@ export function createApp(): Express {
   // Security middleware
   app.use(helmet());
 
-
+  // General rate limiting (100 req/min per IP)
+  app.use(generalRateLimiter);
 
   // Body parsing
   app.use(express.json({ limit: '10kb' }));

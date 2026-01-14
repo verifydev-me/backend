@@ -46,4 +46,11 @@ router.put('/profile', authenticateRecruiter, AuthController.updateProfile);
  */
 router.post('/logout', authenticateRecruiter, AuthController.logout);
 
+/**
+ * @route   GET /api/v1/recruiters/public/:userId
+ * @desc    Get public recruiter info
+ * @access  Public
+ */
+router.get('/public/:userId', AuthController.getPublicProfile);
+
 export default router;

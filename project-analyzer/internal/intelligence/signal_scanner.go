@@ -14,9 +14,10 @@ import (
 
 // SignalScanner performs fast lightweight analysis
 type SignalScanner struct {
-	repoPath   string
-	confidence *SignalConfidenceVector
-	signals    *FastSignals
+	repoPath      string
+	confidence    *SignalConfidenceVector
+	signals       *FastSignals
+	manifestPaths []string
 }
 
 // FastSignals - quick extraction results
@@ -27,7 +28,10 @@ type FastSignals struct {
 	SecondaryLanguages []string `json:"secondaryLanguages"`
 
 	// Framework fingerprints
+	// Framework fingerprints
 	DetectedFrameworks []string `json:"detectedFrameworks"`
+	DetectedDatabases  []string `json:"detectedDatabases"` // NEW
+	DetectedInfra      []string `json:"detectedInfra"`     // NEW
 	PackageManager     string   `json:"packageManager"`
 
 	// Folder intent signals
@@ -184,10 +188,14 @@ func (s *SignalScanner) scanFileSystem() {
 			s.signals.HasReadme = true
 		case ".env.example", ".env.sample":
 			s.signals.HasEnvExample = true
-		case ".eslintrc", ".eslintrc.json", ".eslintrc.js", ".prettierrc":
+		case ".eslintrc", ".eslintrc.json", ".eslintrc.js", ".prettierrc",
+			"eslint.config.js", "eslint.config.mjs", "eslint.config.cjs":
 			s.signals.HasLinting = true
 		case "requirements.txt", "pyproject.toml":
 			s.signals.PackageManager = "pip"
+			s.manifestPaths = append(s.manifestPaths, path)
+		case "package.json", "go.mod", "pom.xml":
+			s.manifestPaths = append(s.manifestPaths, path)
 		}
 
 		// CI detection
@@ -240,69 +248,156 @@ func (s *SignalScanner) scanFileSystem() {
 
 // detectFrameworks - check config files only (no code parsing)
 func (s *SignalScanner) detectFrameworks() {
-	// Check package.json
-	if content, err := os.ReadFile(filepath.Join(s.repoPath, "package.json")); err == nil {
-		s.signals.PackageManager = "npm"
-		pkg := string(content)
-		if strings.Contains(pkg, "\"react\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "React")
+	seenFrameworks := make(map[string]bool)
+	seenDatabases := make(map[string]bool)
+	seenInfra := make(map[string]bool)
+
+	for _, path := range s.manifestPaths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
 		}
-		if strings.Contains(pkg, "\"vue\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Vue")
-		}
-		if strings.Contains(pkg, "\"@angular/core\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Angular")
-		}
-		if strings.Contains(pkg, "\"next\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Next.js")
-		}
-		if strings.Contains(pkg, "\"express\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Express")
-		}
-		if strings.Contains(pkg, "\"nestjs\"") || strings.Contains(pkg, "\"@nestjs/core\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "NestJS")
-		}
-		if strings.Contains(pkg, "\"prisma\"") || strings.Contains(pkg, "\"@prisma/client\"") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Prisma")
+
+		filename := filepath.Base(path)
+		fileContent := string(content)
+		lowerContent := strings.ToLower(fileContent)
+
+		switch filename {
+		case "package.json":
+			s.signals.PackageManager = "npm"
+
+			// Linting check in package.json (devDeps or scripts)
+			if strings.Contains(fileContent, "eslint") || strings.Contains(fileContent, "\"lint\":") {
+				s.signals.HasLinting = true
+			}
+
+			// Frameworks
+			if strings.Contains(fileContent, "\"react\"") {
+				seenFrameworks["React"] = true
+			}
+			if strings.Contains(fileContent, "\"vue\"") {
+				seenFrameworks["Vue"] = true
+			}
+			if strings.Contains(fileContent, "\"@angular/core\"") {
+				seenFrameworks["Angular"] = true
+			}
+			if strings.Contains(fileContent, "\"next\"") {
+				seenFrameworks["Next.js"] = true
+			}
+			if strings.Contains(fileContent, "\"express\"") {
+				seenFrameworks["Express"] = true
+			}
+			if strings.Contains(fileContent, "\"nestjs\"") || strings.Contains(fileContent, "\"@nestjs/core\"") {
+				seenFrameworks["NestJS"] = true
+			}
+
+			// Databases
+			if strings.Contains(fileContent, "\"prisma\"") || strings.Contains(fileContent, "\"@prisma/client\"") {
+				seenFrameworks["Prisma"] = true
+				seenDatabases["Prisma"] = true
+				seenDatabases["PostgreSQL"] = true // Prisma usually implies SQL
+			}
+			if strings.Contains(fileContent, "\"mongoose\"") || strings.Contains(fileContent, "\"mongodb\"") {
+				seenDatabases["MongoDB"] = true
+			}
+			if strings.Contains(fileContent, "\"pg\"") {
+				seenDatabases["PostgreSQL"] = true
+			}
+			if strings.Contains(fileContent, "\"mysql\"") || strings.Contains(fileContent, "\"mysql2\"") {
+				seenDatabases["MySQL"] = true
+			}
+
+			// Infra
+			if strings.Contains(lowerContent, "redis") {
+				seenInfra["Redis"] = true
+			}
+			if strings.Contains(lowerContent, "kafka") || strings.Contains(lowerContent, "kafkajs") {
+				seenInfra["Kafka"] = true
+			}
+			if strings.Contains(lowerContent, "amqplib") || strings.Contains(lowerContent, "rabbitmq") {
+				seenInfra["RabbitMQ"] = true
+			}
+
+		case "go.mod":
+			// Frameworks
+			if strings.Contains(fileContent, "gin-gonic/gin") {
+				seenFrameworks["Gin"] = true
+			}
+			if strings.Contains(fileContent, "gofiber/fiber") {
+				seenFrameworks["Fiber"] = true
+			}
+			if strings.Contains(fileContent, "labstack/echo") {
+				seenFrameworks["Echo"] = true
+			}
+			if strings.Contains(fileContent, "go-chi/chi") {
+				seenFrameworks["Chi"] = true
+			}
+			if strings.Contains(fileContent, "grpc") {
+				seenFrameworks["gRPC"] = true
+			}
+
+			// Databases
+			if strings.Contains(fileContent, "gorm.io/gorm") {
+				seenDatabases["GORM"] = true
+			}
+			if strings.Contains(fileContent, "lib/pq") || strings.Contains(fileContent, "pgx") {
+				seenDatabases["PostgreSQL"] = true
+			}
+			if strings.Contains(fileContent, "mongo-driver") {
+				seenDatabases["MongoDB"] = true
+			}
+
+			// Infra
+			if strings.Contains(fileContent, "redis/go-redis") {
+				seenInfra["Redis"] = true
+			}
+			if strings.Contains(fileContent, "segmentio/kafka-go") || strings.Contains(fileContent, "confluent-kafka-go") {
+				seenInfra["Kafka"] = true
+			}
+
+		case "requirements.txt", "pyproject.toml":
+			if strings.Contains(fileContent, "fastapi") || strings.Contains(fileContent, "FastAPI") {
+				seenFrameworks["FastAPI"] = true
+			}
+			if strings.Contains(fileContent, "django") || strings.Contains(fileContent, "Django") {
+				seenFrameworks["Django"] = true
+			}
+			if strings.Contains(fileContent, "flask") || strings.Contains(fileContent, "Flask") {
+				seenFrameworks["Flask"] = true
+			}
+
+			// Databases
+			if strings.Contains(lowerContent, "sqlalchemy") {
+				seenDatabases["SQLAlchemy"] = true
+			}
+			if strings.Contains(lowerContent, "psycopg2") {
+				seenDatabases["PostgreSQL"] = true
+			}
+			if strings.Contains(lowerContent, "pymongo") {
+				seenDatabases["MongoDB"] = true
+			}
+
+			// Infra
+			if strings.Contains(lowerContent, "redis") {
+				seenInfra["Redis"] = true
+			}
+
+			if strings.Contains(fileContent, "tensorflow") || strings.Contains(fileContent, "torch") ||
+				strings.Contains(fileContent, "sklearn") || strings.Contains(fileContent, "keras") {
+				s.signals.HasMLMarkers = true
+			}
 		}
 	}
 
-	// Check go.mod
-	if content, err := os.ReadFile(filepath.Join(s.repoPath, "go.mod")); err == nil {
-		mod := string(content)
-		if strings.Contains(mod, "gin-gonic/gin") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Gin")
-		}
-		if strings.Contains(mod, "gofiber/fiber") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Fiber")
-		}
-		if strings.Contains(mod, "labstack/echo") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Echo")
-		}
-		if strings.Contains(mod, "go-chi/chi") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Chi")
-		}
-		if strings.Contains(mod, "grpc") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "gRPC")
-		}
+	// Convert maps to slices
+	for k := range seenFrameworks {
+		s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, k)
 	}
-
-	// Check requirements.txt / pyproject.toml
-	if content, err := os.ReadFile(filepath.Join(s.repoPath, "requirements.txt")); err == nil {
-		req := string(content)
-		if strings.Contains(req, "fastapi") || strings.Contains(req, "FastAPI") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "FastAPI")
-		}
-		if strings.Contains(req, "django") || strings.Contains(req, "Django") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Django")
-		}
-		if strings.Contains(req, "flask") || strings.Contains(req, "Flask") {
-			s.signals.DetectedFrameworks = append(s.signals.DetectedFrameworks, "Flask")
-		}
-		if strings.Contains(req, "tensorflow") || strings.Contains(req, "torch") ||
-			strings.Contains(req, "sklearn") || strings.Contains(req, "keras") {
-			s.signals.HasMLMarkers = true
-		}
+	for k := range seenDatabases {
+		s.signals.DetectedDatabases = append(s.signals.DetectedDatabases, k)
+	}
+	for k := range seenInfra {
+		s.signals.DetectedInfra = append(s.signals.DetectedInfra, k)
 	}
 }
 
@@ -388,19 +483,4 @@ func ComputeSignalConfidence(signals *FastSignals) *SignalConfidenceVector {
 // computeConfidence - calculate confidence vector
 func (s *SignalScanner) computeConfidence() {
 	s.confidence = ComputeSignalConfidence(s.signals)
-}
-
-// Helper functions
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

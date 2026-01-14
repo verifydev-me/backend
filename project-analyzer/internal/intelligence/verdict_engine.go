@@ -165,7 +165,11 @@ func (e *VerdictEngine) calculateArchitectureMaturity() int {
 		score += 1
 	}
 
-	return int(min(score, 10))
+	// Cap at 10
+	if score > 10 {
+		score = 10
+	}
+	return int(score)
 }
 
 // calculateOverallScore returns 0-100 score
@@ -187,13 +191,13 @@ func (e *VerdictEngine) calculateOverallScore() float64 {
 		baseScore += 2
 	}
 
-	// Penalties
-	if !e.signals.HasTests && e.signals.CodeFiles > 10 {
-		baseScore -= 10
-	}
-	if !e.signals.HasCI && e.intent == IntentProduction {
-		baseScore -= 5
-	}
+	// Penalties REMOVED for user happiness
+	// if !e.signals.HasTests && e.signals.CodeFiles > 10 {
+	// 	baseScore -= 10
+	// }
+	// if !e.signals.HasCI && e.intent == IntentProduction {
+	// 	baseScore -= 5
+	// }
 
 	// Authenticity Adjustments (Git Forensics)
 	if e.authorship != nil {
@@ -205,7 +209,11 @@ func (e *VerdictEngine) calculateOverallScore() float64 {
 		}
 	}
 
-	return min(baseScore, 100)
+	// Cap at 100
+	if baseScore > 100 {
+		baseScore = 100
+	}
+	return baseScore
 }
 
 // extractKeySignals returns bullet points of detected patterns

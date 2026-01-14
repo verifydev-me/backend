@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package user;
+
+import "common/types.proto";
+import "common/errors.proto";
+
+// ==================== USER SERVICE ====================
+
+service UserService {
+  // Get user by ID
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  
+  // Get multiple users in batch (optimization for parallel calls)
+  rpc BatchGetUsers(BatchGetUsersRequest) returns (BatchGetUsersResponse);
+  
+  // Search candidates with filters
+  rpc SearchCandidates(SearchCandidatesRequest) returns (SearchCandidatesResponse);
+  
+  // Get user with full profile details
+  rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
+  
+  // Update user profile
+  rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
+  
+  // Stream user updates (real-time)
+  rpc WatchUserUpdates(WatchUserRequest) returns (stream UserUpdateEvent);
+}
+
+// ==================== MESSAGES ====================
+
+// User message
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string username = 4;
+  string avatar_url = 5;
+  int32 aura_score = 6;
+  common.UserProfile profile = 7;
+  repeated common.Skill skills = 8;
+  repeated common.Experience experiences = 9;
+  repeated common.Education education = 10;
+  repeated common.Project projects = 11;
+  common.Timestamp created_at = 12;
+  common.Timestamp updated_at = 13;
+}
+
+// Get User Request
+message GetUserRequest {
+  string user_id = 1;
+  repeated string fields = 2; // Optional: specific fields to return
+}
+
+message GetUserResponse {
+  User user = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Batch Get Users Request
+message BatchGetUsersRequest {
+  repeated string user_ids = 1;
+  repeated string fields = 2; // Optional: specific fields to return
+}
+
+message BatchGetUsersResponse {
+  repeated User users = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Search Candidates Request
+message SearchCandidatesRequest {
+  repeated string skills = 1;
+  int32 min_aura_score = 2;
+  string location_city = 3;
+  string location_country = 4;
+  common.ExperienceLevel min_experience_level = 5;
+  string availability = 6; // AVAILABLE, NOT_AVAILABLE, OPEN_TO_OFFERS
+  common.PaginationRequest pagination = 7;
+}
+
+message SearchCandidatesResponse {
+  repeated User candidates = 1;
+  common.PaginationResponse pagination = 2;
+  common.ErrorResponse error = 3;
+}
+
+// Get User Profile Request
+message GetUserProfileRequest {
+  string user_id = 1;
+  bool include_projects = 2;
+  bool include_skills = 3;
+  bool include_experiences = 4;
+  bool include_education = 5;
+}
+
+message GetUserProfileResponse {
+  User user = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Update User Profile Request
+message UpdateUserProfileRequest {
+  string user_id = 1;
+  common.UserProfile profile = 2;
+}
+
+message UpdateUserProfileResponse {
+  User user = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Watch User Updates (Streaming)
+message WatchUserRequest {
+  repeated string user_ids = 1; // Watch specific users
+}
+
+message UserUpdateEvent {
+  string user_id = 1;
+  string event_type = 2; // PROFILE_UPDATED, SKILL_ADDED, PROJECT_ADDED, AURA_CHANGED
+  User user = 3;
+  common.Timestamp timestamp = 4;
+}

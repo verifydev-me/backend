@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/user-service/src/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
@@ -24,7 +24,7 @@
   "author": "VerifyDev",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^6.19.1",
     "amqplib": "^0.10.3",
     "axios": "^1.6.2",
     "cors": "^2.8.5",
@@ -36,7 +36,9 @@
     "jsonwebtoken": "^9.0.2",
     "pino": "^8.17.1",
     "pino-pretty": "^10.3.0",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@grpc/grpc-js": "^1.9.13",
+    "@grpc/proto-loader": "^0.7.10"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",
@@ -47,7 +49,7 @@
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "eslint": "^8.56.0",
-    "prisma": "^5.7.0",
+    "prisma": "^6.19.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

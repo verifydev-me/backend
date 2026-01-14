@@ -41,7 +41,7 @@ model Recruiter {
   sessions          RecruiterSession[]
   savedCandidates   SavedCandidate[]
   candidateFeedback CandidateFeedback[]
-  messages          Message[]
+  messages          LegacyMessage[]
   interviews        Interview[]
   messageTemplates  MessageTemplate[]
 
@@ -184,8 +184,10 @@ model CandidateFeedback {
 }
 
 // ==================== MESSAGES ====================
+// DEPRECATED: Legacy message system - replaced by chat-service
+// Kept for backward compatibility with existing data
 
-model Message {
+model LegacyMessage {
   id          String @id @default(auto()) @map("_id") @db.ObjectId
   recruiterId String @map("recruiter_id") @db.ObjectId
   candidateId String @map("candidate_id") @db.ObjectId // User ID from user-service

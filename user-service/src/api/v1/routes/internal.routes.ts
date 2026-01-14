@@ -164,9 +164,15 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        skills: { orderBy: { verifiedScore: 'desc' } },
+        // Only get skills user has chosen to show to recruiters
+        skills: { 
+          where: { showToRecruiters: true },
+          orderBy: [{ isHighlighted: 'desc' }, { verifiedScore: 'desc' }] 
+        },
+        // Only get projects user has chosen to show to recruiters
         projects: {
-          orderBy: { overallScore: 'desc' },
+          where: { showToRecruiters: true },
+          orderBy: [{ isPinned: 'desc' }, { overallScore: 'desc' }],
         },
         experiences: { orderBy: { startDate: 'desc' } },
         socialLinks: true,
@@ -178,6 +184,16 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
         success: false,
         message: 'User not found',
         error: { code: 'NOT_FOUND' },
+      });
+      return;
+    }
+
+    // Check if user allows recruiter visibility
+    if (user.visibilityLevel === 'INVITE_ONLY') {
+      res.status(403).json({
+        success: false,
+        message: 'This profile is private',
+        error: { code: 'PRIVATE_PROFILE' },
       });
       return;
     }
@@ -200,13 +216,15 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
       isOpenToWork: user.isOpenToWork,
       isVerified: user.isVerified,
       
-      // Skills
+      // Skills (only those marked for recruiter visibility)
       allSkills: user.skills.map((s) => ({
+        id: s.id,
         name: s.name,
         category: s.category,
         score: s.verifiedScore,
         isVerified: s.isVerified,
         projectCount: s.projectCount,
+        isHighlighted: s.isHighlighted,
       })),
       topSkills: user.skills.slice(0, 5).map((s) => ({
         name: s.name,
@@ -214,7 +232,7 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
         isVerified: s.isVerified,
       })),
 
-      // Projects
+      // Projects (only those marked for recruiter visibility)
       analyzedProjects: user.projects.map((p) => ({
         id: p.id,
         repoName: p.repoName,
@@ -226,6 +244,7 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
         structureScore: p.structureScore || 0,
         stars: p.stars,
         forks: p.forks,
+        isPinned: p.isPinned,
         analyzedAt: p.analyzedAt?.toISOString(),
       })),
       topProjects: user.projects.slice(0, 3).map((p) => ({

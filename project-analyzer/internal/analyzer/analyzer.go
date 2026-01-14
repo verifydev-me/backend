@@ -14,6 +14,7 @@ import (
 	"github.com/verifydev/project-analyzer/internal/intelligence"
 	"github.com/verifydev/project-analyzer/internal/parser"
 	"github.com/verifydev/project-analyzer/internal/rabbitmq"
+	"github.com/verifydev/project-analyzer/pkg/dimensions"
 	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
@@ -308,6 +309,12 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	inferenceEngine := parser.NewInferenceEngine()
 	result.IndustryAnalysis = inferenceEngine.InferSkills(infraSignals)
 
+	// Fix #6: Apply authorship penalty to individual skills, not just overall score
+	// This prevents fake/copied projects from generating resume-ready skills
+	if result.AuthorshipVerdict != nil && result.IndustryAnalysis != nil {
+		applyAuthorshipPenaltyToSkills(result.IndustryAnalysis, result.AuthorshipVerdict)
+	}
+
 	// 3. Architecture Graph Generation
 	result.ArchitectureGraph = infraExtractor.GenerateArchitectureGraph()
 
@@ -333,6 +340,12 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	} else if intelligenceResult != nil && intelligenceResult.Verdict != nil {
 		// Map intelligence verdict to API response
 		result.IntelligenceVerdict = mapIntelligenceVerdict(intelligenceResult)
+
+		// ============================================
+		// DIMENSIONAL ANALYSIS INTEGRATION (Phase 5)
+		// ============================================
+		// Run dimensional analysis and enrich verdict with detailed scores
+		enrichVerdictWithDimensionalAnalysis(result, intelligenceResult, infraSignals)
 	}
 
 	// Calculate final totals
@@ -412,18 +425,29 @@ func filterSignalsByProjectType(result *signals.ProjectSignals, projectType stri
 		// Backend projects: remove frontend-specific signals
 		result.ReactSignals = nil
 
-		// Strict Skill Filtering for Backend
+		// Fix #1: Instead of removing skills, reduce their confidence
+		// This allows backend projects with legitimate frontend components (e.g., docs site)
+		// to retain those skills but with lower priority
 		if result.IndustryAnalysis != nil {
 			var filteredSkills []signals.VerifiedSkill
 			for _, skill := range result.IndustryAnalysis.VerifiedSkills {
-				if skill.Category != "frontend" {
+				if skill.Category == "frontend" {
+					// Fix #1: Reduce confidence instead of removing completely
+					// Backend projects with frontend skills get reduced confidence (40%)
+					skill.Confidence *= 0.4
+					skill.ResumeReady = false // Not primary for resume
+					// Only include if confidence is still above threshold
+					if skill.Confidence >= 0.2 {
+						filteredSkills = append(filteredSkills, skill)
+					}
+				} else {
 					filteredSkills = append(filteredSkills, skill)
 				}
 			}
 			result.IndustryAnalysis.VerifiedSkills = filteredSkills
 		}
 
-		// Filter Frameworks (remove React/Next/Vue)
+		// Filter Frameworks (remove React/Next/Vue) - these still get removed from primary list
 		var filteredFrameworks []string
 		for _, fw := range result.Frameworks {
 			if fw != "React" && fw != "Vue.js" && fw != "Angular" && fw != "Svelte" && fw != "Tailwind CSS" {
@@ -432,7 +456,7 @@ func filterSignalsByProjectType(result *signals.ProjectSignals, projectType stri
 		}
 		result.Frameworks = filteredFrameworks
 
-		log.Debug().Msg("Filtered out frontend signals for backend project")
+		log.Debug().Msg("Adjusted frontend skill confidence for backend project")
 
 	case "fullstack":
 		// Fullstack: keep everything
@@ -551,6 +575,66 @@ func enrichTechStack(result *signals.ProjectSignals, infra *signals.Infrastructu
 				uniqueTech[name] = true
 			}
 		}
+	}
+}
+
+// Fix #6: Apply authorship penalty to individual skills
+// Snapshot/copied projects should have reduced skill confidence
+// This prevents resume-ready skills from appearing for fake projects
+func applyAuthorshipPenaltyToSkills(analysis *signals.IndustryAnalysis, authorship *signals.AuthorshipVerdict) {
+	if authorship == nil || analysis == nil {
+		return
+	}
+
+	// Determine penalty multiplier based on authorship level
+	// NOTE: Penalties reduced to be less aggressive - real skill detection matters more
+	var penaltyMultiplier float64
+	switch authorship.Level {
+	case "SNAPSHOT":
+		// FURTHER REDUCED: Even snapshots have real skills - only 10% penalty
+		penaltyMultiplier = 0.90 // Keep 90% confidence (was 70%)
+	case "SUSPICIOUS":
+		// Minor penalty - some concerns about authenticity
+		penaltyMultiplier = 0.85 // Keep 85% confidence
+	case "ASSISTED":
+		// Very minor penalty - automated assistance is common and acceptable
+		penaltyMultiplier = 0.95 // Keep 95% confidence
+	case "ORGANIC":
+		// No penalty or bonus
+		if authorship.Confidence == "HIGH" {
+			penaltyMultiplier = 1.05 // 5% boost for verified organic
+		} else {
+			penaltyMultiplier = 1.0
+		}
+	default:
+		penaltyMultiplier = 1.0
+	}
+
+	// Apply penalty to all verified skills
+	for i := range analysis.VerifiedSkills {
+		skill := &analysis.VerifiedSkills[i]
+		skill.Confidence *= penaltyMultiplier
+
+		// Cap at 1.0
+		if skill.Confidence > 1.0 {
+			skill.Confidence = 1.0
+		}
+
+		// Update resume-ready flag based on new confidence
+		// Threshold is typically 0.4 (40%)
+		skill.ResumeReady = skill.Confidence >= 0.4
+	}
+
+	// Also update skills by category
+	for cat, skills := range analysis.SkillsByCategory {
+		for i := range skills {
+			skills[i].Confidence *= penaltyMultiplier
+			if skills[i].Confidence > 1.0 {
+				skills[i].Confidence = 1.0
+			}
+			skills[i].ResumeReady = skills[i].Confidence >= 0.4
+		}
+		analysis.SkillsByCategory[cat] = skills
 	}
 }
 
@@ -708,13 +792,95 @@ func mapIntelligenceVerdict(result *intelligence.PipelineResult) *signals.Intell
 	// Map skills
 	for _, skill := range v.ExtractedSkills {
 		verdict.ExtractedSkills = append(verdict.ExtractedSkills, signals.IntelligenceSkill{
-			Name:        skill.Name,
-			Category:    skill.Category,
-			Confidence:  skill.Confidence,
-			Evidence:    skill.Evidence,
-			ResumeReady: skill.ResumeReady,
+			Name:          skill.Name,
+			Category:      skill.Category,
+			Confidence:    skill.Confidence,
+			Evidence:      skill.Evidence,
+			ResumeReady:   skill.ResumeReady,
+			UsageVerified: skill.UsageVerified, // NEW: Pass through verification status
+			UsageStrength: skill.UsageStrength, // NEW: Pass through verification strength
 		})
 	}
 
 	return verdict
+}
+
+// enrichVerdictWithDimensionalAnalysis runs dimensional engine and enriches verdict
+func enrichVerdictWithDimensionalAnalysis(
+	result *signals.ProjectSignals,
+	intelligenceResult *intelligence.PipelineResult,
+	infraSignals *signals.InfrastructureSignals,
+) {
+	// Use the dimensional extractor to get scores
+	extractor := dimensions.NewDimensionExtractor(result, infraSignals)
+	dimMatrix := extractor.Extract()
+
+	// Enrich IntelligenceVerdict with dimensional data
+	if dimMatrix != nil && result.IntelligenceVerdict != nil {
+		result.IntelligenceVerdict.Dimensions = &signals.DimensionalScores{
+			Fundamentals: &signals.DimensionScoreData{
+				Score:      dimMatrix.Fundamentals.Score,
+				Confidence: dimMatrix.Fundamentals.Confidence,
+				Signals:    dimMatrix.Fundamentals.Signals,
+			},
+			EngineeringDepth: &signals.DimensionScoreData{
+				Score:      dimMatrix.EngineeringDepth.Score,
+				Confidence: dimMatrix.EngineeringDepth.Confidence,
+				Signals:    dimMatrix.EngineeringDepth.Signals,
+			},
+			ProductionReady: &signals.DimensionScoreData{
+				Score:      dimMatrix.ProductionReadiness.Score,
+				Confidence: dimMatrix.ProductionReadiness.Confidence,
+				Signals:    dimMatrix.ProductionReadiness.Signals,
+			},
+			TestingMaturity: &signals.DimensionScoreData{
+				Score:      dimMatrix.TestingMaturity.Score,
+				Confidence: dimMatrix.TestingMaturity.Confidence,
+				Signals:    dimMatrix.TestingMaturity.Signals,
+			},
+			Architecture: &signals.DimensionScoreData{
+				Score:      dimMatrix.Architecture.Score,
+				Confidence: dimMatrix.Architecture.Confidence,
+				Signals:    dimMatrix.Architecture.Signals,
+			},
+			InfraDevOps: &signals.DimensionScoreData{
+				Score:      dimMatrix.InfraDevOps.Score,
+				Confidence: dimMatrix.InfraDevOps.Confidence,
+				Signals:    dimMatrix.InfraDevOps.Signals,
+			},
+			OverallScore:     dimMatrix.OverallScore,
+			OverallBandLower: int(dimMatrix.OverallBand.Lower),
+			OverallBandUpper: int(dimMatrix.OverallBand.Upper),
+		}
+
+		log.Info().
+			Float64("dimOverall", dimMatrix.OverallScore).
+			Float64("fundamentals", dimMatrix.Fundamentals.Score).
+			Float64("engineering", dimMatrix.EngineeringDepth.Score).
+			Msg("🎯 Dimensional analysis complete")
+	}
+
+	// CRITICAL FIX: Sync Usage Verification from IntelligenceVerdict to IndustryAnalysis
+	// aura-processor reads IndustryAnalysis.VerifiedSkills for DB storage
+	if result.IntelligenceVerdict != nil && result.IndustryAnalysis != nil {
+		// Create map for fast lookup
+		verifiedMap := make(map[string]bool)
+		strengthMap := make(map[string]float64)
+
+		for _, s := range result.IntelligenceVerdict.ExtractedSkills {
+			if s.UsageVerified {
+				verifiedMap[s.Name] = true
+				strengthMap[s.Name] = s.UsageStrength
+			}
+		}
+
+		// Update IndustryAnalysis skills
+		for i := range result.IndustryAnalysis.VerifiedSkills {
+			skillName := result.IndustryAnalysis.VerifiedSkills[i].Name
+			if verifiedMap[skillName] {
+				result.IndustryAnalysis.VerifiedSkills[i].UsageVerified = true
+				result.IndustryAnalysis.VerifiedSkills[i].UsageStrength = strengthMap[skillName]
+			}
+		}
+	}
 }

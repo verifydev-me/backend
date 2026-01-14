@@ -32,11 +32,15 @@ export class JobController {
 
       // Create job with recruiter ID from authenticated user
       const jobService = new JobService();
-      const job = await jobService.createJob({
+      const jobData = {
         ...validation.data,
         recruiterId: req.user.userId,
         expiresAt: validation.data.expiresAt ? new Date(validation.data.expiresAt) : undefined,
-      });
+        // Convert null to undefined for optional number fields
+        salaryMin: validation.data.salaryMin ?? undefined,
+        salaryMax: validation.data.salaryMax ?? undefined,
+      };
+      const job = await jobService.createJob(jobData);
 
       res.status(201).json({
         success: true,

@@ -48,7 +48,7 @@ export class MessageService {
   static async sendMessage(input: SendMessageInput): Promise<MessageWithMeta> {
     logger.info({ recruiterId: input.recruiterId, candidateId: input.candidateId }, 'Sending message');
 
-    const message = await prisma.message.create({
+    const message = await prisma.legacyMessage.create({
       data: {
         recruiterId: input.recruiterId,
         candidateId: input.candidateId,
@@ -118,7 +118,7 @@ export class MessageService {
     }
 
     const [messages, total] = await Promise.all([
-      prisma.message.findMany({
+      prisma.legacyMessage.findMany({
         where,
         include: {
           recruiter: {
@@ -129,7 +129,7 @@ export class MessageService {
         skip,
         take: limit,
       }),
-      prisma.message.count({ where }),
+      prisma.legacyMessage.count({ where }),
     ]);
 
     return {
@@ -169,7 +169,7 @@ export class MessageService {
     };
 
     const [messages, total] = await Promise.all([
-      prisma.message.findMany({
+      prisma.legacyMessage.findMany({
         where,
         include: {
           recruiter: {
@@ -180,7 +180,7 @@ export class MessageService {
         skip,
         take: limit,
       }),
-      prisma.message.count({ where }),
+      prisma.legacyMessage.count({ where }),
     ]);
 
     return {
@@ -207,7 +207,7 @@ export class MessageService {
    * Mark message as read
    */
   static async markAsRead(messageId: string, recruiterId: string): Promise<boolean> {
-    const message = await prisma.message.updateMany({
+    const message = await prisma.legacyMessage.updateMany({
       where: {
         id: messageId,
         recruiterId,
@@ -226,7 +226,7 @@ export class MessageService {
    * Mark all messages from a candidate as read
    */
   static async markConversationAsRead(recruiterId: string, candidateId: string): Promise<number> {
-    const result = await prisma.message.updateMany({
+    const result = await prisma.legacyMessage.updateMany({
       where: {
         recruiterId,
         candidateId,
@@ -246,7 +246,7 @@ export class MessageService {
    * Get unread message count
    */
   static async getUnreadCount(recruiterId: string): Promise<number> {
-    return prisma.message.count({
+    return prisma.legacyMessage.count({
       where: {
         recruiterId,
         direction: 'CANDIDATE_TO_RECRUITER',
@@ -259,7 +259,7 @@ export class MessageService {
    * Archive a message
    */
   static async archiveMessage(messageId: string, recruiterId: string): Promise<boolean> {
-    const result = await prisma.message.updateMany({
+    const result = await prisma.legacyMessage.updateMany({
       where: {
         id: messageId,
         recruiterId,

@@ -2,7 +2,10 @@ package intelligence
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // ============================================
@@ -211,15 +214,24 @@ const (
 )
 
 type ExtractedSkill struct {
-	Name         string   `json:"name"`
-	Category     string   `json:"category"`
-	Confidence   int      `json:"confidence"` // 0-100
-	Evidence     []string `json:"evidence"`
-	ResumeReady  bool     `json:"resumeReady"`
-	UsageDepth   float64  `json:"-"` // Internal scoring
-	ArchUsage    float64  `json:"-"`
-	BestPractice float64  `json:"-"`
-	Complexity   float64  `json:"-"`
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Confidence  int      `json:"confidence"` // 0-100
+	Evidence    []string `json:"evidence"`
+	ResumeReady bool     `json:"resumeReady"`
+	// Internal scoring factors
+	UsageDepth   float64 `json:"-"` // Internal scoring
+	ArchUsage    float64 `json:"-"`
+	BestPractice float64 `json:"-"`
+	Complexity   float64 `json:"-"`
+
+	// NEW: Usage verification
+	UsageVerified bool    `json:"usageVerified"` // NEW
+	UsageStrength float64 `json:"usageStrength"` // NEW (0-1.0)
+
+	// NEW: Multipliers applied
+	AuthorshipMult float64 `json:"-"` // NEW
+	SecurityMult   float64 `json:"-"` // NEW
 }
 
 // ComputeConfidence calculates weighted skill confidence
@@ -228,10 +240,71 @@ func (s *ExtractedSkill) ComputeConfidence() {
 		(s.ArchUsage * SkillWeightArchitecture) +
 		(s.BestPractice * SkillWeightBestPractices) +
 		(s.Complexity * SkillWeightComplexity)
+
 	s.Confidence = int(raw * 100)
+	rawConfidence := s.Confidence // Store for logging
+
+	// INTELLIGENT BOOST: Evidence-based Authority
+	// If explicit evidence exists (files, configs), we shouldn't rely solely on usage depth heuristics.
+	// 1. Check for Config + Package confirmation (Highest Trust)
+	hasPackage := false
+	hasConfig := false
+	for _, e := range s.Evidence {
+		eLower := strings.ToLower(e)
+		if strings.Contains(eLower, "package.json") || strings.Contains(eLower, "go.mod") || strings.Contains(eLower, "pom.xml") {
+			hasPackage = true
+		}
+		if strings.Contains(eLower, "config") || strings.Contains(eLower, ".yml") || strings.Contains(eLower, ".json") || strings.Contains(eLower, "schema") {
+			hasConfig = true
+		}
+	}
+
+	// DEBUG: Log evidence analysis
+	log.Debug().
+		Str("skill", s.Name).
+		Int("rawConfidence", rawConfidence).
+		Int("evidenceCount", len(s.Evidence)).
+		Bool("hasPackage", hasPackage).
+		Bool("hasConfig", hasConfig).
+		Strs("evidence", s.Evidence).
+		Msg("🔍 Computing confidence")
+
+	// 2. Apply Boosts (ENHANCED: Higher confidence floors)
+	boostApplied := "none"
+	if hasPackage && hasConfig {
+		// Confirmed via dependency AND configuration -> Very High Confidence (95%+)
+		if s.Confidence < 95 {
+			s.Confidence = 95 // Increased from 90
+			boostApplied = "package+config → 95%"
+		}
+	} else if len(s.Evidence) >= 2 {
+		// Corroborated by multiple sources -> High Confidence (85%+)
+		if s.Confidence < 85 {
+			s.Confidence = 85 // Increased from 75
+			boostApplied = "multiple_evidence → 85%"
+		}
+	} else if len(s.Evidence) == 1 && (hasPackage || hasConfig) {
+		// Single strong evidence -> Good Base (75%+)
+		if s.Confidence < 75 {
+			s.Confidence = 75 // Increased from 60
+			boostApplied = "single_strong → 75%"
+		}
+	}
+
 	if s.Confidence > 100 {
 		s.Confidence = 100
 	}
+
+	// DEBUG: Log final result
+	if boostApplied != "none" {
+		log.Info().
+			Str("skill", s.Name).
+			Int("raw", rawConfidence).
+			Int("final", s.Confidence).
+			Str("boost", boostApplied).
+			Msg("✨ Evidence boost applied")
+	}
+
 	// Resume-ready if confidence > 60 and has evidence
 	s.ResumeReady = s.Confidence >= 60 && len(s.Evidence) > 0
 }

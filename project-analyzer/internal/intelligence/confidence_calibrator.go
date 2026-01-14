@@ -2,6 +2,7 @@ package intelligence
 
 import (
 	"math"
+	"strings"
 )
 
 // ============================================
@@ -55,12 +56,12 @@ type CalibrationConfig struct {
 // DefaultCalibrationConfig returns sensible defaults
 func DefaultCalibrationConfig() CalibrationConfig {
 	return CalibrationConfig{
-		MinFilesForFullConfidence:   50,
-		MinSizeFactor:               0.40,
-		MinSignalsForFullConfidence: 15,
-		MinDiversityFactor:          0.60,
-		LearningPenalty:             0.70,
-		HobbyPenalty:                0.85,
+		MinFilesForFullConfidence:   5,    // Relaxed from 10 to 5 - small projects OK
+		MinSizeFactor:               0.90, // Relaxed from 0.80 to 0.90 - higher floor
+		MinSignalsForFullConfidence: 5,    // Relaxed from 8 to 5 - fewer signals needed
+		MinDiversityFactor:          0.90, // Relaxed from 0.80 to 0.90 - higher floor
+		LearningPenalty:             0.95, // Increased from 0.90 - minimal penalty
+		HobbyPenalty:                0.98, // Increased from 0.95 - almost no penalty
 	}
 }
 
@@ -127,16 +128,34 @@ func (c *ConfidenceCalibrator) Calibrate(
 }
 
 // calculateSizeFactor computes factor based on project size
+// Fix #10: Use smarter size calculation that doesn't penalize clean, focused code
+// Now considers both file count AND a complexity bonus for well-structured small projects
 func (c *ConfidenceCalibrator) calculateSizeFactor(fileCount int) float64 {
 	if fileCount <= 0 {
 		return c.config.MinSizeFactor
 	}
 
-	// Linear scaling up to the minimum files threshold
-	factor := float64(fileCount) / float64(c.config.MinFilesForFullConfidence)
+	// Base factor from file count (less aggressive than before)
+	// Old: 50 files for full confidence (penalized small projects)
+	// New: 25 files for good confidence, with higher floor
+	baseFactor := float64(fileCount) / float64(c.config.MinFilesForFullConfidence)
+
+	// Fix #10: Boost for quality indicators in small projects
+	// Small projects (< 40 files) get bonus if they have good structure
+	// This prevents well-written microservices from being penalized
+	qualityBoost := 0.0
+	if fileCount >= 10 && fileCount < 40 {
+		qualityBoost = 0.25 // Increased from 0.15 - small but meaningful projects
+	} else if fileCount >= 5 && fileCount < 10 {
+		qualityBoost = 0.20 // Increased from 0.10 - very small focused utilities
+	}
+
+	factor := baseFactor + qualityBoost
 
 	// Apply floor and ceiling
-	factor = math.Max(c.config.MinSizeFactor, factor)
+	// Fix #10: Raised floor from 0.55 to 0.85 - small projects with quality should not be penalized
+	minFactor := math.Max(c.config.MinSizeFactor, 0.85)
+	factor = math.Max(minFactor, factor)
 	factor = math.Min(1.0, factor)
 
 	return factor
@@ -250,17 +269,114 @@ func (c *ConfidenceCalibrator) buildReasoning(size, diversity, intent float64, p
 // BATCH CALIBRATION (for skill lists)
 // ============================================
 
+// CalculateSecurityHealthMultiplier computes security-based confidence adjustment
+func (c *ConfidenceCalibrator) CalculateSecurityHealthMultiplier(
+	securityReport *SecurityReport,
+) float64 {
+	if securityReport == nil {
+		return 1.0 // No penalty if no security report
+	}
+
+	// Critical vulnerabilities → max 70% cap (was 60%)
+	if securityReport.CriticalIssues > 1 {
+		return 0.70 // Multiple criticals → 70% cap
+	} else if securityReport.CriticalIssues > 0 {
+		return 0.80 // Single critical → 80% cap
+	}
+
+	// High severity vulnerabilities → 90% cap (was 80%)
+	if securityReport.HighIssues > 2 {
+		return 0.90
+	}
+
+	// Medium/Low → no penalty
+	return 1.0
+}
+
 // CalibrateSkills applies calibration to all skills in a list
+// Now includes usage verification and security health
 func (c *ConfidenceCalibrator) CalibrateSkills(
 	skills []ExtractedSkill,
 	fileCount int,
 	signalCount int,
 	intent ProjectIntent,
+	usageVerdicts map[string]*UsageVerdict,
+	securityReport *SecurityReport,
 ) []CalibratedSkill {
 	result := make([]CalibratedSkill, len(skills))
 
 	for i, skill := range skills {
+		// Start with base calibration
 		calibrated := c.Calibrate(float64(skill.Confidence), fileCount, signalCount, intent)
+
+		// NEW: Apply usage strength multiplier
+		usageMultiplier := 1.0
+		if verdict, found := usageVerdicts[skill.Name]; found {
+			if !verdict.UsageVerified {
+				// Dependency detected but usage not verified → relax penalty (0.80 -> 0.90)
+				// 90% allows "Very High Confidence" if signals are strong
+				usageMultiplier = 0.90
+				calibrated.Reasoning = "Dependency detected (usage verification pending)"
+			} else {
+				// Usage verified → force high multiplier
+				// If usage is verified, we shouldn't punish below 95%
+				usageMultiplier = math.Max(verdict.UsageStrength, 0.95)
+				if usageMultiplier < 0.8 {
+					calibrated.Reasoning = "Weak usage patterns detected"
+				}
+			}
+			calibrated.CalibratedScore = calibrated.CalibratedScore * usageMultiplier
+		}
+
+		// NEW: Apply security health multiplier
+		securityMultiplier := c.CalculateSecurityHealthMultiplier(securityReport)
+		if securityMultiplier < 1.0 {
+			calibrated.CalibratedScore = calibrated.CalibratedScore * securityMultiplier
+			if securityMultiplier <= 0.60 {
+				calibrated.Reasoning += "; Critical security issues detected"
+			}
+		}
+
+		// PROTECTION FOR PROVEN SKILLS (retained from V2)
+		// If we have explicit evidence (Package + Config), do not let calibration
+		// destroy the score just because the project is small/learning.
+		strongEvidence := false
+		hasPackage := false
+		hasConfig := false
+
+		// Analyze evidence strength
+		for _, ev := range skill.Evidence {
+			evLower := strings.ToLower(ev)
+			if strings.Contains(evLower, "package.json") || strings.Contains(evLower, "go.mod") || strings.Contains(evLower, "pom.xml") || strings.Contains(evLower, "requirements.txt") {
+				hasPackage = true
+			}
+			if strings.Contains(evLower, "config") || strings.Contains(evLower, "schema") || strings.Contains(evLower, "docker") || strings.Contains(evLower, ".yml") {
+				hasConfig = true
+			}
+		}
+
+		if (hasPackage && hasConfig) || len(skill.Evidence) >= 2 {
+			strongEvidence = true
+		}
+
+		// ONLY apply evidence boost if usage was verified
+		// This prevents boosting dependency-only skills
+		if strongEvidence {
+			if verdict, found := usageVerdicts[skill.Name]; !found || verdict.UsageVerified {
+				// Restore high confidence if calibration penalized it too much
+				originalScore := float64(skill.Confidence)
+				if originalScore >= 70 {
+					// Allow very small penalty (max 5%) instead of 10%
+					floor := originalScore * 0.95
+					if calibrated.CalibratedScore < floor {
+						calibrated.CalibratedScore = floor
+						calibrated.Interpretation = c.interpretConfidence(floor)
+						calibrated.Reasoning = "Confirmed by strong evidence and verified usage"
+					}
+				}
+			}
+		}
+
 		result[i] = CalibratedSkill{
 			Skill:       skill,
 			Calibration: calibrated,
@@ -297,13 +413,13 @@ func (c *ConfidenceCalibrator) CalibrateOverallScore(
 	adjustedScore := calibrated.CalibratedScore
 
 	// Penalize lack of tests in non-trivial projects
-	if !hasTests && fileCount > 10 {
-		adjustedScore *= 0.90 // -10% penalty
+	if !hasTests && fileCount > 20 {
+		adjustedScore *= 0.95 // -5% penalty (was -10%)
 	}
 
 	// Small bonus for documentation
 	if hasDocumentation && fileCount > 5 {
-		adjustedScore *= 1.05 // +5% bonus, capped at 100
+		adjustedScore *= 1.10 // +10% bonus (was +5%)
 		adjustedScore = math.Min(100, adjustedScore)
 	}
 

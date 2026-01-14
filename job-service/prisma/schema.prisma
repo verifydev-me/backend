@@ -70,7 +70,7 @@ model Job {
   // Relations
   applications Application[]
   interviews   Interview[]
-  messages     Message[]
+  messages     LegacyMessage[]
   savedByUsers SavedJob[]
 
   @@index([category])
@@ -130,7 +130,7 @@ model Application {
 
   // Relations
   interviews Interview[]
-  messages   Message[]
+  messages   LegacyMessage[]
 
   @@unique([jobId, userId])
   @@map("applications")
@@ -176,7 +176,9 @@ model Interview {
   @@map("interviews")
 }
 
-model Message {
+// DEPRECATED: Legacy message system - replaced by chat-service
+// Kept for backward compatibility with existing data
+model LegacyMessage {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   // References

@@ -205,22 +205,22 @@ export class AnalyticsService {
       }),
       
       // Sent messages
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'RECRUITER_TO_CANDIDATE' },
       }),
       
       // Received messages
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'CANDIDATE_TO_RECRUITER' },
       }),
       
       // Unread messages
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'CANDIDATE_TO_RECRUITER', readAt: null },
       }),
       
       // Recent messages
-      prisma.message.findMany({
+      prisma.legacyMessage.findMany({
         where: { recruiterId },
         orderBy: { sentAt: 'desc' },
         take: 5,
@@ -406,13 +406,13 @@ export class AnalyticsService {
     weeklyVolume: { week: string; sent: number; received: number }[];
   }> {
     const [sentCount, receivedCount, topCandidates] = await Promise.all([
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'RECRUITER_TO_CANDIDATE' },
       }),
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'CANDIDATE_TO_RECRUITER' },
       }),
-      prisma.message.groupBy({
+      prisma.legacyMessage.groupBy({
         by: ['candidateId'],
         where: { recruiterId },
         _count: { id: true },
@@ -522,7 +522,7 @@ export class AnalyticsService {
     metadata: Record<string, any>;
   }[]> {
     const [messages, interviews, savedCandidates, feedback] = await Promise.all([
-      prisma.message.findMany({
+      prisma.legacyMessage.findMany({
         where: { recruiterId },
         orderBy: { sentAt: 'desc' },
         take: limit,
@@ -625,7 +625,7 @@ export class AnalyticsService {
     const [saved, pending, unread, upcoming] = await Promise.all([
       prisma.savedCandidate.count({ where: { recruiterId } }),
       prisma.interview.count({ where: { recruiterId, status: 'PENDING' } }),
-      prisma.message.count({
+      prisma.legacyMessage.count({
         where: { recruiterId, direction: 'CANDIDATE_TO_RECRUITER', readAt: null },
       }),
       prisma.interview.count({

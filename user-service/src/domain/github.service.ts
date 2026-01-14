@@ -177,6 +177,34 @@ export class GitHubService {
   }
 
   /**
+   * Get language breakdown for repository
+   */
+  static async getRepoLanguages(repoUrl: string, userToken?: string): Promise<Record<string, number>> {
+    try {
+      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (!match) {
+        return {};
+      }
+
+      const [, owner, repoName] = match;
+      const cleanRepoName = repoName.replace(/\.git$/, '');
+
+      const headers = this.getAuthHeaders(userToken);
+      const response = await fetch(`${GITHUB_API}/repos/${owner}/${cleanRepoName}/languages`, { headers });
+
+      if (!response.ok) {
+        logger.warn({ repoUrl, status: response.status }, 'Failed to fetch repo languages');
+        return {};
+      }
+
+      return (await response.json()) as Record<string, number>;
+    } catch (error) {
+      logger.error({ error, repoUrl }, 'Error fetching repo languages');
+      return {};
+    }
+  }
+
+  /**
    * Get user's pinned repos (uses GraphQL API, no auth for public data)
    */
   static async getPinnedRepos(username: string, userToken?: string): Promise<GitHubRepo[]> {

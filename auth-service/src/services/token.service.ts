@@ -83,9 +83,16 @@ export class TokenService {
       }
 
       // Verify session exists
+      const sessionKey = `session:${payload.userId}:${payload.sessionId}`;
       const sessionValid = await sessionStore.get(payload.userId, payload.sessionId);
+      
       if (!sessionValid) {
-        logger.debug({ userId: payload.userId, sessionId: payload.sessionId }, 'Session not found');
+        logger.debug({ 
+          userId: payload.userId, 
+          sessionId: payload.sessionId,
+          sessionKey,
+          error: 'Session lookup failed in Redis'
+        }, 'Session not found');
         return null;
       }
 

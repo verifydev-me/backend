@@ -120,11 +120,12 @@ export class RecruiterAuthService {
     email: string;
     password: string;
     name: string;
+    position: string;
     organizationName: string;
-    organizationWebsite?: string;
-    organizationType?: string;
-    organizationSize?: string;
-    position?: string;
+    organizationWebsite: string;
+    industry: string;
+    organizationSize: 'STARTUP' | 'SMALL' | 'MEDIUM' | 'LARGE' | 'ENTERPRISE';
+    organizationDescription?: string;
   }): Promise<{
     success: boolean;
     recruiter?: Omit<Recruiter, 'passwordHash'>;
@@ -157,7 +158,9 @@ export class RecruiterAuthService {
             name: data.organizationName,
             slug: orgSlug,
             website: data.organizationWebsite,
-            size: (data.organizationSize as any) || 'STARTUP',
+            industry: data.industry,
+            description: data.organizationDescription,
+            size: data.organizationSize,
             isVerified: false,
           },
         });

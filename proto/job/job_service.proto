@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package job;
+
+import "common/types.proto";
+import "common/errors.proto";
+
+// ==================== JOB SERVICE ====================
+
+service JobService {
+  // Get job by ID
+  rpc GetJob(GetJobRequest) returns (GetJobResponse);
+  
+  // Get applications for a job
+  rpc GetApplications(GetApplicationsRequest) returns (GetApplicationsResponse);
+  
+  // Get application by ID
+  rpc GetApplication(GetApplicationRequest) returns (GetApplicationResponse);
+  
+  // Update application status
+  rpc UpdateApplicationStatus(UpdateApplicationStatusRequest) returns (UpdateApplicationStatusResponse);
+  
+  // Add note to application
+  rpc AddApplicationNote(AddApplicationNoteRequest) returns (AddApplicationNoteResponse);
+  
+  // Get recruiter's jobs
+  rpc GetRecruiterJobs(GetRecruiterJobsRequest) returns (GetRecruiterJobsResponse);
+  
+  // Stream application updates (real-time)
+  rpc StreamApplicationUpdates(StreamApplicationsRequest) returns (stream ApplicationUpdateEvent);
+}
+
+// ==================== MESSAGES ====================
+
+// Job message
+message Job {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string company = 4;
+  string company_logo = 5;
+  common.Location location = 6;
+  common.LocationType location_type = 7;
+  common.EmploymentType employment_type = 8;
+  common.ExperienceLevel experience_level = 9;
+  repeated string required_skills = 10;
+  repeated string preferred_skills = 11;
+  int32 min_salary = 12;
+  int32 max_salary = 13;
+  string currency = 14;
+  string recruiter_id = 15;
+  int32 applicant_count = 16;
+  string status = 17; // DRAFT, PUBLISHED, CLOSED
+  common.Timestamp created_at = 18;
+  common.Timestamp updated_at = 19;
+  common.Timestamp deadline = 20;
+}
+
+// Application message
+message Application {
+  string id = 1;
+  string job_id = 2;
+  string user_id = 3;
+  string recruiter_id = 4;
+  common.ApplicationStatus status = 5;
+  string cover_letter = 6;
+  string resume_url = 7;
+  repeated ApplicationNote notes = 8;
+  int32 match_score = 9;
+  common.Timestamp applied_at = 10;
+  common.Timestamp updated_at = 11;
+}
+
+// Application Note
+message ApplicationNote {
+  string id = 1;
+  string application_id = 2;
+  string author_id = 3;
+  string author_name = 4;
+  string content = 5;
+  common.Timestamp created_at = 6;
+}
+
+// Get Job Request
+message GetJobRequest {
+  string job_id = 1;
+}
+
+message GetJobResponse {
+  Job job = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Get Applications Request
+message GetApplicationsRequest {
+  string job_id = 1;
+  common.ApplicationStatus status = 2; // Filter by status (optional)
+  common.PaginationRequest pagination = 3;
+}
+
+message GetApplicationsResponse {
+  repeated Application applications = 1;
+  common.PaginationResponse pagination = 2;
+  common.ErrorResponse error = 3;
+}
+
+// Get Application Request
+message GetApplicationRequest {
+  string application_id = 1;
+}
+
+message GetApplicationResponse {
+  Application application = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Update Application Status Request
+message UpdateApplicationStatusRequest {
+  string application_id = 1;
+  common.ApplicationStatus status = 2;
+  string reason = 3; // Optional reason for status change
+}
+
+message UpdateApplicationStatusResponse {
+  Application application = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Add Application Note Request
+message AddApplicationNoteRequest {
+  string application_id = 1;
+  string author_id = 2;
+  string content = 3;
+}
+
+message AddApplicationNoteResponse {
+  ApplicationNote note = 1;
+  common.ErrorResponse error = 2;
+}
+
+// Get Recruiter Jobs Request
+message GetRecruiterJobsRequest {
+  string recruiter_id = 1;
+  string status = 2; // DRAFT, PUBLISHED, CLOSED (optional filter)
+  common.PaginationRequest pagination = 3;
+}
+
+message GetRecruiterJobsResponse {
+  repeated Job jobs = 1;
+  common.PaginationResponse pagination = 2;
+  common.ErrorResponse error = 3;
+}
+
+// Stream Applications Request
+message StreamApplicationsRequest {
+  string recruiter_id = 1;
+  repeated string job_ids = 2; // Optional: filter by specific jobs
+}
+
+message ApplicationUpdateEvent {
+  string application_id = 1;
+  string event_type = 2; // NEW_APPLICATION, STATUS_CHANGED, NOTE_ADDED
+  Application application = 3;
+  common.Timestamp timestamp = 4;
+}

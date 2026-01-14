@@ -26,6 +26,10 @@ type Pipeline struct {
 	preComputedSignals    *FastSignals
 	preComputedConfidence *SignalConfidenceVector
 	gitForensicsVerdict   *signals.AuthorshipVerdict
+
+	// NEW: Context
+	astReport      *ASTReport
+	securityReport *SecurityReport
 }
 
 // PipelineResult contains complete analysis output
@@ -239,6 +243,17 @@ func (p *Pipeline) checkEarlyExit(confidence *SignalConfidenceVector, signals *F
 		ConfidenceAtExit: confidence.OverallConfidence(),
 	}
 
+	// CRITICAL: Never early-exit ML/Data Science projects
+	// ML projects often use Jupyter notebooks (.ipynb) which aren't counted as code files,
+	// leading to premature termination before ML-specific analysis runs
+	if p.userProjectType == "ml" || p.hasMLSignals(signals) {
+		log.Debug().
+			Str("userProjectType", p.userProjectType).
+			Bool("hasMLSignals", p.hasMLSignals(signals)).
+			Msg("Skipping early exit for ML/Data Science project")
+		return decision // ShouldExit = false
+	}
+
 	// Rule 1: High confidence threshold (weighted > 80%)
 	if confidence.OverallConfidence() > 0.80 {
 		// Check for blocking risks
@@ -317,6 +332,26 @@ func (p *Pipeline) hasStrongPatternConsistency(signals *FastSignals) bool {
 	return false
 }
 
+// hasMLSignals detects if project has ML/Data Science characteristics
+func (p *Pipeline) hasMLSignals(signals *FastSignals) bool {
+	// Check for ML markers (sklearn, tensorflow, pytorch, etc.)
+	if signals.HasMLMarkers {
+		return true
+	}
+
+	// Check for Jupyter notebooks
+	if signals.HasNotebooks {
+		return true
+	}
+
+	// Python-dominant projects are often ML/DS
+	if signals.DominantLanguage == "Python" || signals.DominantLanguage == "Jupyter Notebook" {
+		return true
+	}
+
+	return false
+}
+
 // extractBasicSkills extracts skills with minimal analysis (for early exit)
 func (p *Pipeline) extractBasicSkills(signals *FastSignals) []ExtractedSkill {
 	skills := []ExtractedSkill{}
@@ -343,6 +378,49 @@ func (p *Pipeline) extractBasicSkills(signals *FastSignals) []ExtractedSkill {
 		}
 		skill.ComputeConfidence()
 		skills = append(skills, skill)
+	}
+
+	// Databases (Basic extraction)
+	for _, db := range signals.DetectedDatabases {
+		skill := ExtractedSkill{
+			Name:       db,
+			Category:   "Database",
+			Evidence:   []string{"Database detected in configuration"},
+			UsageDepth: 0.7,
+		}
+		skill.ComputeConfidence()
+		skills = append(skills, skill)
+	}
+
+	// Infra (Basic extraction)
+	for _, infra := range signals.DetectedInfra {
+		skill := ExtractedSkill{
+			Name:       infra,
+			Category:   "Infrastructure",
+			Evidence:   []string{"Infrastructure detecting in configuration"},
+			UsageDepth: 0.7,
+		}
+		skill.ComputeConfidence()
+		skills = append(skills, skill)
+	}
+
+	// USAGE VERIFICATION (CRITICAL FIX)
+	// Even for early exit, we MUST verify usage to show the "Verified" badge.
+	// Since early exit implies small project, this file walk is cheap.
+	usageVerdicts := VerifyAllUsage(p.repoPath, signals)
+
+	for i := range skills {
+		if verdict, ok := usageVerdicts[skills[i].Name]; ok {
+			skills[i].UsageVerified = verdict.UsageVerified
+			skills[i].UsageStrength = verdict.UsageStrength
+			for _, ev := range verdict.Evidence {
+				skills[i].Evidence = append(skills[i].Evidence, ev.Description)
+			}
+			// Apply boost to confidence if verified
+			if skills[i].UsageVerified && skills[i].Confidence < 90 {
+				skills[i].Confidence = 90
+			}
+		}
 	}
 
 	return skills
@@ -412,6 +490,33 @@ func (p *Pipeline) extractSkills(signals *FastSignals, confidence *SignalConfide
 			ArchUsage:  confidence.FrameworkConfidence,
 		}
 		skill.ComputeConfidence()
+		skills = append(skills, skill)
+	}
+
+	// CRITICAL FIX: Add Database loops (was missing!)
+	// Databases with context
+	for _, db := range signals.DetectedDatabases {
+		skill := ExtractedSkill{
+			Name:       db,
+			Category:   "Database",
+			Evidence:   []string{"Database detected in configuration"},
+			UsageDepth: 0.7,
+			ArchUsage:  confidence.FrameworkConfidence,
+		}
+		skill.ComputeConfidence() // Will get boosted to 85-95% with package.json + schema evidence!
+		skills = append(skills, skill)
+	}
+
+	// Infrastructure/Messaging (Kafka, Redis, RabbitMQ)
+	for _, infra := range signals.DetectedInfra {
+		skill := ExtractedSkill{
+			Name:       infra,
+			Category:   "Infrastructure",
+			Evidence:   []string{"Infrastructure detected in configuration"},
+			UsageDepth: 0.7,
+			ArchUsage:  confidence.InfraConfidence,
+		}
+		skill.ComputeConfidence() // Will get boosted with docker-compose + package evidence!
 		skills = append(skills, skill)
 	}
 
@@ -492,7 +597,121 @@ func (p *Pipeline) extractSkills(signals *FastSignals, confidence *SignalConfide
 		skills = append(skills, skill)
 	}
 
-	return skills
+	// ==========================================
+	// NEW: USAGE VERIFICATION & BOOSTS
+	// ==========================================
+
+	// 1. Verify actual usage
+	usageVerdicts := VerifyAllUsage(p.repoPath, signals)
+
+	// Update skills with verification data (for UI/debugging)
+	for i := range skills {
+		if verdict, ok := usageVerdicts[skills[i].Name]; ok {
+			skills[i].UsageVerified = verdict.UsageVerified
+			skills[i].UsageStrength = verdict.UsageStrength
+			// Add evidence from verification
+			for _, ev := range verdict.Evidence {
+				skills[i].Evidence = append(skills[i].Evidence, ev.Description)
+			}
+		}
+	}
+
+	// 2. Apply AST & Security Boosts
+	applyASTSecurityBoosts(skills, p.astReport, p.securityReport)
+
+	// 3. Calibrate with ALL factors
+	calibrator := NewConfidenceCalibrator()
+	calibratedSkills := calibrator.CalibrateSkills(
+		skills,
+		signals.TotalFiles,
+		countSignals(signals),
+		getIntent(p.userProjectType), // Helper to convert string to Intent
+		usageVerdicts,                // Usage Verification
+		p.securityReport,             // Security Health
+	)
+
+	// 4. Convert back to ExtractedSkill and Filter
+	finalSkills := []ExtractedSkill{}
+	for i, cal := range calibratedSkills {
+		// Update original skill confidence
+		skills[i].Confidence = int(cal.Calibration.CalibratedScore)
+		skills[i].ResumeReady = skills[i].Confidence >= 40 // Strict 40% threshold based on usage
+
+		// Map multipliers for transparency
+		if verdict, ok := usageVerdicts[skills[i].Name]; ok {
+			skills[i].UsageStrength = verdict.UsageStrength
+		}
+		// Security multiplier is derived in calibrator, not stored directly yet,
+		// but effect is in final score.
+
+		finalSkills = append(finalSkills, skills[i])
+	}
+
+	return finalSkills
+}
+
+func countSignals(s *FastSignals) int {
+	count := len(s.DetectedFrameworks) + len(s.DetectedDatabases) + len(s.DetectedInfra)
+	if s.HasTests {
+		count++
+	}
+	if s.HasDockerCompose {
+		count++
+	}
+	if s.HasCI {
+		count++
+	}
+	return count
+}
+
+func getIntent(projectType string) ProjectIntent {
+	if projectType == "LEARNING" {
+		return IntentLearning
+	} else if projectType == "HOBBY" {
+		return IntentHobby
+	} else if projectType == "ENTERPRISE" {
+		return IntentEnterprise
+	}
+	return IntentProduction
+}
+
+func applyASTSecurityBoosts(skills []ExtractedSkill, astReport *ASTReport, secReport *SecurityReport) {
+	if astReport == nil {
+		return
+	}
+
+	for i := range skills {
+		// Pointers to modify in place
+		skill := &skills[i]
+
+		// Go-specific boosts
+		if skill.Name == "Go" {
+			// Safe goroutine usage (+5)
+			if astReport.GoroutinePatterns.HasProperSync && astReport.GoroutinePatterns.PotentialLeaks == 0 {
+				skill.Confidence = minInt(100, skill.Confidence+5)
+			}
+			// Strong error handling (+5)
+			if astReport.ErrorHandling.ErrorHandlingRatio > 0.80 {
+				skill.Confidence = minInt(100, skill.Confidence+5)
+			}
+		}
+
+		// General Engineering boosts
+		if skill.Category == "Architecture" || skill.Category == "Backend" {
+			// Clean Code (+5)
+			if astReport.Complexity.Average < 10.0 && astReport.CodeOrganization.LongFunctions == 0 {
+				skill.Confidence = minInt(100, skill.Confidence+5)
+			}
+		}
+	}
+}
+
+// Helper
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // runStackAnalyzers executes stack-specific analyzers based on detected signals

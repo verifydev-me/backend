@@ -174,12 +174,78 @@ enum SkillSource {
 }
 
 enum SkillCategory {
-  LANGUAGE // JavaScript, Go, Python
-  FRAMEWORK // React, Express, Gin
-  DATABASE // PostgreSQL, MongoDB, Redis
-  DEVOPS // Docker, K8s, CI/CD
-  TOOL // Git, VS Code
-  SOFT_SKILL // Communication, Leadership
+  // Core categories
+  LANGUAGE         @map("language")
+  LANGUAGE_LEGACY  @map("LANGUAGE")
+  FRAMEWORK        @map("framework")
+  FRAMEWORK_LEGACY @map("FRAMEWORK")
+  LIBRARY          @map("library")
+  LIBRARY_LEGACY   @map("LIBRARY")
+  DATABASE         @map("database")
+  DATABASE_LEGACY  @map("DATABASE")
+
+  // DevOps & Infrastructure
+  DEVOPS                  @map("devops")
+  DEVOPS_LEGACY           @map("DEVOPS")
+  INFRASTRUCTURE          @map("infrastructure")
+  INFRASTRUCTURE_LEGACY   @map("INFRASTRUCTURE")
+  WEBSERVER               @map("webserver")
+  WEBSERVER_LEGACY        @map("WEBSERVER")
+  CI_CD                   @map("ci_cd")
+  CI_CD_LEGACY            @map("CI_CD")
+  CONTAINERIZATION        @map("containerization")
+  CONTAINERIZATION_LEGACY @map("CONTAINERIZATION")
+  ORCHESTRATION           @map("orchestration")
+  ORCHESTRATION_LEGACY    @map("ORCHESTRATION")
+  CLOUD                   @map("cloud")
+  CLOUD_LEGACY            @map("CLOUD")
+
+  // Tools & Testing
+  TOOL              @map("tool")
+  TOOL_LEGACY       @map("TOOL")
+  TESTING           @map("testing")
+  TESTING_LEGACY    @map("TESTING")
+  BUILD_TOOL        @map("build_tool")
+  BUILD_TOOL_LEGACY @map("BUILD_TOOL")
+  LINTING           @map("linting")
+  LINTING_LEGACY    @map("LINTING")
+
+  // Messaging & Caching
+  MESSAGING        @map("messaging")
+  MESSAGING_LEGACY @map("MESSAGING")
+  CACHE            @map("cache")
+  CACHE_LEGACY     @map("CACHE")
+  SEARCH           @map("search")
+  SEARCH_LEGACY    @map("SEARCH")
+
+  // Architecture & Patterns
+  ARCHITECTURE        @map("architecture")
+  ARCHITECTURE_LEGACY @map("ARCHITECTURE")
+
+  // Machine Learning & AI
+  ML        @map("ml")
+  ML_LEGACY @map("ML")
+
+  // Observability & Monitoring
+  OBSERVABILITY        @map("observability")
+  OBSERVABILITY_LEGACY @map("OBSERVABILITY")
+
+  // Patterns
+  PATTERN        @map("pattern")
+  PATTERN_LEGACY @map("PATTERN")
+
+  // Optimization categories (from aura-calculator)
+  PERFORMANCE          @map("performance")
+  PERFORMANCE_LEGACY   @map("PERFORMANCE")
+  SECURITY             @map("security")
+  SECURITY_LEGACY      @map("SECURITY")
+  STRUCTURE            @map("structure")
+  STRUCTURE_LEGACY     @map("STRUCTURE")
+  DOCUMENTATION        @map("documentation")
+  DOCUMENTATION_LEGACY @map("DOCUMENTATION")
+
+  // Soft skills
+  SOFT_SKILL
   OTHER
 }
 
@@ -243,8 +309,6 @@ model Project {
 
   // ========== ANALYSIS ==========
   analysisStatus AnalysisStatus @default(PENDING) @map("analysis_status")
-  analysisId     String?        @map("analysis_id") @db.ObjectId
-  fullAnalysis   Json?          @map("full_analysis")
   analyzedAt     DateTime?      @map("analyzed_at")
 
   // ========== SCORES ==========
@@ -267,7 +331,9 @@ model Project {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ========== RELATIONS ==========
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis ProjectAnalysis? // Detailed analysis in separate collection
 
   @@unique([userId, githubRepoUrl])
   @@index([userId])
@@ -283,6 +349,419 @@ enum AnalysisStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ==================== PROJECT ANALYSIS MODEL (STRUCTURED) ====================
+// Complete structured schema - NO JSON fields!
+// All analysis data as proper database fields for better querying and performance
+
+model ProjectAnalysis {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String @unique @map("project_id") @db.ObjectId
+
+  // ========== METADATA ==========
+  analyzerVersion String   @default("2.0.0") @map("analyzer_version")
+  processingTime  Int?     @map("processing_time") // milliseconds
+  analyzedAt      DateTime @default(now()) @map("analyzed_at")
+
+  // ========== FOLDER STRUCTURE ==========
+  hasSrcFolder      Boolean  @default(false) @map("has_src_folder")
+  hasComponents     Boolean  @default(false) @map("has_components")
+  hasUtils          Boolean  @default(false) @map("has_utils")
+  hasTests          Boolean  @default(false) @map("has_tests")
+  hasTypes          Boolean  @default(false) @map("has_types")
+  hasConfig         Boolean  @default(false) @map("has_config")
+  hasDocs           Boolean  @default(false) @map("has_docs")
+  hasApi            Boolean  @default(false) @map("has_api")
+  hasServices       Boolean  @default(false) @map("has_services")
+  hasModels         Boolean  @default(false) @map("has_models")
+  hasMiddleware     Boolean  @default(false) @map("has_middleware")
+  hasControllers    Boolean  @default(false) @map("has_controllers")
+  organizationScore Int      @default(0) @map("organization_score")
+  maxDepth          Int      @default(0) @map("max_depth")
+  topLevelFolders   String[] @default([]) @map("top_level_folders")
+
+  // ========== CODE QUALITY SIGNALS ==========
+  hasReadme        Boolean @default(false) @map("has_readme")
+  hasLicense       Boolean @default(false) @map("has_license")
+  hasGitignore     Boolean @default(false) @map("has_gitignore")
+  hasEnvExample    Boolean @default(false) @map("has_env_example")
+  hasDockerfile    Boolean @default(false) @map("has_dockerfile")
+  hasDockerCompose Boolean @default(false) @map("has_docker_compose")
+  hasCI            Boolean @default(false) @map("has_ci")
+  ciPlatform       String? @map("ci_platform") // "GitHub Actions", "GitLab CI", etc.
+  hasLinting       Boolean @default(false) @map("has_linting")
+  hasPrettier      Boolean @default(false) @map("has_prettier")
+  hasTypeScript    Boolean @default(false) @map("has_typescript")
+  hasMakefile      Boolean @default(false) @map("has_makefile")
+  testFilesCount   Int     @default(0) @map("test_files_count")
+  commentDensity   Int     @default(0) @map("comment_density")
+
+  // ========== PROJECT METRICS ==========
+  totalLines      Int    @default(0) @map("total_lines")
+  totalFiles      Int    @default(0) @map("total_files")
+  primaryLanguage String @default("Unknown") @map("primary_language")
+
+  // ========== TECH STACK ==========
+  languages      String[] @default([]) // ["TypeScript", "JavaScript"]
+  frameworks     String[] @default([]) // ["React", "Express"]
+  databases      String[] @default([]) // ["MongoDB", "Redis"]
+  tools          String[] @default([]) // ["Docker", "Vite"]
+  infrastructure String[] @default([]) // ["Nginx", "RabbitMQ"]
+
+  // ========== ARCHITECTURE ==========
+  architectureType          ArchitectureType? @map("architecture_type")
+  serviceCount              Int               @default(0) @map("service_count")
+  hasAPIGateway             Boolean           @default(false) @map("has_api_gateway")
+  hasMessageQueue           Boolean           @default(false) @map("has_message_queue")
+  hasSharedLibraries        Boolean           @default(false) @map("has_shared_libraries")
+  engineeringLevel          EngineeringLevel? @map("engineering_level")
+  architectureCommunication String[]          @default([]) @map("architecture_communication")
+  architecturePatterns      String[]          @default([]) @map("architecture_patterns")
+  architectureServiceNames  String[]          @default([]) @map("architecture_service_names")
+  architectureGateway       String?           @map("architecture_gateway")
+  infraSignalNames          String[]          @default([]) @map("infra_signal_names")
+
+  // ========== BEST PRACTICES ==========
+  bestPracticesFollowed String[] @default([]) @map("best_practices_followed")
+  bestPracticesMissing  String[] @default([]) @map("best_practices_missing")
+  bestPracticesScore    Int      @default(0) @map("best_practices_score")
+
+  // ========== SCORES (from breakdown) ==========
+  structureScore     Int @default(0) @map("structure_score")
+  codeQualityScore   Int @default(0) @map("code_quality_score")
+  testingScore       Int @default(0) @map("testing_score")
+  documentationScore Int @default(0) @map("documentation_score")
+  techStackScore     Int @default(0) @map("tech_stack_score")
+  complexityScore    Int @default(0) @map("complexity_score")
+  industryBonus      Int @default(0) @map("industry_bonus")
+  projectTypeBonus   Int @default(0) @map("project_type_bonus")
+
+  // ========== DIMENSIONAL ANALYSIS (from Go: pkg/dimensions) ==========
+  // Dimension Scores (0-100) - MUST MATCH aura-processor schema!
+  fundamentalsScore             Int?   @map("fundamentals_score")
+  fundamentalsConfidence        Float? @map("fundamentals_confidence")
+  engineeringDepthScore         Int?   @map("engineering_depth_score")
+  engineeringDepthConfidence    Float? @map("engineering_depth_confidence")
+  productionReadinessScore      Int?   @map("production_readiness_score")
+  productionReadinessConfidence Float? @map("production_readiness_confidence")
+  testingMaturityScore          Int?   @map("testing_maturity_score")
+  testingMaturityConfidence     Float? @map("testing_maturity_confidence")
+  architectureScore             Int?   @map("architecture_dimension_score")
+  architectureConfidence        Float? @map("architecture_confidence")
+  infraDevOpsScore              Int?   @map("infra_devops_score")
+  infraDevOpsConfidence         Float? @map("infra_devops_confidence")
+
+  // Verdict (from Go: pkg/verdict)
+  verdictSummary       String?          @map("dimensional_verdict_summary")
+  experienceLevel      ExperienceLevel? @map("experience_level")
+  experienceYearRange  String?          @map("experience_year_range")
+  experienceConfidence Float?           @map("experience_confidence")
+  verdictStrengths     String[]         @default([]) @map("dimensional_strengths")
+  verdictGrowthAreas   String[]         @default([]) @map("dimensional_growth_areas")
+  verdictJustification String?          @map("verdict_justification")
+
+  // Trust Analysis (from Go: pkg/trust)
+  trustLevel        TrustLevel?  @map("trust_level")
+  trustScore        Int?         @map("trust_score")
+  effortClass       EffortClass? @map("effort_class")
+  authenticityScore Int?         @map("authenticity_score")
+  authenticityFlags String[]     @default([]) @map("authenticity_flags")
+  hasOriginalWork   Boolean?     @map("has_original_work")
+
+  // ========== RELATIONS ==========
+  project                 Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  verifiedSkills          AnalysisVerifiedSkill[]
+  optimizationSuggestions AnalysisOptimization[]
+  reactAnalysis           ReactAnalysis?
+  languageStats           AnalysisLanguageStat[]
+  infraSignals            AnalysisInfraSignal[]
+  dimensionSignals        DimensionSignal[] // Signals for each dimension
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([architectureType])
+  @@index([engineeringLevel])
+  @@index([analyzedAt])
+  @@index([experienceLevel])
+  @@index([trustLevel])
+  @@map("project_analyses")
+}
+
+// ==================== REACT-SPECIFIC ANALYSIS ====================
+
+model ReactAnalysis {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @unique @map("analysis_id") @db.ObjectId
+
+  // ========== REACT PATTERNS ==========
+  usesHooks         Boolean @default(false) @map("uses_hooks")
+  usesContext       Boolean @default(false) @map("uses_context")
+  usesReducer       Boolean @default(false) @map("uses_reducer")
+  usesMemo          Boolean @default(false) @map("uses_memo")
+  usesCallback      Boolean @default(false) @map("uses_callback")
+  usesRef           Boolean @default(false) @map("uses_ref")
+  usesLazyLoading   Boolean @default(false) @map("uses_lazy_loading")
+  usesErrorBoundary Boolean @default(false) @map("uses_error_boundary")
+
+  // ========== METRICS ==========
+  componentCount   Int     @default(0) @map("component_count")
+  customHooksCount Int     @default(0) @map("custom_hooks_count")
+  stateManagement  String? @map("state_management") // "Context", "Redux", "Zustand"
+
+  // ========== PATTERNS & SUGGESTIONS ==========
+  patternsDetected String[] @default([]) @map("patterns_detected")
+  advancedUsage    String[] @default([]) @map("advanced_usage")
+  suggestions      String[] @default([])
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@map("react_analyses")
+}
+
+model AnalysisLanguageStat {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  name       String
+  lines      Int    @default(0)
+  files      Int    @default(0)
+  percentage Float  @default(0)
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("analysis_language_stats")
+}
+
+model AnalysisInfraSignal {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  signal     String
+  confidence Float?   @default(0)
+  source     String?
+  evidence   String[] @default([])
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("analysis_infra_signals")
+}
+
+// ==================== VERIFIED SKILLS ====================
+
+model AnalysisVerifiedSkill {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  name          String
+  category      SkillCategory
+  confidence    Float // 0.0 to 1.0
+  auraPoints    Int           @default(0) @map("aura_points")
+  resumeReady   Boolean       @default(false) @map("resume_ready")
+  usageVerified Boolean       @default(false) @map("usage_verified") // NEW
+  usageStrength Float         @default(0.0) @map("usage_strength") // NEW
+  evidence      String[]      @default([])
+  linesOfCode   Int?          @map("lines_of_code")
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([category])
+  @@index([confidence])
+  @@map("analysis_verified_skills")
+}
+
+// ==================== OPTIMIZATIONS ====================
+
+model AnalysisOptimization {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  category    OptimizationCategory
+  priority    OptimizationPriority
+  title       String
+  description String
+  impact      String
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([priority])
+  @@map("analysis_optimizations")
+}
+
+// ==================== DIMENSION SIGNALS (NEW) ====================
+// Stores evidence signals for each dimension
+
+model DimensionSignal {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  dimension DimensionType // Which dimension this signal belongs to
+  signal    String // e.g., "has_docker", "uses_interfaces", "test_coverage_high"
+  weight    Float         @default(1.0) // How much this contributes to the score
+  evidence  String[]      @default([]) // File paths or code locations
+
+  analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([dimension])
+  @@map("dimension_signals")
+}
+
+// ==================== JOB MATCH RESULTS (NEW) ====================
+// Stores results of candidate-job matching
+
+model JobMatchResult {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  jobId      String @map("job_id") @db.ObjectId
+  userId     String @map("user_id") @db.ObjectId
+  analysisId String @map("analysis_id") @db.ObjectId
+
+  // Overall Fit
+  overallFit FitCategory
+  matchScore Float       @default(0) @map("match_score") // 0-100
+  confidence Float       @default(0) // 0-1
+
+  // Dimension Match Breakdown
+  dimFundamentalsFit Float    @default(0) @map("dim_fundamentals_fit")
+  dimEngineeringFit  Float    @default(0) @map("dim_engineering_fit")
+  dimProductionFit   Float    @default(0) @map("dim_production_fit")
+  dimTestingFit      Float    @default(0) @map("dim_testing_fit")
+  dimArchitectureFit Float    @default(0) @map("dim_architecture_fit")
+  dimInfraFit        Float    @default(0) @map("dim_infra_fit")
+  missingRequired    String[] @default([]) @map("missing_required")
+
+  // Skill Match
+  mustHaveMatched Int      @default(0) @map("must_have_matched")
+  mustHaveTotal   Int      @default(0) @map("must_have_total")
+  mustHaveScore   Float    @default(0) @map("must_have_score")
+  missingMustHave String[] @default([]) @map("missing_must_have")
+  bonusSkills     String[] @default([]) @map("bonus_skills")
+
+  // Level Match
+  candidateLevel String? @map("candidate_level")
+  levelStatus    String? @map("level_status") // EXCEEDS, MEETS, BELOW
+  levelGap       Int     @default(0) @map("level_gap")
+
+  // Recruiter Guidance
+  strengths      String[] @default([])
+  concerns       String[] @default([])
+  interviewFocus String[] @default([]) @map("interview_focus")
+  recommendation String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@index([userId])
+  @@index([overallFit])
+  @@index([matchScore])
+  @@map("job_match_results")
+}
+
+// ==================== ENUMS ====================
+
+// New Enums for Multi-Dimensional System
+enum DimensionType {
+  FUNDAMENTALS
+  ENGINEERING_DEPTH
+  PRODUCTION_READINESS
+  TESTING_MATURITY
+  ARCHITECTURE
+  INFRA_DEVOPS
+}
+
+enum ExperienceLevel {
+  FRESH_GRAD // 0-1 years
+  JUNIOR // 1-2 years
+  MID_LEVEL // 2-4 years
+  SENIOR // 4-7 years
+  STAFF // 7-10 years
+  PRINCIPAL // 10+ years
+}
+
+enum TrustLevel {
+  HIGH // Verified, authentic work
+  MEDIUM // Likely authentic
+  LOW // Some concerns
+  SUSPICIOUS // Multiple red flags
+}
+
+enum EffortClass {
+  SIGNIFICANT // Sustained development
+  MODERATE // Normal project
+  MINIMAL // Quick project
+  SUSPICIOUS // Unusual patterns
+}
+
+enum FitCategory {
+  EXCELLENT // 85+, highly recommended
+  GOOD // 70-84, solid match
+  POTENTIAL // 55-69, with development
+  STRETCH // 40-54, significant gap
+  MISMATCH // <40, not recommended
+}
+
+enum ProjectType {
+  FRONTEND
+  BACKEND
+  FULLSTACK
+  MICROSERVICES
+  LIBRARY
+  CLI
+  MOBILE
+  API
+  MONOREPO
+  OTHER
+}
+
+enum ArchitectureType {
+  MICROSERVICES
+  MONOLITH
+  MODULAR_MONOLITH
+  MONOREPO
+  EVENT_DRIVEN
+  LAYERED
+  CLEAN_ARCHITECTURE
+  HEXAGONAL
+  SERVERLESS
+  UNKNOWN
+}
+
+enum EngineeringLevel {
+  BEGINNER // "Beginner"
+  INTERMEDIATE // "Intermediate"
+  ADVANCED // "Advanced"
+  PRODUCTION // "Production-grade"
+}
+
+enum ApiStyle {
+  REST
+  GRAPHQL
+  GRPC
+  SOAP
+  WEBSOCKET
+}
+
+enum OptimizationCategory {
+  PERFORMANCE
+  SECURITY
+  TESTING
+  DOCUMENTATION
+  STRUCTURE
+  SCALABILITY
+}
+
+enum OptimizationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
 // ==================== EXPERIENCE MODEL ====================

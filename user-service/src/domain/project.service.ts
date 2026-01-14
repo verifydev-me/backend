@@ -185,9 +185,51 @@ export class ProjectService {
     // Get project with full analysis
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
+      include: {
+        analysis: {
+          include: {
+            verifiedSkills: true,
+            optimizationSuggestions: true,
+            reactAnalysis: true,
+            infraSignals: true,
+          },
+        },
+        user: {
+          select: {
+            githubAccessToken: true,
+          },
+        },
+      },
     });
 
     if (!project) return null;
+
+    const { analysis, user: projectOwner, ...projectData } = project;
+
+    const structuredFullAnalysis = analysis ? buildStructuredFullAnalysis(analysis) : {};
+    // Legacy fields removed from schema - use structured analysis directly
+    const mergedFullAnalysis = mergeFullAnalysis(structuredFullAnalysis, null);
+    const structuredTechStack = (structuredFullAnalysis as any)?.techStack || {};
+
+    const languageSummary = await buildLanguageBreakdown(
+      mergedFullAnalysis?.techStack?.languages,
+      analysis,
+      null, // legacyFullAnalysis removed
+      project.githubRepoUrl,
+      projectOwner?.githubAccessToken || undefined
+    );
+
+    if (!mergedFullAnalysis.techStack) {
+      mergedFullAnalysis.techStack = {};
+    }
+
+    mergedFullAnalysis.techStack.languages = languageSummary.languages;
+    mergedFullAnalysis.techStack.frameworks = mergedFullAnalysis.techStack.frameworks || structuredTechStack.frameworks || [];
+    mergedFullAnalysis.techStack.databases = mergedFullAnalysis.techStack.databases || structuredTechStack.databases || [];
+    mergedFullAnalysis.techStack.tools = mergedFullAnalysis.techStack.tools || structuredTechStack.tools || [];
+    mergedFullAnalysis.techStack.infrastructure = mergedFullAnalysis.techStack.infrastructure || structuredTechStack.infrastructure || [];
+
+    // Legacy industry analysis removed from schema
 
     // Get user's skills that were detected from projects
     const skills = await prisma.skill.findMany({
@@ -205,21 +247,37 @@ export class ProjectService {
     });
 
     // Build enriched response with all analysis data
-    const fullAnalysis = project.fullAnalysis as any || {};
-    
+    // Get verified skills from analysis if available (PREFERRED)
+    const verifiedSkillsSource = (analysis?.verifiedSkills && analysis.verifiedSkills.length > 0) 
+      ? analysis.verifiedSkills.map(s => ({
+          name: s.name,
+          category: s.category.toLowerCase(),
+          level: getSkillLevel(s.confidence * 100),
+          confidence: s.confidence,
+          score: Math.round(s.confidence * 100),
+          verifiedScore: Math.round(s.confidence * 100),
+          isVerified: s.resumeReady || s.usageVerified || s.confidence >= 0.7,
+          usageVerified: s.usageVerified,
+          usageStrength: s.usageStrength,
+          evidence: s.evidence || [],
+          resumeReady: s.resumeReady,
+          projectCount: 1, // Specific to this project
+        }))
+      : skills.map(skill => ({
+          name: skill.name,
+          category: skill.category.toLowerCase(),
+          level: getSkillLevel(skill.verifiedScore),
+          confidence: skill.verifiedScore / 100, // Convert to 0-1
+          score: skill.verifiedScore,
+          verifiedScore: skill.verifiedScore,
+          isVerified: skill.isVerified,
+          evidence: skill.evidence || [],
+          resumeReady: skill.verifiedScore >= 70,
+          projectCount: skill.projectCount,
+        }));
+
     // Create skills breakdown with percentages
-    const skillsBreakdown = skills.map(skill => ({
-      name: skill.name,
-      category: skill.category.toLowerCase(),
-      level: getSkillLevel(skill.verifiedScore),
-      confidence: skill.verifiedScore / 100, // Convert to 0-1
-      score: skill.verifiedScore,
-      verifiedScore: skill.verifiedScore,
-      isVerified: skill.isVerified,
-      evidence: skill.evidence || [],
-      resumeReady: skill.verifiedScore >= 70,
-      projectCount: skill.projectCount,
-    }));
+    const skillsBreakdown = verifiedSkillsSource;
 
     // Create technologies breakdown
     const techBreakdown = technologies.map(tech => ({
@@ -232,7 +290,7 @@ export class ProjectService {
     }));
 
     // Calculate industry analysis summary
-    const industryAnalysis = {
+    const computedIndustryAnalysis = {
       verifiedSkills: skillsBreakdown,
       skillsByCategory: groupSkillsByCategory(skillsBreakdown),
       totalSkills: skillsBreakdown.length,
@@ -243,20 +301,25 @@ export class ProjectService {
       technologies: techBreakdown,
     };
 
+    const mergedIndustryAnalysis = mergeIndustryAnalysis(null, computedIndustryAnalysis);
+    mergedFullAnalysis.industryAnalysis = mergedIndustryAnalysis;
+
     return {
-      ...project,
+      ...projectData,
+      analysisId: analysis?.id ?? null,
       // Add computed fields for frontend
       repoUrl: project.githubRepoUrl,
       analysisStatus: project.analysisStatus.toLowerCase(),
       // Include detailed analysis
-      fullAnalysis: fullAnalysis,
-      industryAnalysis,
+      fullAnalysis: mergedFullAnalysis,
+      industryAnalysis: mergedIndustryAnalysis,
+      languages: languageSummary.languageMap,
       metrics: {
         codeQuality: project.codeQualityScore,
-        documentation: fullAnalysis.codeQuality?.hasDockerfile ? 80 : Math.min(project.structureScore * 2, 60),
-        testCoverage: fullAnalysis.codeQuality?.testFilesCount ? Math.min(fullAnalysis.codeQuality.testFilesCount * 15, 80) : 0,
+        documentation: mergedFullAnalysis.codeQuality?.hasDockerfile ? 80 : Math.min(project.structureScore * 2, 60),
+        testCoverage: mergedFullAnalysis.codeQuality?.testFilesCount ? Math.min(mergedFullAnalysis.codeQuality.testFilesCount * 15, 80) : 0,
         maintainability: project.structureScore,
-        complexity: fullAnalysis.folderStructure?.maxDepth ? Math.min(fullAnalysis.folderStructure.maxDepth * 10, 100) : 30,
+        complexity: mergedFullAnalysis.folderStructure?.maxDepth ? Math.min(mergedFullAnalysis.folderStructure.maxDepth * 10, 100) : 30,
         activityScore: project.overallScore,
       },
     };
@@ -366,6 +429,335 @@ export class ProjectService {
       projectType,
     });
   }
+}
+
+function buildStructuredFullAnalysis(analysis: any) {
+  if (!analysis) return {};
+
+  const base = {
+    metadata: {
+      analyzerVersion: analysis.analyzerVersion,
+      processingTime: analysis.processingTime,
+      analyzedAt: analysis.analyzedAt,
+    },
+    folderStructure: {
+      hasSrcFolder: analysis.hasSrcFolder,
+      hasComponents: analysis.hasComponents,
+      hasUtils: analysis.hasUtils,
+      hasTests: analysis.hasTests,
+      hasTypes: analysis.hasTypes,
+      hasConfig: analysis.hasConfig,
+      hasDocs: analysis.hasDocs,
+      hasApi: analysis.hasApi,
+      hasServices: analysis.hasServices,
+      hasModels: analysis.hasModels,
+      hasMiddleware: analysis.hasMiddleware,
+      hasControllers: analysis.hasControllers,
+      organizationScore: analysis.organizationScore,
+      maxDepth: analysis.maxDepth,
+      topLevelFolders: analysis.topLevelFolders,
+    },
+    codeQuality: {
+      hasReadme: analysis.hasReadme,
+      hasLicense: analysis.hasLicense,
+      hasGitignore: analysis.hasGitignore,
+      hasEnvExample: analysis.hasEnvExample,
+      hasDockerfile: analysis.hasDockerfile,
+      hasDockerCompose: analysis.hasDockerCompose,
+      hasCI: analysis.hasCI,
+      ciPlatform: analysis.ciPlatform,
+      hasLinting: analysis.hasLinting,
+      hasPrettier: analysis.hasPrettier,
+      hasTypeScript: analysis.hasTypeScript,
+      hasMakefile: analysis.hasMakefile,
+      testFilesCount: analysis.testFilesCount,
+      commentDensity: analysis.commentDensity,
+    },
+    metrics: {
+      totalLines: analysis.totalLines,
+      totalFiles: analysis.totalFiles,
+      primaryLanguage: analysis.primaryLanguage,
+    },
+    techStack: {
+      languages: analysis.languages || [],
+      frameworks: analysis.frameworks || [],
+      databases: analysis.databases || [],
+      tools: analysis.tools || [],
+      infrastructure: analysis.infrastructure || [],
+    },
+    infraSignals: {
+      signals: (analysis.infraSignals || []).map((s: any) => s.signal),
+      signalDetails: (analysis.infraSignals || []).reduce((acc: any, s: any) => {
+        acc[s.signal] = { signal: s.signal, confidence: s.confidence, evidence: s.evidence };
+        return acc;
+      }, {}),
+    },
+    architecture: {
+      type: analysis.architectureType,
+      serviceCount: analysis.serviceCount,
+      hasAPIGateway: analysis.hasAPIGateway,
+      hasMessageQueue: analysis.hasMessageQueue,
+      hasSharedLibraries: analysis.hasSharedLibraries,
+      engineeringLevel: analysis.engineeringLevel,
+    },
+    bestPractices: {
+      followed: analysis.bestPracticesFollowed || [],
+      missing: analysis.bestPracticesMissing || [],
+      score: analysis.bestPracticesScore || 0,
+    },
+    scores: {
+      structure: analysis.structureScore || 0,
+      codeQuality: analysis.codeQualityScore || 0,
+      testing: analysis.testingScore || 0,
+      documentation: analysis.documentationScore || 0,
+      techStack: analysis.techStackScore || 0,
+      complexity: analysis.complexityScore || 0,
+      industryBonus: analysis.industryBonus || 0,
+      projectTypeBonus: analysis.projectTypeBonus || 0,
+    },
+    // ========== DIMENSIONAL ANALYSIS ==========
+    dimensionalAnalysis: {
+      fundamentalsScore: analysis.fundamentalsScore,
+      fundamentalsConfidence: analysis.fundamentalsConfidence,
+      engineeringDepthScore: analysis.engineeringDepthScore,
+      engineeringDepthConfidence: analysis.engineeringDepthConfidence,
+      productionReadinessScore: analysis.productionReadinessScore,
+      productionReadinessConfidence: analysis.productionReadinessConfidence,
+      testingMaturityScore: analysis.testingMaturityScore,
+      testingMaturityConfidence: analysis.testingMaturityConfidence,
+      architectureScore: analysis.architectureScore,
+      architectureConfidence: analysis.architectureConfidence,
+      infraDevOpsScore: analysis.infraDevOpsScore,
+      infraDevOpsConfidence: analysis.infraDevOpsConfidence,
+    },
+    experienceAnalysis: {
+      level: analysis.experienceLevel,
+      yearRange: analysis.experienceYearRange,
+      confidence: analysis.experienceConfidence,
+    },
+    verdict: {
+      summary: analysis.verdictSummary,
+      strengths: analysis.verdictStrengths || [],
+      growthAreas: analysis.verdictGrowthAreas || [],
+      justification: analysis.verdictJustification,
+    },
+    trustAnalysis: {
+      level: analysis.trustLevel,
+      score: analysis.trustScore,
+      effortClass: analysis.effortClass,
+      authenticityScore: analysis.authenticityScore,
+      authenticityFlags: analysis.authenticityFlags || [],
+      hasOriginalWork: analysis.hasOriginalWork,
+    },
+    verifiedSkills: (analysis.verifiedSkills || []).map((skill: any) => ({
+      name: skill.name,
+      category: skill.category,
+      confidence: skill.confidence,
+      auraPoints: skill.auraPoints,
+      resumeReady: skill.resumeReady,
+      usageVerified: skill.usageVerified,
+      usageStrength: skill.usageStrength,
+      evidence: skill.evidence,
+      linesOfCode: skill.linesOfCode,
+    })),
+    optimizations: (analysis.optimizationSuggestions || []).map((opt: any) => ({
+      category: opt.category,
+      priority: opt.priority,
+      title: opt.title,
+      description: opt.description,
+      impact: opt.impact,
+    })),
+    reactAnalysis: analysis.reactAnalysis
+      ? {
+          usesHooks: analysis.reactAnalysis.usesHooks,
+          usesContext: analysis.reactAnalysis.usesContext,
+          usesReducer: analysis.reactAnalysis.usesReducer,
+          usesMemo: analysis.reactAnalysis.usesMemo,
+          usesCallback: analysis.reactAnalysis.usesCallback,
+          usesRef: analysis.reactAnalysis.usesRef,
+          usesLazyLoading: analysis.reactAnalysis.usesLazyLoading,
+          usesErrorBoundary: analysis.reactAnalysis.usesErrorBoundary,
+          componentCount: analysis.reactAnalysis.componentCount,
+          customHooksCount: analysis.reactAnalysis.customHooksCount,
+          stateManagement: analysis.reactAnalysis.stateManagement,
+          patternsDetected: analysis.reactAnalysis.patternsDetected,
+          advancedUsage: analysis.reactAnalysis.advancedUsage,
+          suggestions: analysis.reactAnalysis.suggestions,
+        }
+      : null,
+  };
+
+  return base;
+}
+
+function mergeFullAnalysis(structured: any, legacy: any) {
+  if (!legacy) return structured;
+
+  const merged: any = { ...legacy };
+
+  merged.metadata = { ...(legacy.metadata || {}), ...(structured.metadata || {}) };
+  merged.folderStructure = { ...(legacy.folderStructure || {}), ...(structured.folderStructure || {}) };
+  merged.codeQuality = { ...(legacy.codeQuality || {}), ...(structured.codeQuality || {}) };
+  merged.metrics = { ...(legacy.metrics || {}), ...(structured.metrics || {}) };
+
+  const structuredTech = structured.techStack || {};
+  const legacyTech = legacy.techStack || {};
+  merged.techStack = {
+    ...legacyTech,
+    ...structuredTech,
+    languages: legacyTech.languages || structuredTech.languages || [],
+    frameworks: legacyTech.frameworks || structuredTech.frameworks || [],
+    databases: legacyTech.databases || structuredTech.databases || [],
+    tools: legacyTech.tools || structuredTech.tools || [],
+    infrastructure: legacyTech.infrastructure || structuredTech.infrastructure || [],
+  };
+
+  merged.architecture = { ...(legacy.architecture || {}), ...(structured.architecture || {}) };
+  merged.bestPractices = { ...(legacy.bestPractices || {}), ...(structured.bestPractices || {}) };
+  merged.scores = { ...(legacy.scores || {}), ...(structured.scores || {}) };
+
+  if (structured.verifiedSkills?.length) {
+    merged.verifiedSkills = structured.verifiedSkills;
+  } else {
+    merged.verifiedSkills = legacy.verifiedSkills || [];
+  }
+
+  if (structured.optimizations?.length) {
+    merged.optimizations = structured.optimizations;
+  } else {
+    merged.optimizations = legacy.optimizations || [];
+  }
+
+  merged.reactAnalysis = structured.reactAnalysis || legacy.reactAnalysis || null;
+
+  return merged;
+}
+
+async function buildLanguageBreakdown(
+  techStackLanguages: any,
+  projectAnalysis: any,
+  legacyFullAnalysis: any,
+  repoUrl: string,
+  githubToken?: string
+) {
+  const normalize = (lang: any) => {
+    if (!lang) return null;
+    if (typeof lang === 'string') {
+      return { name: lang, percentage: null as number | null };
+    }
+    if (typeof lang.name === 'string') {
+      return {
+        name: lang.name,
+        percentage: typeof lang.percentage === 'number' ? lang.percentage : null,
+      };
+    }
+    return null;
+  };
+
+  let languages: Array<{ name: string; percentage: number | null }> = [];
+  let languageMap: Record<string, number> = {};
+
+  // Prefer live GitHub language stats when available
+  if (repoUrl) {
+    const repoLanguages = await GitHubService.getRepoLanguages(repoUrl, githubToken);
+    const totalBytes = Object.values(repoLanguages).reduce((acc, value) => acc + value, 0);
+
+    if (totalBytes > 0) {
+      languages = Object.entries(repoLanguages).map(([name, bytes]) => ({
+        name,
+        percentage: Number(((bytes / totalBytes) * 100).toFixed(2)),
+      }));
+      languageMap = Object.fromEntries(
+        Object.entries(repoLanguages).map(([name, bytes]) => [name, Number(bytes)])
+      );
+    }
+  }
+
+  if (!languages.length) {
+    const fromTechStack = Array.isArray(techStackLanguages)
+      ? techStackLanguages.map(normalize).filter(Boolean)
+      : [];
+
+    const fromLegacy = Array.isArray(legacyFullAnalysis?.techStack?.languages)
+      ? legacyFullAnalysis.techStack.languages.map(normalize).filter(Boolean)
+      : [];
+
+    languages = fromTechStack.length ? (fromTechStack as any) : (fromLegacy as any);
+
+    if (!languages.length && Array.isArray(projectAnalysis?.languages) && projectAnalysis.languages.length) {
+      languages = projectAnalysis.languages.map((lang: string) => normalize(lang)).filter(Boolean) as any[];
+    }
+
+    if (!languages.length && typeof projectAnalysis?.primaryLanguage === 'string' && projectAnalysis.primaryLanguage) {
+      languages = [{ name: projectAnalysis.primaryLanguage, percentage: 100 }];
+    }
+
+    if (languages.length) {
+      const providedTotal = languages.reduce((acc, lang) => acc + (lang?.percentage ?? 0), 0);
+      if (providedTotal <= 0) {
+        const equalShare = Number((100 / languages.length).toFixed(2));
+        languages = languages.map(lang => ({ ...lang, percentage: equalShare }));
+      } else {
+        languages = languages.map(lang => ({
+          ...lang,
+          percentage:
+            lang.percentage !== null && lang.percentage !== undefined
+              ? Number(lang.percentage.toFixed(2))
+              : Number(((1 / languages.length) * 100).toFixed(2)),
+        }));
+      }
+    }
+  }
+
+  if (languages.length && Object.keys(languageMap).length === 0) {
+    const totalPercentage = languages.reduce((acc, lang) => acc + (lang.percentage ?? 0), 0);
+    const normalizedTotal = totalPercentage > 0 ? totalPercentage : languages.length;
+    const fallbackTotalBytes = 100000;
+
+    languages = languages.map(lang => {
+      const percentage = lang.percentage ?? Number((100 / languages.length).toFixed(2));
+      languageMap[lang.name] = Math.max(
+        1,
+        Math.round((percentage / normalizedTotal) * fallbackTotalBytes)
+      );
+      return { ...lang, percentage };
+    });
+  }
+
+  return { languages, languageMap };
+}
+
+function mergeIndustryAnalysis(legacy: any, computed: any) {
+  if (!legacy) return computed;
+
+  const merged: any = {
+    ...computed,
+    ...legacy,
+  };
+
+  merged.verifiedSkills = (legacy.verifiedSkills && legacy.verifiedSkills.length > 0)
+    ? legacy.verifiedSkills
+    : computed.verifiedSkills;
+
+  merged.skillsByCategory = {
+    ...computed.skillsByCategory,
+    ...(legacy.skillsByCategory || {}),
+  };
+
+  merged.technologies = (legacy.technologies && legacy.technologies.length > 0)
+    ? legacy.technologies
+    : computed.technologies;
+
+  merged.overallScore = legacy.overallScore ?? computed.overallScore;
+  merged.engineeringLevel = legacy.engineeringLevel || computed.engineeringLevel;
+  merged.infraSignals = legacy.infraSignals || computed.infraSignals;
+
+  const verifiedSkills = merged.verifiedSkills || [];
+  merged.totalSkills = verifiedSkills.length;
+  merged.highConfidenceSkills = legacy.highConfidenceSkills ?? verifiedSkills.filter((s: any) => (s.confidence || 0) >= 0.8).length;
+  merged.resumeReadySkills = legacy.resumeReadySkills ?? verifiedSkills.filter((s: any) => s.resumeReady).length;
+
+  return merged;
 }
 
 // Helper function to get skill level based on score

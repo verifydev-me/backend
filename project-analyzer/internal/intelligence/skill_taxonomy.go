@@ -268,9 +268,24 @@ func (b *SkillGraphBuilder) AddInfraSkill(name, category string, confidence floa
 }
 
 // InferAdjacentSkill adds an inferred skill from another skill
+// Fix #3: Require minimum source confidence and evidence before inferring adjacent skills
 func (b *SkillGraphBuilder) InferAdjacentSkill(name, category, inferredFrom string, sourceConfidence float64) *SkillGraphBuilder {
+	// Fix #3: Don't infer adjacent skills from low-confidence sources
+	// This prevents phantom skills from appearing on profiles
+	const MinSourceConfidenceForInference = 0.70 // 70% minimum
+	if sourceConfidence < MinSourceConfidenceForInference {
+		return b // Skip - source not confident enough to infer adjacent skills
+	}
+
 	// Adjacent skills get max 50% of source confidence
 	inferredConfidence := sourceConfidence * MaxAdjacentInference
+
+	// Fix #3: Cap inferred confidence at 40% to stay below resumeReady threshold (0.4)
+	// This ensures adjacent skills don't appear on resume without explicit evidence
+	const MaxInferredConfidenceForResume = 0.40
+	if inferredConfidence > MaxInferredConfidenceForResume {
+		inferredConfidence = MaxInferredConfidenceForResume
+	}
 
 	b.taxonomy.AddSkill(SkillNode{
 		ID:            slugify(name),

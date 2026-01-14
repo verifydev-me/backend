@@ -130,6 +130,18 @@ func (e *InfraExtractor) scanDockerComposeContent(path, filename string) {
 	contentStr := string(content)
 	contentLower := strings.ToLower(contentStr)
 
+	// Fix #5: Track third-party services vs custom services
+	// Third-party: postgres, redis, nginx, etc. (developer USES but didn't BUILD)
+	// Custom: services with build: context or Dockerfile (developer BUILT)
+	thirdPartyImages := map[string]bool{
+		"postgres": true, "mysql": true, "mariadb": true, "mongo": true, "mongodb": true,
+		"redis": true, "rabbitmq": true, "kafka": true, "zookeeper": true, "confluent": true,
+		"nats": true, "localstack": true, "minio": true, "nginx": true, "traefik": true,
+		"envoy": true, "consul": true, "vault": true, "prometheus": true, "grafana": true,
+		"elasticsearch": true, "kibana": true, "jaeger": true, "zipkin": true, "clickhouse": true,
+		"memcached": true, "cassandra": true, "dynamodb": true, "etcd": true, "haproxy": true,
+	}
+
 	// Map images/services to signals
 	serviceMap := map[string]signals.InfraSignal{
 		"postgres":      signals.SignalPostgres,
@@ -159,9 +171,85 @@ func (e *InfraExtractor) scanDockerComposeContent(path, filename string) {
 		"clickhouse":    signals.SignalClickHouse,
 	}
 
-	// Process line by line for more accurate detection
-	// Only match services from "image:" lines or service names, NOT volume paths
+	// Fix #5: Parse docker-compose to identify custom vs third-party services
+	// Services with "build:" are custom, services with "image:" are third-party
 	lines := strings.Split(contentStr, "\n")
+	inServices := false
+	currentService := ""
+	serviceHasBuild := make(map[string]bool)
+	serviceHasImage := make(map[string]bool)
+	detectedThirdParty := make(map[string]bool)
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		lineLower := strings.ToLower(trimmed)
+
+		// Track services section
+		if lineLower == "services:" {
+			inServices = true
+			continue
+		}
+
+		// New top-level section ends services
+		if inServices && len(line) > 0 && line[0] != ' ' && line[0] != '\t' && !strings.HasPrefix(lineLower, "#") {
+			if !strings.HasPrefix(lineLower, "services") {
+				inServices = false
+			}
+		}
+
+		if !inServices {
+			continue
+		}
+
+		// Detect service definition (indented name ending with :)
+		if strings.HasSuffix(trimmed, ":") && !strings.HasPrefix(lineLower, "#") {
+			indent := len(line) - len(strings.TrimLeft(line, " \t"))
+			if indent > 0 && indent <= 4 { // Service name indentation level
+				currentService = strings.TrimSuffix(trimmed, ":")
+			}
+		}
+
+		// Detect build: context (marks as custom service)
+		if currentService != "" && strings.HasPrefix(lineLower, "build:") {
+			serviceHasBuild[currentService] = true
+		}
+
+		// Detect image: (could be third-party)
+		if currentService != "" && strings.HasPrefix(lineLower, "image:") {
+			serviceHasImage[currentService] = true
+			// Check if it's a known third-party image
+			for thirdParty := range thirdPartyImages {
+				if strings.Contains(lineLower, thirdParty) {
+					detectedThirdParty[currentService] = true
+					break
+				}
+			}
+		}
+	}
+
+	// Fix #5: Categorize services
+	for service, hasBuild := range serviceHasBuild {
+		if hasBuild {
+			e.signals.CustomServiceCount++
+			e.signals.CustomServiceNames = append(e.signals.CustomServiceNames, service)
+		}
+	}
+	for service := range serviceHasImage {
+		if _, hasBuild := serviceHasBuild[service]; !hasBuild {
+			// No build context, check if third-party
+			if _, isThirdParty := detectedThirdParty[service]; isThirdParty {
+				e.signals.ThirdPartyServiceCount++
+				e.signals.ThirdPartyServiceNames = append(e.signals.ThirdPartyServiceNames, service)
+			} else {
+				// Image but not known third-party - could be custom image from registry
+				e.signals.CustomServiceCount++
+				e.signals.CustomServiceNames = append(e.signals.CustomServiceNames, service)
+			}
+		}
+	}
+
+	// Process signals for detected technologies
+	// Only match services from "image:" lines or service names, NOT volume paths
 	for _, line := range lines {
 		lineLower := strings.ToLower(strings.TrimSpace(line))
 

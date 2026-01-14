@@ -8,11 +8,12 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1),
-  organizationName: z.string().optional(),
-  organizationWebsite: z.string().url().optional(),
-  organizationType: z.enum(['STARTUP', 'SMB', 'ENTERPRISE', 'AGENCY', 'NONPROFIT']).optional(),
-  organizationSize: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']).optional(),
-  position: z.string().optional(),
+  position: z.string().min(1), // Required
+  organizationName: z.string().min(1), // Required
+  organizationWebsite: z.string().url(), // Required
+  industry: z.string().min(1), // Required
+  organizationSize: z.enum(['STARTUP', 'SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']), // Required
+  organizationDescription: z.string().max(500).optional(), // Optional
 });
 
 const loginSchema = z.object({
@@ -37,10 +38,7 @@ export class AuthController {
         return;
       }
 
-      const registerData = {
-        ...validation.data,
-        organizationName: validation.data.organizationName || 'Independent Recruiter',
-      };
+      const registerData = validation.data;
 
       const result = await AuthService.register(registerData as any);
 
@@ -269,6 +267,56 @@ export class AuthController {
         message: 'Logout failed',
         error: { code: 'INTERNAL_ERROR' },
       });
+    }
+  }
+
+  /**
+   * GET /public/:userId
+   * Get public recruiter profile by ID
+   */
+  static async getPublicProfile(req: Request, res: Response<ApiResponse>): Promise<void> {
+    try {
+        const { userId } = req.params;
+        const result = await AuthService.getRecruiterWithOrganization(userId);
+
+        if (!result) {
+            res.status(404).json({
+                success: false,
+                message: 'Recruiter not found',
+                error: { code: 'NOT_FOUND' },
+            });
+            return;
+        }
+
+        // Return only safe public info
+        res.json({
+            success: true,
+            message: 'Recruiter profile retrieved',
+            data: {
+                recruiter: {
+                    id: result.recruiter.id,
+                    name: result.recruiter.name,
+                    title: result.recruiter.title,
+                    avatarUrl: result.recruiter.avatarUrl,
+                    bio: undefined // Add bio if exists in model
+                },
+                organization: {
+                    id: result.organization.id,
+                    name: result.organization.name,
+                    slug: result.organization.slug,
+                    logo: result.organization.logo,
+                    website: result.organization.website,
+                    isVerified: result.organization.isVerified
+                }
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Failed to get public profile');
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get profile',
+            error: { code: 'INTERNAL_ERROR' },
+        });
     }
   }
 }

@@ -35,7 +35,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
 ENV NODE_ENV=production
 ENV PORT=3004
 
-RUN npx prisma generate --schema=prisma/job-schema.prisma
+RUN npx prisma generate --schema=prisma/schema.prisma
 
 USER nodejs
 

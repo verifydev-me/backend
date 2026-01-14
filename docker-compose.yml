@@ -1,9 +1,16 @@
+# ============================================
+# VERIFY BACKEND - Docker Compose Configuration
+# ============================================
+# SECURITY: All secrets loaded from .env file
+# Run: docker compose up -d
+
 services:
+  # ==================== API GATEWAY ====================
   gateway:
     build: ./gateway
     container_name: verifydev-gateway
     ports:
-      - "8000:80"  # Host Nginx handles SSL on 80/443, proxies to 8000
+      - "${GATEWAY_PORT:-8000}:80"
     volumes:
       - ./gateway/ssl:/etc/nginx/ssl:ro
     depends_on:
@@ -13,15 +20,27 @@ services:
       - recruiter-service
       - resume-service
       - project-analyzer
+      - chat-service
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== REDIS ====================
   redis:
     image: redis:7-alpine
     container_name: verifydev-redis
@@ -29,72 +48,109 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== RABBITMQ ====================
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: verifydev-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-verifydev}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS is required}
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 30s
       timeout: 10s
       retries: 5
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== AUTH SERVICE ====================
   auth-service:
     build: ./auth-service
     container_name: verifydev-auth
     ports:
-      - "3001:3001"
+      - "${AUTH_SERVICE_PORT:-3001}:3001"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3001
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - REDIS_URL=redis://redis:6379
-      - GITHUB_CLIENT_ID=Ov23li8KrcXPVTwLxWUE
-      - GITHUB_CLIENT_SECRET=2fe9da8ae5e1f9d0fa331b35dab2e5896845e4d5
-      - GITHUB_CALLBACK_URL=https://api.verifydev.me/api/v1/auth/github/callback
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-supersecretrefreshkey32characters}
-      - FRONTEND_URL=https://verifydev.me
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,https://verifydev.vercel.app,https://api.verifydev.me,https://verifydev.me,https://www.verifydev.me
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - REDIS_URL=redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:?GITHUB_CLIENT_ID is required}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:?GITHUB_CLIENT_SECRET is required}
+      - GITHUB_CALLBACK_URL=${GITHUB_CALLBACK_URL:-http://localhost:8000/api/v1/auth/github/callback}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - ALLOWED_ORIGINS=${CORS_ORIGIN:-http://localhost:3000}
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== USER SERVICE ====================
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: ./user-service/Dockerfile
     container_name: verifydev-user
     ports:
-      - "3002:3002"
+      - "${USER_SERVICE_PORT:-3002}:3002"
+      - "${USER_SERVICE_GRPC_PORT:-50051}:50051"  # gRPC port
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3002
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - REDIS_URL=redis://redis:6379
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
+      - GRPC_PORT=50051
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - REDIS_URL=redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
       - AUTH_SERVICE_URL=http://auth-service:3001
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
+      - ALLOWED_ORIGINS=${CORS_ORIGIN:-http://localhost:3000}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     depends_on:
       rabbitmq:
@@ -104,53 +160,123 @@ services:
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== JOB SERVICE ====================
   job-service:
     build:
       context: ./job-service
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: verifydev-job
     ports:
-      - "3004:3004"
+      - "${JOB_SERVICE_PORT:-3004}:3004"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3004
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
-    volumes:
-      - ./job-service/src:/app/src
-      - ./job-service/prisma:/app/prisma
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - ALLOWED_ORIGINS=${CORS_ORIGIN:-http://localhost:3000}
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== RECRUITER SERVICE ====================
   recruiter-service:
-    build: ./recruiter-service
+    build:
+      context: .
+      dockerfile: ./recruiter-service/Dockerfile
     container_name: verifydev-recruiter
     ports:
-      - "3005:3005"
+      - "${RECRUITER_SERVICE_PORT:-3005}:3005"
+      - "${RECRUITER_SERVICE_GRPC_PORT:-50054}:50054"  # gRPC port
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3005
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-supersecretaccesskey32characters!}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-recruiterrefreshkey32characters!}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost
-    volumes:
-      - ./recruiter-service/src:/app/src
-      - ./recruiter-service/prisma:/app/prisma
+      - GRPC_PORT=50054
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      - ALLOWED_ORIGINS=${CORS_ORIGIN:-http://localhost:3000}
+      - USER_SERVICE_GRPC=user-service:50051
+      - JOB_SERVICE_GRPC=job-service:50052
+    depends_on:
+      - user-service
+      - job-service
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== CHAT SERVICE ====================
+  chat-service:
+    build: ./chat-service
+    container_name: verifydev-chat
+    ports:
+      - "${CHAT_SERVICE_PORT:-3006}:3006"
+    environment:
+      - PORT=3006
+      - DATABASE_URL=${CHAT_DATABASE_URL:-${DATABASE_URL}}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== AURA PROCESSOR ====================
   aura-processor:
     build: ./aura-processor
     container_name: verifydev-aura
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=${NODE_ENV:-development}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672
       - CONSUME_QUEUE=project.analyzed
       - EXCHANGE_NAME=project.events
     depends_on:
@@ -159,50 +285,83 @@ services:
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ==================== GO SERVICES ====================
+  # ==================== PROJECT ANALYZER (Go) ====================
   project-analyzer:
     build: ./project-analyzer
     container_name: verifydev-analyzer
     ports:
-      - "8001:8001"
+      - "${ANALYZER_SERVICE_PORT:-8001}:8001"
     environment:
-      - ENV=development
+      - ENV=${NODE_ENV:-development}
       - PORT=8001
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672/
       - EXCHANGE_NAME=project.events
       - CONSUME_QUEUE=project.analyze.request
       - PUBLISH_QUEUE=project.analyzed
       - CLONE_DIR=/tmp/repos
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
-      - /tmp/repos:/tmp/repos
+      - analyzer_repos:/tmp/repos
     depends_on:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ==================== RESUME SERVICE (Go) ====================
   resume-service:
     build: ./resume-service
     container_name: verifydev-resume
     ports:
-      - "8003:8003"
+      - "${RESUME_SERVICE_PORT:-8003}:8003"
     environment:
-      - ENV=development
+      - ENV=${NODE_ENV:-development}
       - PORT=8003
-      - DATABASE_URL=mongodb+srv://thesharmakeshav:TFJUWDRi46dbR5TB@cluster0.kegg0.mongodb.net/verifydev?retryWrites=true&w=majority
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672/
     restart: unless-stopped
     networks:
       - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+# ==================== VOLUMES ====================
 volumes:
   redis_data:
   rabbitmq_data:
+  analyzer_repos:
 
-
+# ==================== NETWORKS ====================
 networks:
   verifydev-network:
     driver: bridge

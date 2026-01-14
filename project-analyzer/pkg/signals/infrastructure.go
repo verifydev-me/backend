@@ -383,6 +383,11 @@ type InfrastructureSignals struct {
 	SignalDetails map[InfraSignal]SignalDetail `json:"signalDetails"`
 	ServiceCount  int                          `json:"serviceCount"`
 	ServiceNames  []string                     `json:"serviceNames"`
+	// Fix #5: Differentiate custom vs third-party services
+	CustomServiceCount     int      `json:"customServiceCount"`     // Services with Dockerfile/code (developer built)
+	ThirdPartyServiceCount int      `json:"thirdPartyServiceCount"` // Services using image: (postgres, redis, etc.)
+	CustomServiceNames     []string `json:"customServiceNames"`     // Names of custom services
+	ThirdPartyServiceNames []string `json:"thirdPartyServiceNames"` // Names of third-party services
 }
 
 // SignalDetail - Evidence for a signal

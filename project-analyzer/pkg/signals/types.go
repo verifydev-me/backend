@@ -310,6 +310,14 @@ type IntelligenceVerdict struct {
 	DeveloperLevel string `json:"developerLevel"` // JUNIOR/INTERMEDIATE/SENIOR/EXPERT
 	ProjectIntent  string `json:"projectIntent"`  // LEARNING/HOBBY/PRODUCTION/ENTERPRISE
 
+	// ============================================
+	// DIMENSIONAL ANALYSIS (From Go Engine)
+	// ============================================
+	Dimensions         *DimensionalScores     `json:"dimensions,omitempty"`
+	ExperienceAnalysis *ExperienceAnalysis    `json:"experienceAnalysis,omitempty"`
+	TrustAnalysis      *TrustAnalysisDetailed `json:"trustAnalysis,omitempty"`
+	VerdictDetailed    *VerdictDetailed       `json:"verdictDetailed,omitempty"`
+
 	// Signals
 	KeySignals      []string `json:"keySignals"`
 	StrengthSignals []string `json:"strengthSignals"`
@@ -344,11 +352,64 @@ type IntelligenceSuggestion struct {
 
 // IntelligenceSkill - Extracted skill with confidence scoring
 type IntelligenceSkill struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Confidence  int      `json:"confidence"` // 0-100
-	Evidence    []string `json:"evidence"`
-	ResumeReady bool     `json:"resumeReady"`
+	Name          string   `json:"name"`
+	Category      string   `json:"category"`
+	Confidence    int      `json:"confidence"` // 0-100
+	Evidence      []string `json:"evidence"`
+	ResumeReady   bool     `json:"resumeReady"`
+	UsageVerified bool     `json:"usageVerified"` // NEW: True if actual code usage is verified
+	UsageStrength float64  `json:"usageStrength"` // NEW: 0.0-1.0 strength of usage evidence
+}
+
+// ============================================
+// DIMENSIONAL ANALYSIS TYPES (from pkg/api)
+// ============================================
+
+type DimensionScoreData struct {
+	Score      float64  `json:"score"`
+	Confidence float64  `json:"confidence"`
+	Signals    []string `json:"signals,omitempty"`
+}
+
+type DimensionalScores struct {
+	Fundamentals     *DimensionScoreData `json:"fundamentals,omitempty"`
+	EngineeringDepth *DimensionScoreData `json:"engineeringDepth,omitempty"`
+	ProductionReady  *DimensionScoreData `json:"productionReadiness,omitempty"`
+	TestingMaturity  *DimensionScoreData `json:"testingMaturity,omitempty"`
+	Architecture     *DimensionScoreData `json:"architecture,omitempty"`
+	InfraDevOps      *DimensionScoreData `json:"infraDevOps,omitempty"`
+	OverallScore     float64             `json:"overallScore,omitempty"`
+	OverallBandLower int                 `json:"overallBandLower,omitempty"`
+	OverallBandUpper int                 `json:"overallBandUpper,omitempty"`
+}
+
+type ExperienceAnalysis struct {
+	Level           string   `json:"level"`      // JUNIOR/MID/SENIOR/STAFF/PRINCIPAL
+	Confidence      float64  `json:"confidence"` // 0-1
+	YearsMin        int      `json:"yearsMin"`
+	YearsMax        int      `json:"yearsMax"`
+	YearsEstimate   float64  `json:"yearsEstimate"`
+	MatchingFactors []string `json:"matchingFactors,omitempty"`
+}
+
+type TrustAnalysisDetailed struct {
+	Score             float64  `json:"score"`             // 0-100
+	Level             string   `json:"level"`             // LOW/MODERATE/HIGH/VERY_HIGH
+	EffortScore       float64  `json:"effortScore"`       // 0-100
+	EffortClass       string   `json:"effortClass"`       // TRIVIAL/MODEST/SUBSTANTIAL/IMPRESSIVE
+	AuthenticityScore float64  `json:"authenticityScore"` // 0-100
+	IsLearning        bool     `json:"isLearning"`
+	LearningScore     float64  `json:"learningScore"`    // 0-100
+	ConsistencyScore  float64  `json:"consistencyScore"` // 0-100
+	Flags             []string `json:"flags,omitempty"`
+}
+
+type VerdictDetailed struct {
+	Summary        string   `json:"summary"`
+	Strengths      []string `json:"strengths"`
+	GrowthAreas    []string `json:"growthAreas"`
+	Cautions       []string `json:"cautions"`
+	Recommendation string   `json:"recommendation"`
 }
 
 // ============================================
@@ -369,4 +430,128 @@ type AuthorshipVerdict struct {
 	Level      string   `json:"level"`      // "ORGANIC", "SNAPSHOT", "UNCLEAR"
 	Confidence string   `json:"confidence"` // "HIGH", "MEDIUM", "LOW"
 	Reasons    []string `json:"reasons"`
+}
+
+// ============================================
+// ENHANCED INTELLIGENCE V3 TYPES
+// ============================================
+
+// ASTReport - from internal/intelligence/ast_analyzer.go
+type ASTReport struct {
+	TotalFiles        int                 `json:"totalFiles"`
+	TotalFunctions    int                 `json:"totalFunctions"`
+	TotalMethods      int                 `json:"totalMethods"`
+	TotalInterfaces   int                 `json:"totalInterfaces"`
+	Complexity        ComplexityMetrics   `json:"complexity"`
+	GoroutinePatterns GoroutineAnalysis   `json:"goroutinePatterns"`
+	ErrorHandling     ErrorHandlingScore  `json:"errorHandling"`
+	TypeSafety        TypeSafetyScore     `json:"typeSafety"`
+	CodeOrganization  OrganizationMetrics `json:"codeOrganization"`
+}
+
+type ComplexityMetrics struct {
+	Average      float64        `json:"average"`
+	Max          int            `json:"max"`
+	Total        int            `json:"total"`
+	Distribution map[string]int `json:"distribution"`
+}
+
+type GoroutineAnalysis struct {
+	Total          int      `json:"total"`
+	WithContext    int      `json:"withContext"`
+	WithChannels   int      `json:"withChannels"`
+	WithMutex      int      `json:"withMutex"`
+	HasProperSync  bool     `json:"hasProperSync"`
+	PotentialLeaks int      `json:"potentialLeaks"`
+	LeakReasons    []string `json:"leakReasons,omitempty"`
+}
+
+type ErrorHandlingScore struct {
+	Score              int     `json:"score"`
+	TotalErrorChecks   int     `json:"totalErrorChecks"`
+	IgnoredErrors      int     `json:"ignoredErrors"`
+	PanicCalls         int     `json:"panicCalls"`
+	ErrorReturns       int     `json:"errorReturns"`
+	ErrorHandlingRatio float64 `json:"errorHandlingRatio"`
+}
+
+type TypeSafetyScore struct {
+	Score          int `json:"score"`
+	InterfaceUsage int `json:"interfaceUsage"`
+	TypeAssertions int `json:"typeAssertions"`
+	UnsafeUsage    int `json:"unsafeUsage"`
+	ReflectUsage   int `json:"reflectUsage"`
+}
+
+type OrganizationMetrics struct {
+	PackageCount    int     `json:"packageCount"`
+	AvgFuncPerFile  float64 `json:"avgFuncPerFile"`
+	AvgLinesPerFunc float64 `json:"avgLinesPerFunc"`
+	LongFunctions   int     `json:"longFunctions"`
+	SmallFunctions  int     `json:"smallFunctions"`
+}
+
+// SecurityReport - from internal/intelligence/security_scanner.go
+type SecurityReport struct {
+	SecurityScore       int                     `json:"securityScore"`
+	TotalIssues         int                     `json:"totalIssues"`
+	CriticalIssues      int                     `json:"criticalIssues"`
+	HighIssues          int                     `json:"highIssues"`
+	MediumIssues        int                     `json:"mediumIssues"`
+	LowIssues           int                     `json:"lowIssues"`
+	Vulnerabilities     []SecurityVulnerability `json:"vulnerabilities"`
+	CategoryBreakdown   map[string]int          `json:"categoryBreakdown"`
+	HasHardcodedSecrets bool                    `json:"hasHardcodedSecrets"`
+	HasSQLInjection     bool                    `json:"hasSQLInjection"`
+	HasWeakCrypto       bool                    `json:"hasWeakCrypto"`
+}
+
+type SecurityVulnerability struct {
+	Type        string `json:"type"`
+	RuleID      string `json:"ruleId"`
+	Severity    string `json:"severity"`
+	Confidence  string `json:"confidence"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Code        string `json:"code,omitempty"`
+	Description string `json:"description"`
+	CWE         string `json:"cwe,omitempty"`
+}
+
+// StaticReport - from internal/intelligence/static_analyzer.go
+type StaticReport struct {
+	CodeQuality       int            `json:"codeQuality"`
+	TotalIssues       int            `json:"totalIssues"`
+	ErrorIssues       int            `json:"errorIssues"`
+	WarningIssues     int            `json:"warningIssues"`
+	InfoIssues        int            `json:"infoIssues"`
+	Suggestions       []Suggestion   `json:"suggestions"`
+	CategoryBreakdown map[string]int `json:"categoryBreakdown"`
+	HasUnusedCode     bool           `json:"hasUnusedCode"`
+	HasDeprecatedAPIs bool           `json:"hasDeprecatedAPIs"`
+	HasRaceConditions bool           `json:"hasRaceConditions"`
+}
+
+type Suggestion struct {
+	Category    string `json:"category"`
+	Severity    string `json:"severity"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Description string `json:"description"`
+	Suggestion  string `json:"suggestion"`
+}
+
+// LanguageDistribution - from internal/parser/language_detector.go
+type LanguageDistribution struct {
+	Primary            string             `json:"primary"`
+	Languages          map[string]float64 `json:"languages"`
+	TotalBytes         int64              `json:"totalBytes"`
+	TotalFiles         int                `json:"totalFiles"`
+	FilesByLanguage    map[string]int     `json:"filesByLanguage"`
+	IsMultiLanguage    bool               `json:"isMultiLanguage"`
+	HasGeneratedCode   bool               `json:"hasGeneratedCode"`
+	HasVendoredCode    bool               `json:"hasVendoredCode"`
+	DocumentationBytes int64              `json:"documentationBytes"`
+	CodeBytes          int64              `json:"codeBytes"`
+	AccuracyScore      float64            `json:"accuracyScore"`
 }

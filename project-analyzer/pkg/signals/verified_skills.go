@@ -38,15 +38,17 @@ const (
 
 // VerifiedSkill - A skill proven by code evidence
 type VerifiedSkill struct {
-	Name        string        `json:"name"`
-	Category    SkillCategory `json:"category"`
-	Level       SkillLevel    `json:"level"`
-	Confidence  float64       `json:"confidence"`  // 0.0 - 1.0
-	Evidence    []string      `json:"evidence"`    // Human-readable proof
-	Signals     []InfraSignal `json:"signals"`     // Underlying signals
-	Keywords    []string      `json:"keywords"`    // Related keywords for search
-	ResumeReady bool          `json:"resumeReady"` // Safe to put on resume
-	Weight      int           `json:"weight"`      // Importance (1-10) for scoring
+	Name          string        `json:"name"`
+	Category      SkillCategory `json:"category"`
+	Level         SkillLevel    `json:"level"`
+	Confidence    float64       `json:"confidence"`    // 0.0 - 1.0
+	Evidence      []string      `json:"evidence"`      // Human-readable proof
+	Signals       []InfraSignal `json:"signals"`       // Underlying signals
+	Keywords      []string      `json:"keywords"`      // Related keywords for search
+	ResumeReady   bool          `json:"resumeReady"`   // Safe to put on resume
+	Weight        int           `json:"weight"`        // Importance (1-10) for scoring
+	UsageVerified bool          `json:"usageVerified"` // NEW
+	UsageStrength float64       `json:"usageStrength"` // NEW
 }
 
 // ArchitectureType - System architecture classification
@@ -162,6 +164,7 @@ func (ia *IndustryAnalysis) GetTopSkills(n int) []VerifiedSkill {
 }
 
 // CalculateOverallScore calculates the final score
+// Fix #2: Changed from multiplicative to additive bonuses to prevent score inflation
 func (ia *IndustryAnalysis) CalculateOverallScore() float64 {
 	if ia.TotalSkills == 0 {
 		return 0
@@ -183,13 +186,17 @@ func (ia *IndustryAnalysis) CalculateOverallScore() float64 {
 	// Normalize to 0-100
 	score := (weightedSum / totalWeight) * 100
 
-	// Bonus for high skill count
+	// Fix #2: ADDITIVE bonuses instead of multiplicative to prevent score inflation
+	// Old: 10+ skills = 1.1x, 20+ skills = 1.1x again (total 1.21x = 21% bonus!)
+	// New: 10+ skills = +5 points, 20+ skills = +5 more points (total +10 points max)
+	bonus := 0.0
 	if ia.TotalSkills > 10 {
-		score = score * 1.1 // 10% bonus
+		bonus += 5.0 // +5 points for >10 skills
 	}
 	if ia.TotalSkills > 20 {
-		score = score * 1.1 // Another 10%
+		bonus += 5.0 // +5 more for >20 skills
 	}
+	score += bonus
 
 	// Cap at 100
 	if score > 100 {

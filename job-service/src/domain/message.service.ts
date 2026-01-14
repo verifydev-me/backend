@@ -1,5 +1,5 @@
 import { prisma } from '../prisma/client.js';
-import type { Message, SenderType } from '../../node_modules/.prisma/job-client/index.js';
+import type { LegacyMessage as Message, SenderType } from '../../node_modules/.prisma/job-client/index.js';
 
 export interface CreateMessageDTO {
   senderId: string;
@@ -18,7 +18,7 @@ export interface CreateMessageDTO {
 export class MessageService {
   // Send message
   async sendMessage(data: CreateMessageDTO): Promise<Message> {
-    return await prisma.message.create({
+    return await prisma.legacyMessage.create({
       data: {
         ...data,
         isRead: false,
@@ -30,7 +30,7 @@ export class MessageService {
   async getInbox(userId: string, isRecruiter = false) {
     const receiverType: SenderType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
 
-    return await prisma.message.findMany({
+    return await prisma.legacyMessage.findMany({
       where: {
         receiverId: userId,
         receiverType,
@@ -43,7 +43,7 @@ export class MessageService {
   async getSentMessages(userId: string, isRecruiter = false) {
     const senderType: SenderType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
 
-    return await prisma.message.findMany({
+    return await prisma.legacyMessage.findMany({
       where: {
         senderId: userId,
         senderType,
@@ -65,7 +65,7 @@ export class MessageService {
       where.jobId = jobId;
     }
 
-    return await prisma.message.findMany({
+    return await prisma.legacyMessage.findMany({
       where,
       orderBy: { sentAt: 'asc' },
     });
@@ -73,7 +73,7 @@ export class MessageService {
 
   // Mark message as read
   async markAsRead(messageId: string, userId: string): Promise<Message> {
-    const message = await prisma.message.findUnique({
+    const message = await prisma.legacyMessage.findUnique({
       where: { id: messageId },
     });
 
@@ -81,7 +81,7 @@ export class MessageService {
       throw new Error('Message not found or unauthorized');
     }
 
-    return await prisma.message.update({
+    return await prisma.legacyMessage.update({
       where: { id: messageId },
       data: {
         isRead: true,
@@ -94,7 +94,7 @@ export class MessageService {
   async markAllAsRead(userId: string, isRecruiter = false): Promise<number> {
     const receiverType: SenderType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
 
-    const result = await prisma.message.updateMany({
+    const result = await prisma.legacyMessage.updateMany({
       where: {
         receiverId: userId,
         receiverType,
@@ -113,7 +113,7 @@ export class MessageService {
   async getUnreadCount(userId: string, isRecruiter = false): Promise<number> {
     const receiverType: SenderType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
 
-    return await prisma.message.count({
+    return await prisma.legacyMessage.count({
       where: {
         receiverId: userId,
         receiverType,
@@ -124,7 +124,7 @@ export class MessageService {
 
   // Delete message
   async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await prisma.message.findUnique({
+    const message = await prisma.legacyMessage.findUnique({
       where: { id: messageId },
     });
 
@@ -132,7 +132,7 @@ export class MessageService {
       throw new Error('Message not found or unauthorized');
     }
 
-    await prisma.message.delete({
+    await prisma.legacyMessage.delete({
       where: { id: messageId },
     });
   }
@@ -148,7 +148,7 @@ export class MessageService {
       throw new Error('Job not found or unauthorized');
     }
 
-    return await prisma.message.findMany({
+    return await prisma.legacyMessage.findMany({
       where: { jobId },
       orderBy: { sentAt: 'desc' },
     });
@@ -170,7 +170,7 @@ export class MessageService {
       throw new Error('Unauthorized');
     }
 
-    return await prisma.message.findMany({
+    return await prisma.legacyMessage.findMany({
       where: { applicationId },
       orderBy: { sentAt: 'asc' },
     });

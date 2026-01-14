@@ -41,7 +41,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res, next) => {
 router.get('/my-interviews', async (req: AuthenticatedRequest, res, next) => {
   try {
     const { status } = req.query;
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     
     const interviews = isRecruiter
       ? await interviewService.getRecruiterInterviews(req.user!.userId, status as any)
@@ -56,7 +56,7 @@ router.get('/my-interviews', async (req: AuthenticatedRequest, res, next) => {
 // Get upcoming interviews
 router.get('/upcoming', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const isRecruiter = req.user.role === 'recruiter';
+    const isRecruiter = req.user!.role === 'recruiter';
     const interviews = await interviewService.getUpcomingInterviews(
       req.user!.userId,
       isRecruiter

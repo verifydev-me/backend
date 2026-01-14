@@ -1,0 +1,89 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+model ChatRoom {
+    id            String  @id @default(auto()) @map("_id") @db.ObjectId
+    roomId        String  @unique // Format: chat_{jobId}_{candidateId}
+    jobId         String? @db.ObjectId
+    applicationId String? @db.ObjectId
+
+    // Participants stored as JSON or simplified relation
+    // Storing as fields for querying
+    candidateId String @db.ObjectId
+    recruiterId String @db.ObjectId
+
+    // Quick access fields
+    candidateName String?
+    recruiterName String?
+
+    lastMessage  LastMessage?
+    unreadCounts UnreadCount[]
+
+    messages Message[]
+
+    isActive  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([candidateId])
+    @@index([recruiterId])
+    @@index([jobId])
+}
+
+type LastMessage {
+    content  String
+    senderId String   @db.ObjectId
+    sentAt   DateTime
+}
+
+type UnreadCount {
+    userId String @db.ObjectId
+    count  Int    @default(0)
+}
+
+model Message {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    chatRoomId String   @db.ObjectId
+    chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
+
+    roomId     String // Denormalized for easier querying/validation without join
+    senderId   String  @db.ObjectId
+    senderRole Role
+    senderName String?
+
+    content String
+    type    MessageType @default(TEXT)
+
+    metadata Json? // File url, size etc
+
+    readBy ReadReceipt[]
+
+    deliveredAt DateTime?
+    createdAt   DateTime  @default(now())
+
+    @@index([roomId])
+    @@index([senderId])
+}
+
+type ReadReceipt {
+    userId String   @db.ObjectId
+    readAt DateTime @default(now())
+}
+
+enum Role {
+    CANDIDATE
+    RECRUITER
+}
+
+enum MessageType {
+    TEXT
+    FILE
+    SYSTEM
+}

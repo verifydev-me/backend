@@ -1,8 +1,10 @@
-// Types for project signals received from analyzer
+// ============================================
+// PROJECT SIGNALS TYPES (Go Engine Match)
+// ============================================
 
 // Project Types
 export type ProjectType = 
-  | 'microservice'
+  | 'microservices'
   | 'monolith'
   | 'monorepo'   
   | 'library'
@@ -11,8 +13,11 @@ export type ProjectType =
   | 'fullstack'
   | 'frontend'
   | 'backend'
+  | 'ml'
+  | 'mobile'
   | 'unknown';
 
+// Main signals from Go engine
 export interface ProjectSignals {
   projectId: string;
   userId: string;
@@ -27,6 +32,7 @@ export interface ProjectSignals {
   frameworks: string[];
   databases: string[];
   tools: string[];
+  infrastructure?: string[];
 
   // Structure
   folderStructure: FolderAnalysis;
@@ -70,6 +76,10 @@ export interface FolderAnalysis {
   hasServices: boolean;
   hasMiddleware: boolean;
   hasControllers: boolean;
+  hasInternal?: boolean;
+  hasPkg?: boolean;
+  hasCmd?: boolean;
+  hasGateway?: boolean;
   maxDepth: number;
   topLevelFolders: string[];
   organizationScore: number;
@@ -84,316 +94,209 @@ export interface CodeSignals {
   hasDockerCompose: boolean;
   hasCI: boolean;
   hasLinting: boolean;
-  hasPrettier: boolean;
+  hasPrettier?: boolean;
   hasTypeScript: boolean;
-  hasMakefile: boolean;
+  hasMakefile?: boolean;
   testFilesCount: number;
   commentDensity: number;
 }
 
+// ============================================
+// FRAMEWORK-SPECIFIC SIGNALS
+// ============================================
+
 export interface ReactSignals {
-  componentCount: number;
-  customHooksCount: number;
   usesHooks: boolean;
+  usesContext: boolean;
+  usesRedux: boolean;
+  usesRouter: boolean;
+  componentCount: number;
+  hasCustomHooks: boolean;
   usesMemo: boolean;
   usesCallback: boolean;
-  usesContext: boolean;
-  usesReducer: boolean;
-  usesRef: boolean;
-  stateManagement: string;
-  usesLazyLoading: boolean;
-  usesErrorBoundary: boolean;
-  usesSuspense: boolean;
-  usesPortal: boolean;
-  usesForwardRef: boolean;
-  styleApproach: string;
-  hasPropTypes: boolean;
-  componentPatterns: string[];
+  usesPortals: boolean;
+  hasLazyLoading: boolean;
+  usesZustand?: boolean;
+  usesReactQuery?: boolean;
+  hasErrorBoundaries?: boolean;
+  hasSuspense?: boolean;
 }
 
 export interface NodeSignals {
-  framework: string;
-  usesTypeScript: boolean;
+  usesExpress: boolean;
+  usesFastify: boolean;
+  usesNestJS: boolean;
   hasMiddleware: boolean;
-  hasErrorHandling: boolean;
-  hasValidation: boolean;
-  hasAuthentication: boolean;
-  hasRateLimiting: boolean;
-  hasLogging: boolean;
-  hasCaching: boolean;
-  hasWebSocket: boolean;
-  hasGraphQL: boolean;
-  hasSwagger: boolean;
-  databaseORM: string;
-  routesCount: number;
-  middlewareCount: number;
+  hasRoutes: boolean;
+  usesCluster: boolean;
+  hasErrorHandler: boolean;
+  usesStreams: boolean;
+  hasWebSocket?: boolean;
+  usesGraphQL?: boolean;
 }
 
 export interface GoSignals {
-  framework: string;
-  usesInterfaces: boolean;
-  usesGoroutines: boolean;
+  usesGin: boolean;
+  usesEcho: boolean;
+  usesFiber: boolean;
+  hasGoroutines: boolean;
   usesChannels: boolean;
-  usesMutex: boolean;
+  hasInterfaces: boolean;
   usesContext: boolean;
-  usesDefer: boolean;
-  errorHandlingStyle: string;
-  hasTests: boolean;
-  hasBenchmarks: boolean;
-  testCoverage: number;
-  moduleCount: number;
-  packageStructure: string;
+  hasErrorHandling: boolean;
+  usesGRPC?: boolean;
+  hasInternalPkg?: boolean;
 }
 
 export interface PythonSignals {
-  framework: string;
-  usesTypeHints: boolean;
-  usesAsyncAwait: boolean;
-  usesDataclasses: boolean;
-  usesPydantic: boolean;
-  usesDecorators: boolean;
-  usesGenerators: boolean;
-  usesContextMgr: boolean;
-  usesComprehensions: boolean;
-  hasVirtualEnv: boolean;
-  hasRequirements: boolean;
-  hasPyproject: boolean;
-  packageManager: string;
-  testFramework: string;
-  lintTools: string[];
+  usesDjango: boolean;
+  usesFlask: boolean;
+  usesFastAPI: boolean;
+  hasAsyncio: boolean;
+  usesTyping: boolean;
+  hasTesting: boolean;
+  usesVirtualenv: boolean;
+  hasDocstrings: boolean;
+  usesDecorators?: boolean;
+  hasMLLibraries?: boolean;
 }
 
 export interface AdvancedPatterns {
-  // Architecture Patterns
-  usesCleanArch: boolean;
-  usesMvc: boolean;
-  usesMvvm: boolean;
-  usesHexagonal: boolean;
-  usesRepository: boolean;
-  usesFactory: boolean;
-  usesSingleton: boolean;
-  usesObserver: boolean;
-  usesDependencyInj: boolean;
-
-  // Performance Patterns
-  usesLazyLoading: boolean;
-  usesMemoization: boolean;
-  usesCaching: boolean;
-  usesDebouncing: boolean;
-  usesThrottling: boolean;
-  usesVirtualization: boolean;
-  usesCodeSplitting: boolean;
-
-  // API Patterns
-  usesRest: boolean;
-  usesGraphql: boolean;
-  usesWebsocket: boolean;
-  usesGrpc: boolean;
-
-  // Security Patterns
-  hasInputValidation: boolean;
-  hasSanitization: boolean;
+  hasDI: boolean;
+  hasEventSourcing: boolean;
+  hasCQRS: boolean;
+  usesDesignPatterns: string[];
+  hasCleanArch: boolean;
+  hasAPIVersioning: boolean;
   hasRateLimiting: boolean;
-  hasAuth: boolean;
-  hasOauth: boolean;
-  hasJwt: boolean;
-
-  // DevOps Patterns
-  hasHealthCheck: boolean;
-  hasGracefulShutdown: boolean;
-  hasMetrics: boolean;
-  hasTracing: boolean;
-  hasLogging: boolean;
-
-  // Keywords Found
-  advancedKeywords: string[];
+  hasCircuitBreaker?: boolean;
+  hasSagaPattern?: boolean;
 }
 
-// Aura calculation result with full analysis
+// ============================================
+// AURA CALCULATION TYPES
+// ============================================
+
 export interface AuraCalculation {
   projectScore: number;
   breakdown: {
-    structure: number;      // Folder organization
-    codeQuality: number;    // Best practices
-    testing: number;        // Test coverage
-    documentation: number;  // README, comments
-    techStack: number;      // Modern frameworks/tools
-    complexity: number;     // Project size/depth
+    structure: number;
+    codeQuality: number;
+    testing: number;
+    documentation: number;
+    bestPractices: number;
   };
   skills: SkillScore[];
   improvements: string[];
-  
-  // Full Analysis for Recruiter View
-  fullAnalysis: ProjectFullAnalysis;
+  fullAnalysis: FullAnalysis;
 }
 
-export interface ProjectFullAnalysis {
-  // Structure Analysis
-  folderStructure: {
-    hasSrcFolder: boolean;
-    hasComponents: boolean;
-    hasTests: boolean;
-    hasTypes: boolean;
-    hasConfig: boolean;
-    hasDocs: boolean;
-    organizationScore: number;
-    maxDepth: number;
-  };
-  
-  // Code Quality Details
-  codeQuality: {
-    hasLinting: boolean;
-    hasPrettier: boolean;
-    hasTypeScript: boolean;
-    hasDockerfile: boolean;
-    hasCI: boolean;
-    hasEnvExample: boolean;
-    testFilesCount: number;
-    commentDensity: number;
-  };
-  
-  // Best Practices Breakdown
-  bestPractices: {
+export interface SkillScore {
+  name: string;
+  score: number;
+  category: SkillCategory;
+  evidence: string[];
+}
+
+export type SkillCategory = 
+  | 'LANGUAGE'
+  | 'FRAMEWORK'
+  | 'DATABASE'
+  | 'DEVOPS'
+  | 'TOOL'
+  | 'OTHER';
+
+export interface FullAnalysis {
+  summary?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  suggestions?: string[];
+  bestPractices?: {
     followed: string[];
     missing: string[];
-    score: number; // out of 100
+    score?: number;
   };
-  
-  // Optimization Suggestions
-  optimizations: OptimizationSuggestion[];
-  
-  // Framework-Specific Analysis
-  frameworkAnalysis?: {
-    framework: string;
-    patternsDetected: string[];
-    suggestions: string[];
-    advancedUsage: string[];
-  };
-  
-  // Tech Stack Summary
-  techStack: {
-    languages: { name: string; percentage: number }[];
-    frameworks: string[];
-    databases: string[];
-    tools: string[];
-  };
+}
 
-  // Project Type
-  projectType?: ProjectType;
+// ============================================
+// INDUSTRY ANALYSIS (Go: IndustryAnalysis)
+// ============================================
 
-  // Advanced Patterns Summary
-  advancedPatternsSummary?: {
-    detected: string[];
-    score: number;
+export interface IndustryAnalysis {
+  architecture: SystemArchitecture;
+  verifiedSkills: VerifiedSkill[];
+  skillsByCategory: Record<SkillCategory, VerifiedSkill[]>;
+  totalSkills: number;
+  highConfidenceSkills: number;
+  resumeReadySkills: number;
+  overallScore: number;
+  engineeringLevel: string;
+  infraSignals?: {
+    signals: string[];
+    signalDetails?: Record<string, { confidence: number; evidence: string[]; source: string }>;
+    serviceCount: number;
+    serviceNames: string[];
+    customServiceCount?: number;
+    thirdPartyServiceCount?: number;
+    customServiceNames?: string[];
+    thirdPartyServiceNames?: string[];
   };
+}
+
+export interface SystemArchitecture {
+  type: string;
+  services: string[];
+  serviceCount: number;
+  communication: string[];
+  patterns: string[];
+  gateway?: string;
+}
+
+export interface VerifiedSkill {
+  name: string;
+  category: SkillCategory | string;
+  level: string;
+  confidence: number;
+  evidence: string[];
+  keywords: string[];
+  resumeReady: boolean;
+  weight?: number;
+  usageVerified?: boolean; // NEW
+  usageStrength?: number;  // NEW
+}
+
+// ============================================
+// LEGACY TYPES (for aura-calculator compatibility)
+// ============================================
+
+export interface ProjectFullAnalysis {
+  summary?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  suggestions?: string[];
+  bestPractices?: {
+    followed: string[];
+    missing: string[];
+    score?: number;
+  };
+  techStack?: {
+    languages?: any[];
+    frameworks?: string[];
+    databases?: string[];
+    tools?: string[];
+    infrastructure?: string[];
+  };
+  folderStructure?: Partial<FolderAnalysis>;
+  codeQuality?: Partial<CodeSignals>;
+  optimizations?: OptimizationSuggestion[];
+  frameworkAnalysis?: any;
 }
 
 export interface OptimizationSuggestion {
-  category: 'performance' | 'security' | 'structure' | 'testing' | 'documentation';
-  priority: 'high' | 'medium' | 'low';
+  category: string;
+  priority: number;
   title: string;
   description: string;
   impact: string;
 }
 
-export interface SkillScore {
-  name: string;
-  category: 'LANGUAGE' | 'FRAMEWORK' | 'DATABASE' | 'DEVOPS' | 'TOOL';
-  score: number;
-  evidence: string[];
-}
-
-// ============================================
-// INDUSTRY-LEVEL ANALYSIS TYPES
-// From the 3-Layer Deterministic Pipeline
-// ============================================
-
-export type SkillCategory = 
-  | 'architecture'
-  | 'infrastructure'
-  | 'database'
-  | 'messaging'
-  | 'security'
-  | 'devops'
-  | 'observability'
-  | 'testing'
-  | 'language'
-  | 'framework'
-  | 'cloud'
-  | 'performance';
-
-export type SkillLevel = 'basic' | 'intermediate' | 'advanced' | 'expert';
-
-export type ArchitectureType = 
-  | 'monolith'
-  | 'microservices'
-  | 'monorepo'       // Frontend + Backend in one repo
-  | 'serverless'
-  | 'event_driven'
-  | 'modular_monolith'
-  | 'layered'
-  | 'hexagonal'
-  | 'clean_architecture';
-
-export type CommunicationType = 
-  | 'http'
-  | 'rest'
-  | 'graphql'
-  | 'grpc'
-  | 'websocket'
-  | 'message_queue'
-  | 'event_bus';
-
-export interface VerifiedSkill {
-  name: string;
-  category: SkillCategory;
-  level: SkillLevel;
-  confidence: number;       // 0.0 - 1.0
-  evidence: string[];       // Human-readable proof
-  signals: string[];        // Underlying signals
-  keywords: string[];       // Related keywords
-  resumeReady: boolean;     // Safe for resume
-  weight: number;           // Importance (1-10)
-}
-
-export interface SystemArchitecture {
-  type: ArchitectureType;
-  communication: CommunicationType[];
-  gateway?: string;
-  serviceCount: number;
-  services?: string[];
-  patterns: string[];
-  engineeringLevel: string;
-}
-
-export interface IndustryAnalysis {
-  // Architecture Analysis
-  architecture: SystemArchitecture;
-
-  // Verified Skills (the gold)
-  verifiedSkills: VerifiedSkill[];
-
-  // Skill Summary by Category
-  skillsByCategory: Record<SkillCategory, VerifiedSkill[]>;
-
-  // Quality Metrics
-  totalSkills: number;
-  highConfidenceSkills: number;  // confidence >= 0.8
-  resumeReadySkills: number;
-  overallScore: number;          // 0-100
-
-  // Engineering Level
-  engineeringLevel: string;
-
-  // Raw Signals (for transparency)
-  infraSignals?: {
-    signals: string[];
-    serviceCount: number;
-    serviceNames: string[];
-  };
-}
-
-// Updated ProjectSignals to include industry analysis
-export interface ProjectSignalsWithIndustry extends ProjectSignals {
-  industryAnalysis?: IndustryAnalysis;
-}
