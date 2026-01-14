@@ -6,8 +6,16 @@ import path from 'path';
 import { GrpcServer } from '../../../shared/grpc-server';
 import { UserGrpcService } from './user-grpc.service';
 
+// Proto path - works in both dev (src) and prod (dist) environments
+// In Docker, proto files are at /app/proto
+const PROTO_PATH = process.env.NODE_ENV === 'production'
+  ? path.join(process.cwd(), 'proto/user/user_service.proto')
+  : path.join(__dirname, '../../../../proto/user/user_service.proto');
 
-const PROTO_PATH = path.join(__dirname, '../../../../proto/user/user_service.proto');
+const PROTO_INCLUDE_DIR = process.env.NODE_ENV === 'production'
+  ? path.join(process.cwd(), 'proto')
+  : path.join(__dirname, '../../../../proto');
+
 
 /**
  * Start the User Service gRPC server
@@ -20,7 +28,7 @@ export async function startGrpcServer(port: number = 50051): Promise<GrpcServer>
     enums: String,
     defaults: true,
     oneofs: true,
-    includeDirs: [path.join(__dirname, '../../../../proto')],
+    includeDirs: [PROTO_INCLUDE_DIR],
   });
 
   const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;

@@ -1,6 +1,12 @@
 import { logger } from '../utils/logger.js';
 import type { CandidateSearchFilters, CandidateProfile } from '../types/index.js';
 import axios from 'axios';
+import { 
+  searchCandidates as grpcSearchCandidates, 
+  getUser as grpcGetUser,
+  getUserProfile as grpcGetUserProfile,
+  batchGetUsers as grpcBatchGetUsers 
+} from '../grpc/user-client.js';
 
 /**
  * Full Candidate Profile for Recruiter View
@@ -106,7 +112,7 @@ export interface FullCandidateProfile extends CandidateProfile {
   memberSince: string;
 }
 
-// User service URL
+// User service URL (fallback for HTTP)
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:3002';
 
 /**
@@ -118,64 +124,212 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:30
  * - Core count
  * - Location
  * - Open to work status
+ * 
+ * Uses gRPC for high-performance inter-service communication
  */
 export class CandidateService {
   /**
    * Search candidates with filters
-   * Fetches data from user-service internal API
+   * Uses gRPC for high-performance search, falls back to HTTP if needed
    */
   static async searchCandidates(
     filters: CandidateSearchFilters,
     page = 1,
     limit = 20
   ): Promise<{ candidates: CandidateProfile[]; total: number }> {
-    logger.debug({ filters, page, limit }, 'Searching candidates');
+    logger.debug({ filters, page, limit }, 'Searching candidates via gRPC');
 
     try {
-      // Call user-service internal API to search candidates
-      const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/search`, {
-        params: {
-          skills: filters.skills?.join(','),
-          minAuraScore: filters.minAuraScore || filters.minAura,
-          minCoreCount: filters.minCoreCount,
-          location: filters.location,
-          isOpenToWork: filters.isOpenToWork,
-          minSkillScore: filters.minSkillScore,
-          page,
-          limit,
-        },
-        timeout: 10000,
+      // Try gRPC first (faster, more efficient)
+      const result = await grpcSearchCandidates({
+        skills: filters.skills,
+        minAuraScore: filters.minAuraScore || filters.minAura,
+        locationCity: filters.location,
+        page,
+        limit,
       });
 
-      if (response.data.success) {
-        const candidates = response.data.data.candidates || [];
-        const total = response.data.meta?.total || 0;
+      const candidates = (result.candidates || []).map((c: any) => ({
+        id: c.id,
+        username: c.username,
+        name: c.name,
+        avatarUrl: c.avatar_url,
+        bio: c.profile?.bio,
+        location: c.profile?.location?.city,
+        auraScore: c.aura_score || 0,
+        coreCount: 0, // Calculate from projects if needed
+        isOpenToWork: c.profile?.availability === 'AVAILABLE',
+        isVerified: false,
+        topSkills: (c.skills || []).map((s: any) => ({
+          name: s.name,
+          score: s.confidence_score || 0.8,
+        })),
+        topProjects: (c.projects || []).slice(0, 3).map((p: any) => ({
+          name: p.name,
+          techStack: p.tech_stack || [],
+          score: p.quality_score || 0,
+        })),
+        matchScore: this.calculateMatchScore({
+          auraScore: c.aura_score || 0,
+          coreCount: 0,
+          topSkills: c.skills || [],
+          isVerified: false,
+        }, filters),
+      }));
 
-        // Add match scores
-        const candidatesWithMatch: CandidateProfile[] = candidates.map((c: any) => ({
-          ...c,
-          matchScore: this.calculateMatchScore(c, filters),
-        }));
+      return { 
+        candidates, 
+        total: result.pagination?.total || candidates.length 
+      };
+    } catch (grpcError) {
+      logger.warn({ error: grpcError }, 'gRPC search failed, falling back to HTTP');
+      
+      // Fallback to HTTP
+      try {
+        const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/search`, {
+          params: {
+            skills: filters.skills?.join(','),
+            minAuraScore: filters.minAuraScore || filters.minAura,
+            minCoreCount: filters.minCoreCount,
+            location: filters.location,
+            isOpenToWork: filters.isOpenToWork,
+            minSkillScore: filters.minSkillScore,
+            page,
+            limit,
+          },
+          timeout: 10000,
+        });
 
-        return { candidates: candidatesWithMatch, total };
+        if (response.data.success) {
+          const candidates = response.data.data.candidates || [];
+          const total = response.data.meta?.total || 0;
+
+          const candidatesWithMatch: CandidateProfile[] = candidates.map((c: any) => ({
+            ...c,
+            matchScore: this.calculateMatchScore(c, filters),
+          }));
+
+          return { candidates: candidatesWithMatch, total };
+        }
+
+        return { candidates: [], total: 0 };
+      } catch (httpError) {
+        logger.error({ error: httpError }, 'HTTP fallback also failed');
+        return { candidates: [], total: 0 };
       }
-
-      return { candidates: [], total: 0 };
-    } catch (error) {
-      logger.error({ error }, 'Failed to search candidates from user-service');
-      return { candidates: [], total: 0 };
     }
   }
 
   /**
    * Get FULL candidate profile for recruiter
    * Includes all details, analyzed projects, resume
+   * Uses gRPC for high-performance, falls back to HTTP
    */
   static async getFullCandidateProfile(userId: string): Promise<FullCandidateProfile | null> {
-    logger.debug({ userId }, 'Fetching full candidate profile');
+    logger.debug({ userId }, 'Fetching full candidate profile via gRPC');
 
     try {
-      // Fetch user profile from user-service internal API
+      // Try gRPC first
+      const [grpcUser, resumeResponse] = await Promise.all([
+        grpcGetUserProfile(userId, {
+          includeProjects: true,
+          includeSkills: true,
+          includeExperiences: true,
+          includeEducation: true,
+        }).catch(() => null),
+        axios.get(`http://resume-service:8003/api/v1/resumes/user/${userId}/url`, { timeout: 5000 }).catch(() => null),
+      ]);
+
+      if (grpcUser) {
+        const resumeUrl = resumeResponse?.data?.url;
+
+        // Transform gRPC response to full candidate profile
+        const fullProfile: FullCandidateProfile = {
+          id: grpcUser.id,
+          username: grpcUser.username,
+          name: grpcUser.name,
+          avatarUrl: grpcUser.avatar_url,
+          bio: grpcUser.profile?.bio,
+          location: grpcUser.profile?.location?.city,
+          auraScore: grpcUser.aura_score || 0,
+          coreCount: (grpcUser.projects || []).length,
+          isOpenToWork: grpcUser.profile?.availability === 'AVAILABLE',
+          isVerified: false,
+          
+          email: grpcUser.email,
+          website: grpcUser.profile?.social_links?.portfolio,
+          
+          socialLinks: [],
+          topSkills: (grpcUser.skills || []).slice(0, 5).map((s: any) => ({
+            name: s.name,
+            score: s.confidence_score || 0.8,
+          })),
+          
+          allSkills: (grpcUser.skills || []).map((s: any) => ({
+            name: s.name,
+            category: s.category,
+            score: s.confidence_score || 0.8,
+            isVerified: s.verified || false,
+            projectCount: 0,
+            evidence: [],
+          })),
+          
+          topProjects: (grpcUser.projects || []).slice(0, 3).map((p: any) => ({
+            name: p.name,
+            techStack: p.tech_stack || [],
+            score: p.quality_score || 0,
+          })),
+          
+          analyzedProjects: (grpcUser.projects || []).map((p: any) => ({
+            id: p.id,
+            repoName: p.name,
+            repoUrl: p.repo_url,
+            description: p.description,
+            primaryLanguage: (p.tech_stack || [])[0] || '',
+            technologies: p.tech_stack || [],
+            overallScore: p.quality_score || 0,
+            codeQualityScore: p.quality_score || 0,
+            structureScore: p.quality_score || 0,
+            analysis: {
+              folderStructure: {},
+              codeQuality: {},
+              optimizations: [],
+              bestPractices: { followed: [], missing: [] },
+            },
+            analyzedAt: p.created_at?.seconds ? new Date(p.created_at.seconds * 1000).toISOString() : new Date().toISOString(),
+          })),
+          
+          experiences: (grpcUser.experiences || []).map((e: any) => ({
+            company: e.company,
+            position: e.title,
+            startDate: e.start_date?.seconds ? new Date(e.start_date.seconds * 1000).toISOString() : '',
+            endDate: e.end_date?.seconds ? new Date(e.end_date.seconds * 1000).toISOString() : undefined,
+            isCurrent: e.current || false,
+            description: e.description,
+          })),
+          
+          education: (grpcUser.education || []).map((e: any) => ({
+            institution: e.institution,
+            degree: e.degree,
+            field: e.field_of_study,
+            startYear: e.start_date?.seconds ? new Date(e.start_date.seconds * 1000).getFullYear() : 0,
+            endYear: e.end_date?.seconds ? new Date(e.end_date.seconds * 1000).getFullYear() : 0,
+          })),
+          
+          resumeUrl,
+          lastActive: grpcUser.updated_at?.seconds ? new Date(grpcUser.updated_at.seconds * 1000).toISOString() : new Date().toISOString(),
+          memberSince: grpcUser.created_at?.seconds ? new Date(grpcUser.created_at.seconds * 1000).toISOString() : new Date().toISOString(),
+          matchScore: 0,
+        };
+
+        return fullProfile;
+      }
+    } catch (grpcError) {
+      logger.warn({ error: grpcError, userId }, 'gRPC profile fetch failed, falling back to HTTP');
+    }
+
+    // Fallback to HTTP
+    try {
       const [candidateResponse, resumeResponse] = await Promise.all([
         axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${userId}`, { timeout: 10000 }).catch(() => null),
         axios.get(`http://resume-service:8003/api/v1/resumes/user/${userId}/url`, { timeout: 5000 }).catch(() => null),
@@ -188,7 +342,6 @@ export class CandidateService {
       const candidate = candidateResponse.data.data.candidate;
       const resumeUrl = resumeResponse?.data?.url;
 
-      // Transform to full candidate profile
       const fullProfile: FullCandidateProfile = {
         id: candidate.id,
         username: candidate.username,
@@ -200,24 +353,12 @@ export class CandidateService {
         coreCount: candidate.coreCount || 0,
         isOpenToWork: candidate.isOpenToWork,
         isVerified: candidate.isVerified || false,
-        
-        // Contact (if open to work)
         email: candidate.email,
         website: candidate.website,
-        
-        // Social
         socialLinks: candidate.socialLinks || [],
-        
-        // Skills summary for search
         topSkills: candidate.topSkills || [],
-        
-        // All skills with full details
         allSkills: candidate.allSkills || [],
-        
-        // Top projects for search
         topProjects: candidate.topProjects || [],
-        
-        // Full analyzed projects with details
         analyzedProjects: (candidate.analyzedProjects || []).map((p: any) => ({
           id: p.id,
           repoName: p.repoName,
@@ -236,8 +377,6 @@ export class CandidateService {
           },
           analyzedAt: p.analyzedAt,
         })),
-        
-        // Experience
         experiences: (candidate.experiences || []).map((e: any) => ({
           company: e.company,
           position: e.position,
@@ -246,8 +385,6 @@ export class CandidateService {
           isCurrent: e.isCurrent,
           description: e.description,
         })),
-        
-        // Education
         education: (candidate.education || []).map((e: any) => ({
           institution: e.institution,
           degree: e.degree,
@@ -255,14 +392,9 @@ export class CandidateService {
           startYear: e.startYear,
           endYear: e.endYear,
         })),
-        
-        // Resume
         resumeUrl,
-        
-        // Activity
         lastActive: candidate.lastActive || new Date().toISOString(),
         memberSince: candidate.memberSince || new Date().toISOString(),
-        
         matchScore: 0,
       };
 
@@ -275,8 +407,42 @@ export class CandidateService {
 
   /**
    * Get candidate profile (basic - for search results)
+   * Uses gRPC with HTTP fallback
    */
   static async getCandidateProfile(userId: string): Promise<CandidateProfile | null> {
+    try {
+      // Try gRPC first
+      const grpcUser = await grpcGetUser(userId).catch(() => null);
+      
+      if (grpcUser) {
+        return {
+          id: grpcUser.id,
+          username: grpcUser.username,
+          name: grpcUser.name,
+          avatarUrl: grpcUser.avatar_url,
+          bio: grpcUser.profile?.bio,
+          location: grpcUser.profile?.location?.city,
+          auraScore: grpcUser.aura_score || 0,
+          coreCount: 0,
+          isOpenToWork: grpcUser.profile?.availability === 'AVAILABLE',
+          isVerified: false,
+          topSkills: (grpcUser.skills || []).slice(0, 5).map((s: any) => ({
+            name: s.name,
+            score: s.confidence_score || 0.8,
+          })),
+          topProjects: (grpcUser.projects || []).slice(0, 3).map((p: any) => ({
+            name: p.name,
+            techStack: p.tech_stack || [],
+            score: p.quality_score || 0,
+          })),
+          matchScore: 0,
+        };
+      }
+    } catch (grpcError) {
+      logger.warn({ error: grpcError, userId }, 'gRPC getUser failed, falling back to HTTP');
+    }
+
+    // Fallback to HTTP
     try {
       const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${userId}`, {
         timeout: 5000,

@@ -1,6 +1,10 @@
 import { logger } from '../utils/logger.js';
 import type { CandidateProfile } from '../types/index.js';
 import axios from 'axios';
+import { 
+  searchCandidates as grpcSearchCandidates,
+  getUser as grpcGetUser 
+} from '../grpc/user-client.js';
 
 /**
  * Match Score Breakdown
@@ -459,43 +463,36 @@ export class MatchingService {
 
   /**
    * Find and rank candidates for a job
+   * Uses gRPC for high-performance search with HTTP fallback
    */
   static async findMatchingCandidates(
     job: JobRequirements,
     limit = 50
   ): Promise<(CandidateForMatching & MatchResult)[]> {
-    logger.debug({ jobId: job.jobId, limit }, 'Finding matching candidates');
+    logger.debug({ jobId: job.jobId, limit }, 'Finding matching candidates via gRPC');
 
     try {
-      // Fetch candidates from user-service
-      const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/search`, {
-        params: {
-          skills: job.requiredSkills.map(s => s.name).join(','),
-          minAuraScore: job.minAuraScore || 0,
-          minCoreCount: job.minCoreCount || 0,
-          isOpenToWork: true,
-          limit,
-        },
-        timeout: 10000,
+      // Try gRPC first (faster)
+      const result = await grpcSearchCandidates({
+        skills: job.requiredSkills.map(s => s.name),
+        minAuraScore: job.minAuraScore || 0,
+        page: 1,
+        limit,
       });
 
-      if (!response.data.success) {
-        return [];
-      }
-
-      const candidates: CandidateForMatching[] = response.data.data.candidates.map((c: any) => ({
+      const candidates: CandidateForMatching[] = (result.candidates || []).map((c: any) => ({
         id: c.id,
         username: c.username,
         name: c.name,
-        avatarUrl: c.avatarUrl,
-        location: c.location,
-        auraScore: c.auraScore || 0,
-        coreCount: c.coreCount || 0,
-        isOpenToWork: c.isOpenToWork,
-        skills: (c.topSkills || []).map((s: any) => ({
+        avatarUrl: c.avatar_url,
+        location: c.profile?.location?.city,
+        auraScore: c.aura_score || 0,
+        coreCount: (c.projects || []).length,
+        isOpenToWork: c.profile?.availability === 'AVAILABLE',
+        skills: (c.skills || []).map((s: any) => ({
           name: s.name,
-          score: s.score || 0,
-          isVerified: s.isVerified || false,
+          score: s.confidence_score || 0.8,
+          isVerified: s.verified || false,
         })),
       }));
 
@@ -512,14 +509,62 @@ export class MatchingService {
       matchedCandidates.sort((a, b) => b.totalScore - a.totalScore);
 
       return matchedCandidates;
-    } catch (error) {
-      logger.error({ error, jobId: job.jobId }, 'Failed to find matching candidates');
-      return [];
+    } catch (grpcError) {
+      logger.warn({ error: grpcError, jobId: job.jobId }, 'gRPC search failed, falling back to HTTP');
+
+      // Fallback to HTTP
+      try {
+        const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/search`, {
+          params: {
+            skills: job.requiredSkills.map(s => s.name).join(','),
+            minAuraScore: job.minAuraScore || 0,
+            minCoreCount: job.minCoreCount || 0,
+            isOpenToWork: true,
+            limit,
+          },
+          timeout: 10000,
+        });
+
+        if (!response.data.success) {
+          return [];
+        }
+
+        const candidates: CandidateForMatching[] = response.data.data.candidates.map((c: any) => ({
+          id: c.id,
+          username: c.username,
+          name: c.name,
+          avatarUrl: c.avatarUrl,
+          location: c.location,
+          auraScore: c.auraScore || 0,
+          coreCount: c.coreCount || 0,
+          isOpenToWork: c.isOpenToWork,
+          skills: (c.topSkills || []).map((s: any) => ({
+            name: s.name,
+            score: s.score || 0,
+            isVerified: s.isVerified || false,
+          })),
+        }));
+
+        const matchedCandidates = candidates.map(candidate => {
+          const matchResult = this.calculateMatchScore(candidate, job);
+          return {
+            ...candidate,
+            ...matchResult,
+          };
+        });
+
+        matchedCandidates.sort((a, b) => b.totalScore - a.totalScore);
+        return matchedCandidates;
+      } catch (httpError) {
+        logger.error({ error: httpError, jobId: job.jobId }, 'HTTP fallback also failed');
+        return [];
+      }
     }
   }
 
   /**
    * Calculate match for an application
+   * Uses gRPC with HTTP fallback
    */
   static async calculateApplicationMatch(
     candidateId: string,
@@ -527,7 +572,34 @@ export class MatchingService {
     jobRequirements: JobRequirements
   ): Promise<MatchResult | null> {
     try {
-      // Fetch candidate data
+      // Try gRPC first
+      const grpcUser = await grpcGetUser(candidateId).catch(() => null);
+      
+      if (grpcUser) {
+        const candidate: CandidateForMatching = {
+          id: grpcUser.id,
+          username: grpcUser.username,
+          name: grpcUser.name,
+          avatarUrl: grpcUser.avatar_url,
+          location: grpcUser.profile?.location?.city,
+          auraScore: grpcUser.aura_score || 0,
+          coreCount: (grpcUser.projects || []).length,
+          isOpenToWork: grpcUser.profile?.availability === 'AVAILABLE',
+          skills: (grpcUser.skills || []).map((s: any) => ({
+            name: s.name,
+            score: s.confidence_score || 0.8,
+            isVerified: s.verified || false,
+          })),
+        };
+
+        return this.calculateMatchScore(candidate, jobRequirements);
+      }
+    } catch (grpcError) {
+      logger.warn({ error: grpcError, candidateId }, 'gRPC getUser failed, falling back to HTTP');
+    }
+
+    // Fallback to HTTP
+    try {
       const response = await axios.get(`${USER_SERVICE_URL}/api/internal/candidates/${candidateId}`, {
         timeout: 5000,
       });
@@ -562,3 +634,4 @@ export class MatchingService {
 }
 
 export default MatchingService;
+

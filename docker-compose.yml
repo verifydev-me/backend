@@ -174,8 +174,8 @@ services:
   # ==================== JOB SERVICE ====================
   job-service:
     build:
-      context: ./job-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./job-service/Dockerfile
     container_name: verifydev-job
     ports:
       - "${JOB_SERVICE_PORT:-3004}:3004"
@@ -185,6 +185,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
       - ALLOWED_ORIGINS=${CORS_ORIGIN:-http://localhost:3000}
+      - USER_SERVICE_GRPC=user-service:50051
+    depends_on:
+      - user-service
     restart: unless-stopped
     networks:
       - verifydev-network

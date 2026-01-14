@@ -4,6 +4,7 @@ import { prisma } from '../prisma/client.js';
 import { Application as PrismaApplication, Job as PrismaJob, Prisma } from '../../node_modules/.prisma/job-client/index.js';
 import axios from 'axios';
 import { JobService } from './job.service.js';
+import { getUser as grpcGetUser, getUserProfile as grpcGetUserProfile } from '../grpc/user-client.js';
 
 // ============================================
 // TYPES
@@ -93,6 +94,7 @@ function transformApplication(app: PrismaApplication, prismaJob?: PrismaJob | nu
 export class ApplicationService {
   /**
    * Apply to a job
+   * Uses gRPC for user data fetching with HTTP fallback
    */
   async apply(userId: string, jobId: string, data: ApplyJobDto): Promise<ApplicationWithMatch> {
     logger.info({ userId, jobId }, 'User applying to job');
@@ -122,18 +124,45 @@ export class ApplicationService {
     // Get user skills and calculate match
     let matchScore = 50;
     let matchBreakdown: any = [];
+    let userSkills: UserSkill[] = [];
+    let userAura: number = 0;
 
+    // Try gRPC first for user data
     try {
-      const userDataResponse = await axios.get(
-        `http://user-service:3002/api/v1/users/${userId}/skills-summary`,
-        { timeout: 5000 }
-      );
+      const grpcUser = await grpcGetUserProfile(userId, {
+        includeSkills: true,
+        includeProjects: true,
+      });
 
-      const userData = userDataResponse.data.data;
-      const userSkills: UserSkill[] = userData?.skills || [];
-      const userAura: number = userData?.auraScore || 0;
+      if (grpcUser) {
+        userSkills = (grpcUser.skills || []).map((s: any) => ({
+          name: s.name,
+          score: s.confidence_score || 0.8,
+          isVerified: s.verified || false,
+        }));
+        userAura = grpcUser.aura_score || 0;
+        logger.debug({ userId, skillCount: userSkills.length }, 'Fetched user skills via gRPC');
+      }
+    } catch (grpcError) {
+      logger.warn({ error: grpcError, userId }, 'gRPC failed, falling back to HTTP');
+      
+      // Fallback to HTTP
+      try {
+        const userDataResponse = await axios.get(
+          `http://user-service:3002/api/v1/users/${userId}/skills-summary`,
+          { timeout: 5000 }
+        );
 
-      // Calculate skill matches and scores
+        const userData = userDataResponse.data.data;
+        userSkills = userData?.skills || [];
+        userAura = userData?.auraScore || 0;
+      } catch (httpError) {
+        logger.warn({ error: httpError, userId }, 'HTTP fallback also failed');
+      }
+    }
+
+    // Calculate skill matches and scores
+    if (userSkills.length > 0) {
       const skillMatches = userSkills.filter(us =>
         (job.requiredSkills || []).some(reqSkill => us.name.toLowerCase() === reqSkill.toLowerCase())
       );
@@ -162,10 +191,7 @@ export class ApplicationService {
       };
 
       matchScore = Math.round(skillScore * 0.7 + auraScore * 0.3);
-      matchBreakdown = matchResult; // Store the object
-
-    } catch (error) {
-      logger.warn({ error, userId }, 'Could not fetch user skills for match calculation');
+      matchBreakdown = matchResult;
     }
 
     // Get resume URL
