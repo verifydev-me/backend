@@ -203,22 +203,6 @@ jobs:
             fi
           EOF
 
-      - name: Verify all critical services
-        run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            cd ~/verifydev-backend
-            
-            CRITICAL_SERVICES=("verifydev-gateway" "verifydev-auth" "verifydev-user" "verifydev-job" "verifydev-redis" "verifydev-rabbitmq")
-            
-            for service in "${CRITICAL_SERVICES[@]}"; do
-              STATUS=$(docker inspect -f '{{.State.Status}}' $service 2>/dev/null || echo "not found")
-              if [ "$STATUS" == "running" ]; then
-                echo "✅ $service: running"
-              else
-                echo "❌ $service: $STATUS"
-              fi
-            done
-          EOF
 
       - name: Cleanup SSH
         if: always()
