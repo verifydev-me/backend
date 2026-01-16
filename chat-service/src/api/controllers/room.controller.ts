@@ -17,10 +17,39 @@ export const roomController = {
       const { userId } = req.user;
       const rooms = await chatRoomService.getUserRooms(userId);
 
+      // Collect IDs of users with missing names
+      const missingNameIds = new Set<string>();
+      rooms.forEach((room: any) => {
+        const other = chatRoomService.getOtherParticipant(room, userId);
+        if (!other.name || other.name === 'Unknown') {
+          missingNameIds.add(other.userId);
+        }
+      });
+
+      // Fetch missing user details
+      let userMap = new Map();
+      if (missingNameIds.size > 0) {
+        try {
+          const { userClient } = await import('../../services/user-client.service.js');
+          userMap = await userClient.getUsers(Array.from(missingNameIds));
+        } catch (err) {
+          logger.warn({ err }, 'Failed to fetch missing user details');
+        }
+      }
+
       // Enrich with unread counts and otherParticipant details
       const enrichedRooms = rooms.map((room: any) => {
-        const otherParticipant = chatRoomService.getOtherParticipant(room, userId);
+        const otherParticipant = chatRoomService.getOtherParticipant(room, userId) as any;
         
+        // Use fetched name if available and current name is missing
+        if ((!otherParticipant.name || otherParticipant.name === 'Unknown') && userMap.has(otherParticipant.userId)) {
+          const user = userMap.get(otherParticipant.userId);
+          if (user) {
+            otherParticipant.name = user.name;
+            if (user.avatarUrl) otherParticipant.avatarUrl = user.avatarUrl;
+          }
+        }
+
         return {
           ...room,
           unread: room.unreadCounts?.find((u: any) => u.userId === userId)?.count || 0,
