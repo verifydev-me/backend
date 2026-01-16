@@ -17,11 +17,17 @@ export const roomController = {
       const { userId } = req.user;
       const rooms = await chatRoomService.getUserRooms(userId);
 
-      // Enrich with unread counts
-      const enrichedRooms = rooms.map((room) => ({
-        ...room,
-        unread: room.unreadCounts.find(u => u.userId === userId)?.count || 0,
-      }));
+      // Enrich with unread counts and otherParticipant details
+      const enrichedRooms = rooms.map((room: any) => {
+        const otherParticipant = chatRoomService.getOtherParticipant(room, userId);
+        
+        return {
+          ...room,
+          unread: room.unreadCounts?.find((u: any) => u.userId === userId)?.count || 0,
+          // Always include otherParticipant with name
+          otherParticipant
+        };
+      });
 
       res.json({
         success: true,
