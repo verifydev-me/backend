@@ -21,6 +21,7 @@ services:
       - resume-service
       - project-analyzer
       - chat-service
+      - ai-service
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
@@ -352,6 +353,68 @@ services:
         limits:
           memory: 512M
           cpus: '0.5'
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== OLLAMA (Local LLM) ====================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: verifydev-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== AI SERVICE ====================
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile.dev
+    container_name: verifydev-ai
+    ports:
+      - "${AI_SERVICE_PORT:-3008}:3008"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3008
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2
+      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-verifydev_webhook_secret}
+      - JOB_SERVICE_URL=http://job-service:3004
+      - USER_SERVICE_URL=http://user-service:3002
+    volumes:
+      - ./ai-service:/app
+      - /app/node_modules
+    depends_on:
+      - ollama
+      - job-service
+      - user-service
+    restart: unless-stopped
+    networks:
+      - verifydev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
     logging:
       driver: json-file
       options:
@@ -363,6 +426,7 @@ volumes:
   redis_data:
   rabbitmq_data:
   analyzer_repos:
+  ollama_data:
 
 # ==================== NETWORKS ====================
 networks:
