@@ -13,7 +13,7 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
 - [Performance Analysis](./PERFORMANCE.md) - **Latency Metrics & Benchmarks**
 - [Services](#services)
 - [API Routes](#api-routes)
-- [Getting Started](#getting-started)
+- [Getting Started](#getting-started) 
 
 ---
 
