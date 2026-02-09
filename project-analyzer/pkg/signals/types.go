@@ -402,6 +402,7 @@ type TrustAnalysisDetailed struct {
 	EffortScore       float64  `json:"effortScore"`       // 0-100
 	EffortClass       string   `json:"effortClass"`       // TRIVIAL/MODEST/SUBSTANTIAL/IMPRESSIVE
 	AuthenticityScore float64  `json:"authenticityScore"` // 0-100
+	HasOriginalWork   bool     `json:"hasOriginalWork"`   // True if authenticity score >= 60
 	IsLearning        bool     `json:"isLearning"`
 	LearningScore     float64  `json:"learningScore"`    // 0-100
 	ConsistencyScore  float64  `json:"consistencyScore"` // 0-100

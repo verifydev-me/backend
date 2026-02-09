@@ -231,15 +231,23 @@ func (g *GitAnalyzer) parseCommits(logData string) []commitInfo {
 			// Parse stat line: " 5 files changed, 100 insertions(+), 50 deletions(-)"
 			// We want total changes (insertions + deletions) as a proxy for "Diff Size"
 			if strings.Contains(line, "changed") && (strings.Contains(line, "insertion") || strings.Contains(line, "deletion")) {
-				// Regex to extract numbers
-				re := regexp.MustCompile(`(\d+) insertion`)
-				insMatch := re.FindStringSubmatch(line)
+				// Extract insertions
+				reIns := regexp.MustCompile(`(\d+) insertion`)
+				insMatch := reIns.FindStringSubmatch(line)
 				insertions := 0
 				if len(insMatch) > 1 {
 					insertions, _ = strconv.Atoi(insMatch[1])
 				}
 
-				currentCommit.DiffLines += insertions
+				// Extract deletions (was missing — caused DiffLines to be ~50% too low)
+				reDel := regexp.MustCompile(`(\d+) deletion`)
+				delMatch := reDel.FindStringSubmatch(line)
+				deletions := 0
+				if len(delMatch) > 1 {
+					deletions, _ = strconv.Atoi(delMatch[1])
+				}
+
+				currentCommit.DiffLines += insertions + deletions
 			}
 		}
 	}

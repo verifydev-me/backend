@@ -305,8 +305,8 @@ func (s *ExtractedSkill) ComputeConfidence() {
 			Msg("✨ Evidence boost applied")
 	}
 
-	// Resume-ready if confidence > 60 and has evidence
-	s.ResumeReady = s.Confidence >= 60 && len(s.Evidence) > 0
+	// Resume-ready if confidence >= 50 and has evidence (unified threshold)
+	s.ResumeReady = s.Confidence >= 50 && len(s.Evidence) > 0
 }
 
 // ============================================

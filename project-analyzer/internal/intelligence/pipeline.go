@@ -62,7 +62,7 @@ func NewPipeline(repoPath, niche, userProjectType string) *Pipeline {
 		repoPath:        repoPath,
 		niche:           niche,
 		userProjectType: userProjectType,
-		timeout:         1 * time.Second, // Reduced from 2s for speed
+		timeout:         10 * time.Second, // Increased from 1s — 1s was too aggressive and caused premature termination
 	}
 }
 
@@ -520,8 +520,15 @@ func (p *Pipeline) extractSkills(signals *FastSignals, confidence *SignalConfide
 		skills = append(skills, skill)
 	}
 
-	// Infrastructure skills
-	if signals.HasDockerfile {
+	// Infrastructure skills — only add if NOT already in DetectedInfra (prevents duplicates)
+	dockerAlreadyAdded := false
+	for _, infra := range signals.DetectedInfra {
+		if infra == "Docker" || infra == "Docker & Containerization" {
+			dockerAlreadyAdded = true
+		}
+	}
+
+	if signals.HasDockerfile && !dockerAlreadyAdded {
 		skill := ExtractedSkill{
 			Name:       "Docker",
 			Category:   "Infrastructure",
@@ -635,7 +642,7 @@ func (p *Pipeline) extractSkills(signals *FastSignals, confidence *SignalConfide
 	for i, cal := range calibratedSkills {
 		// Update original skill confidence
 		skills[i].Confidence = int(cal.Calibration.CalibratedScore)
-		skills[i].ResumeReady = skills[i].Confidence >= 40 // Strict 40% threshold based on usage
+		skills[i].ResumeReady = skills[i].Confidence >= 50 // Unified 50% threshold
 
 		// Map multipliers for transparency
 		if verdict, ok := usageVerdicts[skills[i].Name]; ok {

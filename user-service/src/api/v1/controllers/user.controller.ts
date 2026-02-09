@@ -4,6 +4,7 @@ import { AuraService } from '../../../domain/aura.service.js';
 import { VisibilityService } from '../../../domain/visibility.service.js';
 import { updateProfileSchema, updateSettingsSchema } from '../validators/user.schema.js';
 import { logger } from '../../../utils/logger.js';
+import { uploadImage, isCloudinaryConfigured } from '../../../utils/cloudinary.js';
 import type { AuthenticatedRequest, ApiResponse } from '../../../types/index.js';
 
 export class UserController {
@@ -212,6 +213,76 @@ export class UserController {
     } catch (error) {
       logger.error({ error }, 'Failed to sync GitHub');
       res.status(500).json({ success: false, message: 'Failed to sync', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /users/me/avatar
+   * Upload custom avatar image
+   */
+  static async uploadAvatar(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      // Check if Cloudinary is configured
+      if (!isCloudinaryConfigured()) {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Image upload service not configured', 
+          error: { code: 'SERVICE_UNAVAILABLE' } 
+        });
+        return;
+      }
+
+      const { image } = req.body as { image?: string };
+
+      if (!image) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'Image is required. Provide base64 encoded image.', 
+          error: { code: 'VALIDATION_ERROR' } 
+        });
+        return;
+      }
+
+      // Validate base64 image size (max 5MB)
+      const base64Size = (image.length * 3) / 4;
+      if (base64Size > 5 * 1024 * 1024) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'Image too large. Maximum size is 5MB.', 
+          error: { code: 'VALIDATION_ERROR' } 
+        });
+        return;
+      }
+
+      // Upload to Cloudinary
+      const result = await uploadImage(image, 'avatars', `user_${req.user.userId}`);
+
+      // Update user's avatarUrl in database
+      const profile = await ProfileService.updateProfile(req.user.userId, {
+        avatarUrl: result.url,
+      });
+
+      logger.info({ userId: req.user.userId, avatarUrl: result.url }, 'Avatar uploaded successfully');
+
+      res.json({
+        success: true,
+        message: 'Avatar uploaded successfully',
+        data: { 
+          avatarUrl: result.url,
+          profile 
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to upload avatar');
+      res.status(500).json({ success: false, message: 'Failed to upload avatar', error: { code: 'INTERNAL_ERROR' } });
     }
   }
 

@@ -321,10 +321,12 @@ const (
 	SignalRollback            InfraSignal = "rollback"
 
 	// Project Quality Signals
-	SignalIncompleteProject InfraSignal = "incomplete_project"
-	SignalMonorepo          InfraSignal = "monorepo"
-	SignalFrontendOnly      InfraSignal = "frontend_only"
-	SignalBackendOnly       InfraSignal = "backend_only"
+	SignalIncompleteProject     InfraSignal = "incomplete_project"
+	SignalMonorepo              InfraSignal = "monorepo"
+	SignalFrontendOnly          InfraSignal = "frontend_only"
+	SignalBackendOnly           InfraSignal = "backend_only"
+	SignalBuildAutomation       InfraSignal = "build_automation"
+	SignalThirdPartyIntegration InfraSignal = "third_party_integration"
 
 	// Frontend & Frameworks (Verification Targets)
 	SignalReact        InfraSignal = "react"
@@ -333,6 +335,8 @@ const (
 	SignalVue          InfraSignal = "vue"
 	SignalAngular      InfraSignal = "angular"
 	SignalSvelte       InfraSignal = "svelte"
+	SignalSolidJS      InfraSignal = "solidjs"
+	SignalPreact       InfraSignal = "preact"
 	SignalRedux        InfraSignal = "redux"
 	SignalZustand      InfraSignal = "zustand"
 	SignalReactQuery   InfraSignal = "react_query"

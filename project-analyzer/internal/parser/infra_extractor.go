@@ -183,7 +183,7 @@ func (e *InfraExtractor) extractRootFileSignals() {
 		"kubernetes":          signals.SignalKubernetes,
 		"k8s":                 signals.SignalKubernetes,
 		"helm":                signals.SignalHelm,
-		"Makefile":            signals.SignalDocker, // Often indicates build automation
+		"Makefile":            signals.SignalBuildAutomation, // Build automation, not Docker
 		".travis.yml":         signals.SignalTravisCI,
 		"Jenkinsfile":         signals.SignalJenkins,
 		".circleci":           signals.SignalCircleCI,
@@ -289,15 +289,16 @@ func (e *InfraExtractor) extractConfigSignals() {
 func (e *InfraExtractor) analyzeEnvFiles(files []string) {
 	envPatterns := map[string]signals.InfraSignal{
 		// Databases
-		"DATABASE_URL": signals.SignalPostgres,
-		"POSTGRES":     signals.SignalPostgres,
-		"PG_":          signals.SignalPostgres,
-		"MYSQL":        signals.SignalMySQL,
-		"MONGODB":      signals.SignalMongoDB,
-		"MONGO_URI":    signals.SignalMongoDB,
-		"REDIS_URL":    signals.SignalRedis,
-		"REDIS_HOST":   signals.SignalRedis,
-		"REDIS":        signals.SignalRedis,
+		// DATABASE_URL is generic — don't assume PostgreSQL, only flag specific patterns
+		// "DATABASE_URL": removed — was causing false PostgreSQL detection
+		"POSTGRES":   signals.SignalPostgres,
+		"PG_":        signals.SignalPostgres,
+		"MYSQL":      signals.SignalMySQL,
+		"MONGODB":    signals.SignalMongoDB,
+		"MONGO_URI":  signals.SignalMongoDB,
+		"REDIS_URL":  signals.SignalRedis,
+		"REDIS_HOST": signals.SignalRedis,
+		"REDIS":      signals.SignalRedis,
 
 		// Message Queues
 		"RABBITMQ":      signals.SignalRabbitMQ,
@@ -333,10 +334,10 @@ func (e *InfraExtractor) analyzeEnvFiles(files []string) {
 		"PROMETHEUS": signals.SignalPrometheus,
 		"GRAFANA":    signals.SignalGrafana,
 
-		// Third-party Services
-		"STRIPE":   signals.SignalAWS, // Using AWS as placeholder for integrations
-		"TWILIO":   signals.SignalAWS,
-		"SENDGRID": signals.SignalAWS,
+		// Third-party Services (no longer mislabeled as AWS)
+		"STRIPE":   signals.SignalThirdPartyIntegration,
+		"TWILIO":   signals.SignalThirdPartyIntegration,
+		"SENDGRID": signals.SignalThirdPartyIntegration,
 
 		// Search & Analytics
 		"ELASTICSEARCH": signals.SignalElasticsearch,

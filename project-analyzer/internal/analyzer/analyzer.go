@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,6 +19,8 @@ import (
 	"github.com/verifydev/project-analyzer/internal/rabbitmq"
 	"github.com/verifydev/project-analyzer/pkg/dimensions"
 	"github.com/verifydev/project-analyzer/pkg/signals"
+	"github.com/verifydev/project-analyzer/pkg/trust"
+	"github.com/verifydev/project-analyzer/pkg/verdict"
 )
 
 type Analyzer struct {
@@ -34,7 +37,7 @@ func NewAnalyzer(cfg *config.Config, rabbit *rabbitmq.RabbitMQ) *Analyzer {
 	}
 }
 
-// Start begins consuming messages and analyzing projects
+// Start begins consuming messages and analyzing projects (legacy single-threaded mode)
 func (a *Analyzer) Start(ctx context.Context) error {
 	msgs, err := a.rabbit.Consume()
 	if err != nil {
@@ -56,6 +59,61 @@ func (a *Analyzer) Start(ctx context.Context) error {
 			}
 
 			a.handleMessage(ctx, msg)
+		}
+	}
+}
+
+// StartWithWorkerPool begins consuming messages with concurrent workers
+// This is the recommended method for production use
+func (a *Analyzer) StartWithWorkerPool(ctx context.Context) error {
+	msgs, err := a.rabbit.Consume()
+	if err != nil {
+		return err
+	}
+
+	workerCount := a.config.WorkerCount
+	if workerCount <= 0 {
+		workerCount = 4 // Default fallback
+	}
+
+	log.Info().
+		Int("workerCount", workerCount).
+		Msg("🚀 Analyzer started with WORKER POOL - waiting for projects...")
+
+	// Create a semaphore to limit concurrent workers
+	sem := make(chan struct{}, workerCount)
+
+	// WaitGroup to track active workers for graceful shutdown
+	var wg sync.WaitGroup
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("Analyzer shutting down, waiting for active workers...")
+			wg.Wait() // Wait for all workers to finish
+			log.Info().Msg("All workers finished, shutdown complete")
+			return nil
+
+		case msg, ok := <-msgs:
+			if !ok {
+				log.Warn().Msg("RabbitMQ channel closed")
+				wg.Wait()
+				return nil
+			}
+
+			// Acquire semaphore slot (blocks if all workers are busy)
+			sem <- struct{}{}
+			wg.Add(1)
+
+			// Process message in goroutine (worker)
+			go func(msg amqp.Delivery) {
+				defer func() {
+					<-sem // Release semaphore slot
+					wg.Done()
+				}()
+
+				a.handleMessage(ctx, msg)
+			}(msg)
 		}
 	}
 }
@@ -363,10 +421,14 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		enrichVerdictWithDimensionalAnalysis(result, intelligenceResult, infraSignals)
 	}
 
-	// Calculate final totals
-	for _, lang := range result.Languages {
-		result.TotalLines += lang.Lines
-		result.TotalFiles += lang.Files
+	// Calculate final totals (only set once — already computed in Phase 1)
+	// TotalLines was set in Phase 1 line ~244, TotalFiles was set by language parser.
+	// Only compute here if they haven't been set yet (defensive)
+	if result.TotalLines == 0 || result.TotalFiles == 0 {
+		for _, lang := range result.Languages {
+			result.TotalLines += lang.Lines
+			result.TotalFiles += lang.Files
+		}
 	}
 
 	// Filter signals based on project type for clean response
@@ -509,6 +571,7 @@ func enrichTechStack(result *signals.ProjectSignals, infra *signals.Infrastructu
 		// Frontend Frameworks
 		"react": "React", "nextjs": "Next.js", "vue": "Vue.js", "angular": "Angular",
 		"svelte": "Svelte", "tailwind": "Tailwind CSS", "redux": "Redux", "zustand": "Zustand",
+		"solidjs": "Solid.js", "preact": "Preact",
 		"react_query": "React Query", "framer_motion": "Framer Motion",
 
 		// Backend Frameworks
@@ -561,6 +624,12 @@ func enrichTechStack(result *signals.ProjectSignals, infra *signals.Infrastructu
 	}
 	if infra.HasSignal(signals.SignalReactQuery) {
 		result.Frameworks = appendUnique(result.Frameworks, "React Query")
+	}
+	if infra.HasSignal(signals.SignalSolidJS) {
+		result.Frameworks = appendUnique(result.Frameworks, "Solid.js")
+	}
+	if infra.HasSignal(signals.SignalPreact) {
+		result.Frameworks = appendUnique(result.Frameworks, "Preact")
 	}
 
 	// Track what we've already added
@@ -746,7 +815,12 @@ func mapToFastSignals(p *signals.ProjectSignals, infra *signals.InfrastructureSi
 		// Infer Microservices
 		if infra.HasSignal("multiple_services") || len(p.FolderStructure.TopLevelFolders) > 2 {
 			fs.HasMicroservices = true
-			fs.ServiceCount = 2 // Minimal assumption
+			// Use actual service count from infra extraction, fallback to 2
+			if infra.ServiceCount > 0 {
+				fs.ServiceCount = infra.ServiceCount
+			} else {
+				fs.ServiceCount = 2 // Minimal assumption when we can't determine exact count
+			}
 		}
 
 		// ML Markers
@@ -873,6 +947,76 @@ func enrichVerdictWithDimensionalAnalysis(
 			Float64("fundamentals", dimMatrix.Fundamentals.Score).
 			Float64("engineering", dimMatrix.EngineeringDepth.Score).
 			Msg("🎯 Dimensional analysis complete")
+
+		// ============================================
+		// TRUST ANALYSIS INTEGRATION
+		// ============================================
+		var commitData *trust.CommitData
+		if result.GitForensics != nil {
+			commitData = &trust.CommitData{
+				TotalCommits: result.GitForensics.CommitCount,
+			}
+		}
+		trustAnalyzer := trust.NewTrustAnalyzer(result, infraSignals, commitData)
+		trustResult := trustAnalyzer.Analyze()
+		if trustResult != nil {
+			result.IntelligenceVerdict.TrustAnalysis = &signals.TrustAnalysisDetailed{
+				Score:             trustResult.OverallTrust.Score,
+				Level:             string(trustResult.OverallTrust.Classification),
+				EffortScore:       trustResult.Effort.EffortScore,
+				EffortClass:       string(trustResult.Effort.Classification),
+				AuthenticityScore: trustResult.Authenticity.AuthenticityScore,
+				IsLearning:        trustResult.Learning.IsLikelyLearning,
+				LearningScore:     trustResult.Learning.LearningScore * 100,
+				ConsistencyScore:  trustResult.Consistency.ConsistencyScore,
+				HasOriginalWork:   trustResult.Authenticity.AuthenticityScore >= 60,
+				Flags:             extractTrustFlags(trustResult),
+			}
+			log.Info().
+				Float64("trustScore", trustResult.OverallTrust.Score).
+				Str("trustLevel", string(trustResult.OverallTrust.Classification)).
+				Msg("🔒 Trust analysis complete")
+		}
+
+		// ============================================
+		// EXPERIENCE & VERDICT DETAILED INTEGRATION
+		// ============================================
+		verdictGen := verdict.NewVerdictGenerator(dimMatrix)
+		verdictResult := verdictGen.Generate()
+		if verdictResult != nil {
+			// Map experience analysis
+			result.IntelligenceVerdict.ExperienceAnalysis = &signals.ExperienceAnalysis{
+				Level:           string(verdictResult.Experience.Level),
+				Confidence:      verdictResult.Experience.Confidence,
+				YearsMin:        int(verdictResult.Experience.EstimatedYears.Min),
+				YearsMax:        int(verdictResult.Experience.EstimatedYears.Max),
+				YearsEstimate:   verdictResult.Experience.EstimatedYears.Estimate,
+				MatchingFactors: verdictResult.Experience.SupportingSignals,
+			}
+
+			// Map verdict detailed
+			strengthTexts := make([]string, 0, len(verdictResult.Strengths))
+			for _, s := range verdictResult.Strengths {
+				strengthTexts = append(strengthTexts, s.Statement)
+			}
+			growthTexts := make([]string, 0, len(verdictResult.GrowthAreas))
+			for _, g := range verdictResult.GrowthAreas {
+				growthTexts = append(growthTexts, g.Statement)
+			}
+			result.IntelligenceVerdict.VerdictDetailed = &signals.VerdictDetailed{
+				Summary:        verdictResult.Summary,
+				Strengths:      strengthTexts,
+				GrowthAreas:    growthTexts,
+				Cautions:       verdictResult.Cautions,
+				Recommendation: verdictResult.HiringRecommendation,
+			}
+			log.Info().
+				Str("experienceLevel", string(verdictResult.Experience.Level)).
+				Float64("experienceConfidence", verdictResult.Experience.Confidence).
+				Int("strengths", len(verdictResult.Strengths)).
+				Int("growthAreas", len(verdictResult.GrowthAreas)).
+				Msg("📋 Verdict generation complete")
+		}
 	}
 
 	// CRITICAL FIX: Sync Usage Verification from IntelligenceVerdict to IndustryAnalysis
@@ -898,4 +1042,17 @@ func enrichVerdictWithDimensionalAnalysis(
 			}
 		}
 	}
+}
+
+// extractTrustFlags converts trust flags to string slice for JSON output
+func extractTrustFlags(trustResult *trust.TrustAnalysis) []string {
+	flags := make([]string, 0, len(trustResult.Flags))
+	for _, f := range trustResult.Flags {
+		flags = append(flags, fmt.Sprintf("[%s] %s", f.Type, f.Message))
+	}
+	// Also include consistency issues as flags
+	for _, issue := range trustResult.Consistency.Issues {
+		flags = append(flags, fmt.Sprintf("[%s] %s: %s", issue.Severity, issue.Type, issue.Evidence))
+	}
+	return flags
 }

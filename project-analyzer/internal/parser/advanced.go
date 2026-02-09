@@ -9,6 +9,18 @@ import (
 	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
+// Pre-compiled regex patterns (avoid recompiling per-file — was O(n×m) CPU waste)
+var (
+	reRESTPattern  = regexp.MustCompile(`(app\.(get|post|put|delete|patch)|router\.(get|post|put|delete))`)
+	rePyTypeHints  = regexp.MustCompile(`def\s+\w+\([^)]*:\s*\w+`)
+	rePyDecorators = regexp.MustCompile(`@\w+`)
+	rePyListComp   = regexp.MustCompile(`\[\s*\w+\s+for\s+`)
+	rePyDictComp   = regexp.MustCompile(`{\s*\w+:\s*\w+\s+for\s+`)
+	reGoInterface  = regexp.MustCompile(`type\s+\w+\s+interface`)
+	reGoGoroutine  = regexp.MustCompile(`go\s+\w+\(`)
+	reNodeRoutes   = regexp.MustCompile(`\.(get|post|put|delete|patch)\s*\(`)
+)
+
 // AnalyzeAdvancedPatterns detects advanced coding patterns
 func (p *FileParser) AnalyzeAdvancedPatterns() *signals.AdvancedPatterns {
 	ap := &signals.AdvancedPatterns{}
@@ -76,7 +88,7 @@ func (p *FileParser) AnalyzeAdvancedPatterns() *signals.AdvancedPatterns {
 		}
 
 		// API Patterns
-		if regexp.MustCompile(`(app\.(get|post|put|delete|patch)|router\.(get|post|put|delete))`).MatchString(text) {
+		if reRESTPattern.MatchString(text) {
 			ap.UsesREST = true
 		}
 		if strings.Contains(text, "graphql") || strings.Contains(text, "GraphQL") ||
@@ -283,7 +295,7 @@ func (p *FileParser) AnalyzePython() *signals.PythonSignals {
 		text := string(content)
 
 		// Type hints
-		if regexp.MustCompile(`def\s+\w+\([^)]*:\s*\w+`).MatchString(text) ||
+		if rePyTypeHints.MatchString(text) ||
 			strings.Contains(text, "-> ") {
 			ps.UsesTypeHints = true
 		}
@@ -304,7 +316,7 @@ func (p *FileParser) AnalyzePython() *signals.PythonSignals {
 		}
 
 		// Decorators
-		if regexp.MustCompile(`@\w+`).MatchString(text) {
+		if rePyDecorators.MatchString(text) {
 			ps.UsesDecorators = true
 		}
 
@@ -319,8 +331,8 @@ func (p *FileParser) AnalyzePython() *signals.PythonSignals {
 		}
 
 		// Comprehensions
-		if regexp.MustCompile(`\[\s*\w+\s+for\s+`).MatchString(text) ||
-			regexp.MustCompile(`{\s*\w+:\s*\w+\s+for\s+`).MatchString(text) {
+		if rePyListComp.MatchString(text) ||
+			rePyDictComp.MatchString(text) {
 			ps.UsesComprehensions = true
 		}
 
@@ -399,12 +411,12 @@ func (p *FileParser) AnalyzeGo() *signals.GoSignals {
 		text := string(content)
 
 		// Interfaces
-		if regexp.MustCompile(`type\s+\w+\s+interface`).MatchString(text) {
+		if reGoInterface.MatchString(text) {
 			gs.UsesInterfaces = true
 		}
 
 		// Goroutines
-		if strings.Contains(text, "go ") && regexp.MustCompile(`go\s+\w+\(`).MatchString(text) {
+		if strings.Contains(text, "go ") && reGoGoroutine.MatchString(text) {
 			gs.UsesGoroutines = true
 		}
 
@@ -522,7 +534,7 @@ func (p *FileParser) AnalyzeNode() *signals.NodeSignals {
 
 		// Routes detection
 		if strings.Contains(path, "routes") || strings.Contains(path, "router") {
-			matches := regexp.MustCompile(`\.(get|post|put|delete|patch)\s*\(`).FindAllStringIndex(fileText, -1)
+			matches := reNodeRoutes.FindAllStringIndex(fileText, -1)
 			routesCount += len(matches)
 		}
 

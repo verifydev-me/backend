@@ -11,15 +11,17 @@ import (
 )
 
 type RabbitMQ struct {
-	conn         *amqp.Connection
-	channel      *amqp.Channel
-	exchangeName string
-	consumeQueue string
-	publishQueue string
+	conn          *amqp.Connection
+	channel       *amqp.Channel
+	exchangeName  string
+	consumeQueue  string
+	publishQueue  string
+	prefetchCount int // Number of messages to prefetch (should match worker count)
 }
 
 // NewRabbitMQ creates a new RabbitMQ connection
-func NewRabbitMQ(url, exchangeName, consumeQueue, publishQueue string) (*RabbitMQ, error) {
+// prefetchCount should match the number of workers for optimal performance
+func NewRabbitMQ(url, exchangeName, consumeQueue, publishQueue string, prefetchCount int) (*RabbitMQ, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
@@ -31,12 +33,18 @@ func NewRabbitMQ(url, exchangeName, consumeQueue, publishQueue string) (*RabbitM
 		return nil, fmt.Errorf("failed to open channel: %w", err)
 	}
 
+	// Default to 4 if not specified
+	if prefetchCount <= 0 {
+		prefetchCount = 4
+	}
+
 	rmq := &RabbitMQ{
-		conn:         conn,
-		channel:      ch,
-		exchangeName: exchangeName,
-		consumeQueue: consumeQueue,
-		publishQueue: publishQueue,
+		conn:          conn,
+		channel:       ch,
+		exchangeName:  exchangeName,
+		consumeQueue:  consumeQueue,
+		publishQueue:  publishQueue,
+		prefetchCount: prefetchCount,
 	}
 
 	// Setup exchange and queues
@@ -45,7 +53,9 @@ func NewRabbitMQ(url, exchangeName, consumeQueue, publishQueue string) (*RabbitM
 		return nil, err
 	}
 
-	log.Info().Msg("✅ RabbitMQ connected")
+	log.Info().
+		Int("prefetchCount", prefetchCount).
+		Msg("✅ RabbitMQ connected with worker pool support")
 	return rmq, nil
 }
 
@@ -155,11 +165,11 @@ func (r *RabbitMQ) setup() error {
 
 // Consume starts consuming messages from the consume queue
 func (r *RabbitMQ) Consume() (<-chan amqp.Delivery, error) {
-	// Set QoS - process one message at a time
+	// Set QoS - prefetch count matches worker pool size for optimal throughput
 	err := r.channel.Qos(
-		1,     // prefetch count
-		0,     // prefetch size
-		false, // global
+		r.prefetchCount, // prefetch count (matches worker count)
+		0,               // prefetch size
+		false,           // global
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set QoS: %w", err)
@@ -178,7 +188,10 @@ func (r *RabbitMQ) Consume() (<-chan amqp.Delivery, error) {
 		return nil, fmt.Errorf("failed to register consumer: %w", err)
 	}
 
-	log.Info().Str("queue", r.consumeQueue).Msg("Started consuming messages")
+	log.Info().
+		Str("queue", r.consumeQueue).
+		Int("prefetchCount", r.prefetchCount).
+		Msg("🚀 Started consuming messages with worker pool")
 	return msgs, nil
 }
 

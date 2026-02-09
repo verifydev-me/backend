@@ -40,36 +40,46 @@ func main() {
 ║   • Extract signals (frameworks, patterns)                ║
 ║   • Publish signals to RabbitMQ                          ║
 ║                                                           ║
+║   🚀 WORKER POOL ENABLED                                  ║
+║   • Concurrent message processing                         ║
+║   • Configurable worker count                             ║
+║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 	`)
 
-	// Connect to RabbitMQ
+	log.Info().
+		Int("workerCount", cfg.WorkerCount).
+		Int("prefetchCount", cfg.PrefetchCount).
+		Msg("🔧 Worker pool configuration loaded")
+
+	// Connect to RabbitMQ with worker pool support
 	rabbit, err := rabbitmq.NewRabbitMQ(
 		cfg.RabbitMQURL,
 		cfg.ExchangeName,
 		cfg.ConsumeQueue,
 		cfg.PublishQueue,
+		cfg.PrefetchCount, // Match prefetch to worker count
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
 	}
 	defer rabbit.Close()
 
-	// Create analyzer
+	// Create analyzer with worker pool
 	anlzr := analyzer.NewAnalyzer(cfg, rabbit)
 
 	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Start analyzer in goroutine
+	// Start analyzer with worker pool in goroutine
 	go func() {
-		if err := anlzr.Start(ctx); err != nil {
+		if err := anlzr.StartWithWorkerPool(ctx); err != nil {
 			log.Error().Err(err).Msg("Analyzer stopped with error")
 		}
 	}()
 
 	// Start HTTP server for health checks
-	router := setupRouter()
+	router := setupRouter(cfg)
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: router,
@@ -111,7 +121,7 @@ func setupLogger() {
 	}
 }
 
-func setupRouter() *gin.Engine {
+func setupRouter(cfg *config.Config) *gin.Engine {
 	if os.Getenv("ENV") == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -119,15 +129,17 @@ func setupRouter() *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	// Health check
+	// Health check with worker pool info
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "Project Analyzer is healthy",
 			"data": gin.H{
-				"service":   "project-analyzer",
-				"version":   "1.0.0",
-				"timestamp": time.Now().Format(time.RFC3339),
+				"service":       "project-analyzer",
+				"version":       "2.0.0-workerpool",
+				"timestamp":     time.Now().Format(time.RFC3339),
+				"workerCount":   cfg.WorkerCount,
+				"prefetchCount": cfg.PrefetchCount,
 			},
 		})
 	})
@@ -136,7 +148,20 @@ func setupRouter() *gin.Engine {
 	router.GET("/ready", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"message": "Ready to analyze",
+			"message": "Ready to analyze with worker pool",
+		})
+	})
+
+	// Metrics endpoint for worker pool stats
+	router.GET("/metrics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Worker pool metrics",
+			"data": gin.H{
+				"workerCount":   cfg.WorkerCount,
+				"prefetchCount": cfg.PrefetchCount,
+				// Note: Actual runtime metrics would be added from analyzer.GetMetrics()
+			},
 		})
 	})
 

@@ -170,9 +170,20 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
           orderBy: [{ isHighlighted: 'desc' }, { verifiedScore: 'desc' }] 
         },
         // Only get projects user has chosen to show to recruiters
+        // Include full analysis data for detailed view
         projects: {
           where: { showToRecruiters: true },
           orderBy: [{ isPinned: 'desc' }, { overallScore: 'desc' }],
+          include: {
+            analysis: {
+              include: {
+                verifiedSkills: true,
+                optimizationSuggestions: true,
+                languageStats: true,
+                reactAnalysis: true,
+              }
+            }
+          }
         },
         experiences: { orderBy: { startDate: 'desc' } },
         socialLinks: true,
@@ -232,21 +243,96 @@ router.get('/candidates/:userId', async (req: Request, res: Response<ApiResponse
         isVerified: s.isVerified,
       })),
 
-      // Projects (only those marked for recruiter visibility)
-      analyzedProjects: user.projects.map((p) => ({
-        id: p.id,
-        repoName: p.repoName,
-        repoUrl: p.githubRepoUrl,
-        description: p.description,
-        primaryLanguage: p.language,
-        overallScore: p.overallScore || 0,
-        codeQualityScore: p.codeQualityScore || 0,
-        structureScore: p.structureScore || 0,
-        stars: p.stars,
-        forks: p.forks,
-        isPinned: p.isPinned,
-        analyzedAt: p.analyzedAt?.toISOString(),
-      })),
+      // Projects (with full analysis data)
+      analyzedProjects: user.projects.map((p) => {
+        const analysis = p.analysis;
+        return {
+          id: p.id,
+          repoName: p.repoName,
+          repoUrl: p.githubRepoUrl,
+          description: p.description,
+          primaryLanguage: analysis?.primaryLanguage || p.language,
+          // Technologies from analysis
+          technologies: [
+            ...(analysis?.frameworks || []),
+            ...(analysis?.databases || []),
+            ...(analysis?.tools || []),
+            ...(analysis?.infrastructure || []),
+          ],
+          overallScore: p.overallScore || 0,
+          codeQualityScore: p.codeQualityScore || analysis?.codeQualityScore || 0,
+          structureScore: p.structureScore || analysis?.structureScore || 0,
+          stars: p.stars,
+          forks: p.forks,
+          isPinned: p.isPinned,
+          // Full analysis details
+          analysis: analysis ? {
+            folderStructure: {
+              hasSrcFolder: analysis.hasSrcFolder,
+              hasComponents: analysis.hasComponents,
+              hasTests: analysis.hasTests,
+              hasTypes: analysis.hasTypes,
+              hasUtils: analysis.hasUtils,
+              hasConfig: analysis.hasConfig,
+              organizationScore: analysis.organizationScore,
+            },
+            codeQuality: {
+              hasLinting: analysis.hasLinting,
+              hasPrettier: analysis.hasPrettier,
+              hasTypeScript: analysis.hasTypeScript,
+              hasDockerfile: analysis.hasDockerfile,
+              hasCI: analysis.hasCI,
+              ciPlatform: analysis.ciPlatform,
+              testFilesCount: analysis.testFilesCount,
+              hasReadme: analysis.hasReadme,
+            },
+            optimizations: (analysis.optimizationSuggestions || []).map(o => ({
+              title: o.title,
+              description: o.description,
+              category: o.category,
+              priority: o.priority,
+              impact: o.impact,
+            })),
+            bestPractices: {
+              followed: analysis.bestPracticesFollowed || [],
+              missing: analysis.bestPracticesMissing || [],
+              score: analysis.bestPracticesScore,
+            },
+            // React-specific if available
+            reactAnalysis: analysis.reactAnalysis ? {
+              usesHooks: analysis.reactAnalysis.usesHooks,
+              usesContext: analysis.reactAnalysis.usesContext,
+              componentCount: analysis.reactAnalysis.componentCount,
+              customHooksCount: analysis.reactAnalysis.customHooksCount,
+              stateManagement: analysis.reactAnalysis.stateManagement,
+              patterns: analysis.reactAnalysis.patternsDetected,
+            } : null,
+            // Verified skills from this project
+            verifiedSkills: (analysis.verifiedSkills || []).map(s => ({
+              name: s.name,
+              category: s.category,
+              confidence: s.confidence,
+              evidence: s.evidence,
+            })),
+            // Architecture info
+            architectureType: analysis.architectureType,
+            serviceCount: analysis.serviceCount,
+            engineeringLevel: analysis.engineeringLevel,
+            // Languages breakdown
+            languages: (analysis.languageStats || []).map(l => ({
+              name: l.name,
+              percentage: l.percentage,
+              lines: l.lines,
+            })),
+          } : {
+            folderStructure: {},
+            codeQuality: {},
+            optimizations: [],
+            bestPractices: { followed: [], missing: [] },
+          },
+          analyzedAt: p.analyzedAt?.toISOString(),
+        };
+      }),
       topProjects: user.projects.slice(0, 3).map((p) => ({
         name: p.repoName,
         score: p.overallScore || 0,

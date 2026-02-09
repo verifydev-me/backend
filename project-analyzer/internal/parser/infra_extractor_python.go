@@ -83,10 +83,29 @@ func (e *InfraExtractor) analyzePythonDependencies(content, serviceName, sourceF
 		"azure-storage": signals.SignalAzure,
 	}
 
-	for pattern, signal := range depSignals {
-		if strings.Contains(contentStr, strings.ToLower(pattern)) {
-			evidence := fmt.Sprintf("%s/%s → %s", serviceName, sourceFile, pattern)
-			e.signals.AddSignal(signal, 0.9, []string{evidence}, "deep_service_scan")
+	// Line-based matching to prevent partial matches (e.g., "redis" matching "redis-lock")
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Extract package name (before ==, >=, ~=, [, etc.)
+		pkgName := line
+		for _, sep := range []string{"==", ">=", "<=", "~=", "!=", "[", ">", "<", " "} {
+			if idx := strings.Index(pkgName, sep); idx > 0 {
+				pkgName = pkgName[:idx]
+			}
+		}
+		pkgName = strings.TrimSpace(pkgName)
+		if pkgName == "" {
+			continue
+		}
+		for pattern, signal := range depSignals {
+			if pkgName == strings.ToLower(pattern) {
+				evidence := fmt.Sprintf("%s/%s → %s", serviceName, sourceFile, pattern)
+				e.signals.AddSignal(signal, 0.9, []string{evidence}, "deep_service_scan")
+			}
 		}
 	}
 }

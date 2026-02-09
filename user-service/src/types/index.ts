@@ -149,6 +149,7 @@ export interface UpdateProfileDto {
   company?: string;
   website?: string;
   twitterHandle?: string;
+  avatarUrl?: string;
 }
 
 export interface UpdateSettingsDto {

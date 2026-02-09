@@ -3,6 +3,7 @@ package matching
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/verifydev/project-analyzer/pkg/dimensions"
 	"github.com/verifydev/project-analyzer/pkg/verdict"
@@ -444,8 +445,12 @@ func categorizeFit(score float64) FitCategory {
 }
 
 func normalizeSkillName(name string) string {
-	// Simple normalization - lowercase and remove spaces
-	return name // In production, add proper normalization
+	// Normalize: lowercase, trim spaces, replace special chars for consistent matching
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	normalized = strings.ReplaceAll(normalized, " ", "-")
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.ReplaceAll(normalized, ".", "")
+	return normalized
 }
 
 func proficiencyMeets(have, need string) bool {

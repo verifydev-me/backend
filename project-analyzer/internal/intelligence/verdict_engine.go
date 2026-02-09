@@ -191,21 +191,21 @@ func (e *VerdictEngine) calculateOverallScore() float64 {
 		baseScore += 2
 	}
 
-	// Penalties REMOVED for user happiness
-	// if !e.signals.HasTests && e.signals.CodeFiles > 10 {
-	// 	baseScore -= 10
-	// }
-	// if !e.signals.HasCI && e.intent == IntentProduction {
-	// 	baseScore -= 5
-	// }
+	// Penalties — restored with balanced values for accuracy
+	if !e.signals.HasTests && e.signals.CodeFiles > 10 {
+		baseScore -= 5 // Reduced from -10, still meaningful
+	}
+	if !e.signals.HasCI && e.intent == IntentProduction {
+		baseScore -= 3 // Reduced from -5
+	}
 
 	// Authenticity Adjustments (Git Forensics)
 	if e.authorship != nil {
 		if e.authorship.Level == "ORGANIC" && e.authorship.Confidence == "HIGH" {
-			baseScore += 20 // Major boost for verified organic growth
+			baseScore += 10 // Boost for verified organic growth (reduced from +20 to prevent inflation)
 		}
 		if e.authorship.Level == "SNAPSHOT" {
-			baseScore -= 40 // Major penalty for dump/fake projects
+			baseScore -= 25 // Penalty for dump/fake projects (reduced from -40 for less volatility)
 		}
 	}
 

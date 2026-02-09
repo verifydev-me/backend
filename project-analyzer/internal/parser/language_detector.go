@@ -19,6 +19,7 @@ import (
 // LanguageDetector performs accurate language detection using go-enry
 type LanguageDetector struct {
 	repoPath string
+	cache    *LanguageDistribution // Cache result to avoid redundant scans
 }
 
 // LanguageDistribution contains language analysis results
@@ -43,8 +44,13 @@ func NewLanguageDetector(repoPath string) *LanguageDetector {
 	}
 }
 
-// Detect performs accurate language detection
+// Detect performs accurate language detection (cached — safe to call multiple times)
 func (d *LanguageDetector) Detect() (*LanguageDistribution, error) {
+	// Return cached result if available (was called 4+ times per analysis)
+	if d.cache != nil {
+		return d.cache, nil
+	}
+
 	log.Info().Str("path", d.repoPath).Msg("Starting enhanced language detection")
 
 	dist := &LanguageDistribution{
@@ -147,6 +153,9 @@ func (d *LanguageDetector) Detect() (*LanguageDistribution, error) {
 		Bool("multiLanguage", dist.IsMultiLanguage).
 		Float64("accuracy", dist.AccuracyScore).
 		Msg("Language detection completed")
+
+	// Cache result to avoid redundant scans
+	d.cache = dist
 
 	return dist, nil
 }

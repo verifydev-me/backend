@@ -315,6 +315,10 @@ services:
       - PUBLISH_QUEUE=project.analyzed
       - CLONE_DIR=/tmp/repos
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Worker Pool Configuration - process multiple repos concurrently
+      - WORKER_COUNT=${ANALYZER_WORKER_COUNT:-4}
+      - PREFETCH_COUNT=${ANALYZER_PREFETCH_COUNT:-4}
+      - ANALYSIS_TIMEOUT_SEC=${ANALYSIS_TIMEOUT_SEC:-120}
     volumes:
       - analyzer_repos:/tmp/repos
     depends_on:

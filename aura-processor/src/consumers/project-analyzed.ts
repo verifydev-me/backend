@@ -251,11 +251,26 @@ function mapTrustLevel(level?: string): 'UNVERIFIED' | 'LOW' | 'MEDIUM' | 'HIGH'
   return validLevels.includes(normalized) ? normalized as any : undefined;
 }
 
-function mapEffortClass(effortClass?: string): 'MINIMAL' | 'LOW' | 'MODERATE' | 'SIGNIFICANT' | 'SUBSTANTIAL' | 'MAJOR' | undefined {
-  if (!effortClass) return undefined;
+function mapEffortClass(effortClass?: string): 'MINIMAL' | 'LOW' | 'MODERATE' | 'SIGNIFICANT' | 'SUBSTANTIAL' | 'MAJOR' | null {
+  if (!effortClass) return null;
   const normalized = effortClass.toUpperCase();
+  // Map Go's EffortClassification values to Prisma EffortClass enum
+  const aliasMap: Record<string, string> = {
+    'SUSPICIOUS': 'MINIMAL', // Go sends SUSPICIOUS — map to closest Prisma enum
+  };
+  const mapped = aliasMap[normalized] || normalized;
   const validClasses = ['MINIMAL', 'LOW', 'MODERATE', 'SIGNIFICANT', 'SUBSTANTIAL', 'MAJOR'];
-  return validClasses.includes(normalized) ? normalized as any : undefined;
+  return validClasses.includes(mapped) ? mapped as any : null;
+}
+
+function formatYearRange(yearsMin?: number, yearsMax?: number, yearsEstimate?: string | number): string | null {
+  if (yearsMin != null && yearsMax != null) {
+    return `${yearsMin}-${yearsMax} years`;
+  }
+  if (yearsEstimate != null) {
+    return String(yearsEstimate);
+  }
+  return null;
 }
 
 // ============================================
@@ -385,91 +400,180 @@ async function updateProject(
       },
     });
 
-    // 2. SIMPLIFIED: Store only essential analysis data to avoid MongoDB pipeline limit
-    // Split into: (a) Core analysis (b) Dimensional analysis (c) Relations
+    // 2. Build analysis data — all fields in a flat object
+    // NOTE: We use raw MongoDB $set via runCommandRaw to avoid
+    // MongoDB Atlas's 50-stage aggregation pipeline limit (P2010 error).
+    // Prisma's update/upsert generates one pipeline stage per field,
+    // and this model has 90+ fields which exceeds the 50-stage limit.
     
-    const coreAnalysisData = {
-      analyzerVersion: signals.analysisVersion || '3.0.0',
-      analyzedAt: new Date(),
+    const now = new Date();
+    const analysisFields: Record<string, any> = {
+      analyzer_version: signals.analysisVersion || '3.0.0',
+      analyzed_at: { $date: now.toISOString() },
+      updated_at: { $date: now.toISOString() },
       
       // Scores
-      overallScore: projectScore,
-      structureScore: breakdown.structure,
-      codeQualityScore: breakdown.codeQuality,
-      testingScore: breakdown.testing || 0,
-      documentationScore: breakdown.documentation || 0,
-      bestPracticesScore: breakdown.bestPractices || 0,
+      overall_score: projectScore,
+      structure_score: breakdown.structure,
+      code_quality_score: breakdown.codeQuality,
+      testing_score: breakdown.testing || 0,
+      documentation_score: breakdown.documentation || 0,
+      best_practices_score: breakdown.bestPractices || 0,
       
       // Basic info
-      primaryLanguage: signals.primaryLanguage,
-      totalFiles: signals.totalFiles || 0,
-      totalLines: signals.totalLines || 0,
+      primary_language: signals.primaryLanguage,
+      total_files: signals.totalFiles || 0,
+      total_lines: signals.totalLines || 0,
       
       // Architecture
-      architectureType: mapArchitectureType(signals.industryAnalysis?.architecture?.type) as any,
-      serviceCount: signals.industryAnalysis?.architecture?.serviceCount || 0,
-      engineeringLevel: mapEngineeringLevel(signals.industryAnalysis?.engineeringLevel),
+      service_count: signals.industryAnalysis?.architecture?.serviceCount || 0,
       
       // Code quality basics
-      hasReadme: signals.codeSignals.hasReadme,
-      hasLicense: signals.codeSignals.hasLicense,
-      hasDockerfile: signals.codeSignals.hasDockerfile,
-      hasTypeScript: signals.codeSignals.hasTypeScript,
-      testFilesCount: signals.codeSignals.testFilesCount || 0,
+      has_readme: signals.codeSignals.hasReadme || false,
+      has_license: signals.codeSignals.hasLicense || false,
+      has_dockerfile: signals.codeSignals.hasDockerfile || false,
+      has_typescript: signals.codeSignals.hasTypeScript || false,
+      test_files_count: signals.codeSignals.testFilesCount || 0,
       
       // Folder structure basics
-      hasSrcFolder: signals.folderStructure.hasSrcFolder,
-      hasTests: signals.folderStructure.hasTests,
-      maxDepth: signals.folderStructure.maxDepth,
-      topLevelFolders: signals.folderStructure.topLevelFolders || [],
-      
-      // Dimensional Analysis
-      ...(signals.intelligenceVerdict?.dimensions ? {
-        fundamentalsScore: signals.intelligenceVerdict.dimensions.fundamentals?.score ? Math.round(signals.intelligenceVerdict.dimensions.fundamentals.score) : undefined,
-        fundamentalsConfidence: signals.intelligenceVerdict.dimensions.fundamentals?.confidence,
-        engineeringDepthScore: signals.intelligenceVerdict.dimensions.engineeringDepth?.score ? Math.round(signals.intelligenceVerdict.dimensions.engineeringDepth.score) : undefined,
-        engineeringDepthConfidence: signals.intelligenceVerdict.dimensions.engineeringDepth?.confidence,
-        productionReadinessScore: signals.intelligenceVerdict.dimensions.productionReadiness?.score ? Math.round(signals.intelligenceVerdict.dimensions.productionReadiness.score) : undefined,
-        productionReadinessConfidence: signals.intelligenceVerdict.dimensions.productionReadiness?.confidence,
-        testingMaturityScore: signals.intelligenceVerdict.dimensions.testingMaturity?.score ? Math.round(signals.intelligenceVerdict.dimensions.testingMaturity.score) : undefined,
-        testingMaturityConfidence: signals.intelligenceVerdict.dimensions.testingMaturity?.confidence,
-        architectureScore: signals.intelligenceVerdict.dimensions.architecture?.score ? Math.round(signals.intelligenceVerdict.dimensions.architecture.score) : undefined,
-        architectureConfidence: signals.intelligenceVerdict.dimensions.architecture?.confidence,
-        infraDevOpsScore: signals.intelligenceVerdict.dimensions.infraDevOps?.score ? Math.round(signals.intelligenceVerdict.dimensions.infraDevOps.score) : undefined,
-        infraDevOpsConfidence: signals.intelligenceVerdict.dimensions.infraDevOps?.confidence,
-      } : {}),
-      
-      // Experience & Trust
-      ...(signals.intelligenceVerdict?.experienceAnalysis ? {
-        experienceLevel: mapExperienceLevel(signals.intelligenceVerdict.experienceAnalysis.level),
-        experienceConfidence: signals.intelligenceVerdict.experienceAnalysis.confidence,
-        experienceYearRange: signals.intelligenceVerdict.experienceAnalysis.yearsEstimate,
-      } : {}),
-      
-      ...(signals.intelligenceVerdict?.trustAnalysis ? {
-        trustScore: signals.intelligenceVerdict.trustAnalysis.score ? Math.round(signals.intelligenceVerdict.trustAnalysis.score) : undefined,
-        trustLevel: mapTrustLevel(signals.intelligenceVerdict.trustAnalysis.level),
-        effortClass: signals.intelligenceVerdict.trustAnalysis.effortClass ? mapEffortClass(signals.intelligenceVerdict.trustAnalysis.effortClass) : undefined,
-        authenticityScore: signals.intelligenceVerdict.trustAnalysis.authenticityScore ? Math.round(signals.intelligenceVerdict.trustAnalysis.authenticityScore) : undefined,
-        hasOriginalWork: signals.intelligenceVerdict.trustAnalysis.hasOriginalWork,
-        authenticityFlags: signals.intelligenceVerdict.trustAnalysis.flags || [],
-      } : {}),
-      
-      // Verdict
-      ...(signals.intelligenceVerdict?.verdictDetailed ? {
-        verdictSummary: signals.intelligenceVerdict.verdictDetailed.summary,
-        verdictStrengths: signals.intelligenceVerdict.verdictDetailed.strengths,
-        verdictGrowthAreas: signals.intelligenceVerdict.verdictDetailed.growthAreas,
-        verdictJustification: signals.intelligenceVerdict.verdictDetailed.cautions?.join('; '),
-      } : {}),
+      has_src_folder: signals.folderStructure.hasSrcFolder || false,
+      has_tests: signals.folderStructure.hasTests || false,
+      max_depth: signals.folderStructure.maxDepth || 0,
+      top_level_folders: signals.folderStructure.topLevelFolders || [],
     };
 
-    // 3. Upsert ProjectAnalysis with MINIMAL fields
-    const analysis = await prisma.projectAnalysis.upsert({
-      where: { projectId: signals.projectId },
-      create: { projectId: signals.projectId, ...coreAnalysisData },
-      update: { ...coreAnalysisData, updatedAt: new Date() },
+    // Architecture type (enum stored as string)
+    const archType = mapArchitectureType(signals.industryAnalysis?.architecture?.type);
+    if (archType) analysisFields.architecture_type = archType;
+    
+    const engLevel = mapEngineeringLevel(signals.industryAnalysis?.engineeringLevel);
+    if (engLevel) analysisFields.engineering_level = engLevel;
+
+    // Dimensional Analysis
+    if (signals.intelligenceVerdict?.dimensions) {
+      const dims = signals.intelligenceVerdict.dimensions;
+      if (dims.fundamentals?.score != null) analysisFields.fundamentals_score = Math.round(dims.fundamentals.score);
+      if (dims.fundamentals?.confidence != null) analysisFields.fundamentals_confidence = dims.fundamentals.confidence;
+      if (dims.engineeringDepth?.score != null) analysisFields.engineering_depth_score = Math.round(dims.engineeringDepth.score);
+      if (dims.engineeringDepth?.confidence != null) analysisFields.engineering_depth_confidence = dims.engineeringDepth.confidence;
+      if (dims.productionReadiness?.score != null) analysisFields.production_readiness_score = Math.round(dims.productionReadiness.score);
+      if (dims.productionReadiness?.confidence != null) analysisFields.production_readiness_confidence = dims.productionReadiness.confidence;
+      if (dims.testingMaturity?.score != null) analysisFields.testing_maturity_score = Math.round(dims.testingMaturity.score);
+      if (dims.testingMaturity?.confidence != null) analysisFields.testing_maturity_confidence = dims.testingMaturity.confidence;
+      if (dims.architecture?.score != null) analysisFields.architecture_dimension_score = Math.round(dims.architecture.score);
+      if (dims.architecture?.confidence != null) analysisFields.architecture_confidence = dims.architecture.confidence;
+      if (dims.infraDevOps?.score != null) analysisFields.infra_devops_score = Math.round(dims.infraDevOps.score);
+      if (dims.infraDevOps?.confidence != null) analysisFields.infra_devops_confidence = dims.infraDevOps.confidence;
+    }
+    
+    // Experience
+    if (signals.intelligenceVerdict?.experienceAnalysis) {
+      const exp = signals.intelligenceVerdict.experienceAnalysis;
+      const mappedLevel = mapExperienceLevel(exp.level);
+      if (mappedLevel) analysisFields.experience_level = mappedLevel;
+      if (exp.confidence != null) analysisFields.experience_confidence = exp.confidence;
+      const yearRange = formatYearRange(exp.yearsMin, exp.yearsMax, exp.yearsEstimate);
+      if (yearRange) analysisFields.experience_year_range = yearRange;
+    }
+    
+    // Trust
+    if (signals.intelligenceVerdict?.trustAnalysis) {
+      const trust = signals.intelligenceVerdict.trustAnalysis;
+      if (trust.score != null) analysisFields.trust_score = Math.round(trust.score);
+      const tl = mapTrustLevel(trust.level);
+      if (tl) analysisFields.trust_level = tl;
+      const ec = mapEffortClass(trust.effortClass);
+      if (ec) analysisFields.effort_class = ec;
+      if (trust.authenticityScore != null) analysisFields.authenticity_score = Math.round(trust.authenticityScore);
+      if (trust.hasOriginalWork != null) analysisFields.has_original_work = trust.hasOriginalWork;
+      analysisFields.authenticity_flags = trust.flags || [];
+    }
+    
+    // Verdict
+    if (signals.intelligenceVerdict?.verdictDetailed) {
+      const v = signals.intelligenceVerdict.verdictDetailed;
+      if (v.summary) analysisFields.dimensional_verdict_summary = v.summary;
+      if (v.strengths) analysisFields.dimensional_strengths = v.strengths;
+      if (v.growthAreas) analysisFields.dimensional_growth_areas = v.growthAreas;
+      if (v.cautions?.length) analysisFields.verdict_justification = v.cautions.join('; ');
+    }
+
+    // Complexity
+    if (signals.complexity) {
+      analysisFields.complexity_total_score = signals.complexity.totalScore || 0;
+      analysisFields.complexity_architecture_score = signals.complexity.architectureScore || 0;
+      analysisFields.complexity_infrastructure_score = signals.complexity.infrastructureScore || 0;
+      analysisFields.complexity_code_quality_score = signals.complexity.codeQualityScore || 0;
+      analysisFields.complexity_scale_label = signals.complexity.scaleLabel || 'Unknown';
+    }
+
+    // Git Forensics
+    if (signals.gitForensics) {
+      analysisFields.git_commit_count = signals.gitForensics.commitCount || 0;
+      analysisFields.git_first_commit_date = signals.gitForensics.firstCommitDate || null;
+      analysisFields.git_last_commit_date = signals.gitForensics.lastCommitDate || null;
+      analysisFields.git_largest_commit_ratio = signals.gitForensics.largestCommitRatio || 0;
+      analysisFields.git_refactor_count = signals.gitForensics.refactorCount || 0;
+      analysisFields.git_primary_author_pct = signals.gitForensics.primaryAuthorPct || 0;
+      analysisFields.git_is_premium_feature = signals.gitForensics.isPremium || false;
+    }
+
+    // Authorship
+    if (signals.authorshipVerdict) {
+      analysisFields.authorship_level = signals.authorshipVerdict.level || null;
+      analysisFields.authorship_confidence = signals.authorshipVerdict.confidence || null;
+      analysisFields.authorship_reasons = signals.authorshipVerdict.reasons || [];
+    }
+
+    // Intelligence Verdict top-level
+    if (signals.intelligenceVerdict) {
+      analysisFields.verdict_project_intent = signals.intelligenceVerdict.projectIntentSummary || '';
+      analysisFields.verdict_tech_stack = signals.intelligenceVerdict.techStackSnapshot || [];
+      analysisFields.verdict_arch_maturity = signals.intelligenceVerdict.architectureMaturity || 0;
+      analysisFields.verdict_overall_score = signals.intelligenceVerdict.overallScore || 0;
+      analysisFields.verdict_developer_level = signals.intelligenceVerdict.developerLevel || null;
+      analysisFields.verdict_key_signals = signals.intelligenceVerdict.keySignals || [];
+      analysisFields.verdict_strength_signals = signals.intelligenceVerdict.strengthSignals || [];
+      analysisFields.verdict_risk_signals = signals.intelligenceVerdict.riskSignals || [];
+      analysisFields.verdict_senior_verdict = signals.intelligenceVerdict.seniorEngineerVerdict || '';
+      analysisFields.verdict_hire_signal = signals.intelligenceVerdict.hireSignal || null;
+      analysisFields.verdict_analysis_time_ms = signals.intelligenceVerdict.analysisTimeMs || 0;
+      analysisFields.verdict_modules_executed = signals.intelligenceVerdict.modulesExecuted || [];
+      analysisFields.verdict_modules_skipped = signals.intelligenceVerdict.modulesSkipped || [];
+    }
+
+    // Architecture details
+    if (signals.industryAnalysis?.architecture) {
+      analysisFields.architecture_communication = signals.industryAnalysis.architecture.communication || [];
+      analysisFields.architecture_patterns = signals.industryAnalysis.architecture.patterns || [];
+      analysisFields.architecture_service_names = signals.industryAnalysis.architecture.services || [];
+      analysisFields.architecture_gateway = signals.industryAnalysis.architecture.gateway || null;
+    }
+
+    // 3. Use raw MongoDB updateOne with $set to bypass Prisma's pipeline limit
+    // MongoDB native $set is a single pipeline stage regardless of field count
+    const rawResult: any = await prisma.$runCommandRaw({
+      update: 'project_analyses',
+      updates: [
+        {
+          q: { project_id: { $oid: signals.projectId } },
+          u: { $set: analysisFields, $setOnInsert: { project_id: { $oid: signals.projectId }, created_at: { $date: now.toISOString() } } },
+          upsert: true,
+        },
+      ],
     });
+    
+    // Get the analysis ID for creating related records
+    const analysisDoc = await prisma.projectAnalysis.findUnique({
+      where: { projectId: signals.projectId },
+      select: { id: true },
+    });
+    
+    if (!analysisDoc) {
+      throw new Error('Failed to create/update ProjectAnalysis');
+    }
+    
+    const analysis = analysisDoc;
 
     // 4. Store Language Stats
     if (signals.languages?.length > 0) {

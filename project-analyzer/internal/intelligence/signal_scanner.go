@@ -196,6 +196,8 @@ func (s *SignalScanner) scanFileSystem() {
 			s.manifestPaths = append(s.manifestPaths, path)
 		case "package.json", "go.mod", "pom.xml":
 			s.manifestPaths = append(s.manifestPaths, path)
+		case "schema.prisma":
+			s.manifestPaths = append(s.manifestPaths, path)
 		}
 
 		// CI detection
@@ -295,7 +297,7 @@ func (s *SignalScanner) detectFrameworks() {
 			if strings.Contains(fileContent, "\"prisma\"") || strings.Contains(fileContent, "\"@prisma/client\"") {
 				seenFrameworks["Prisma"] = true
 				seenDatabases["Prisma"] = true
-				seenDatabases["PostgreSQL"] = true // Prisma usually implies SQL
+				// Don't assume PostgreSQL — detect actual DB from schema.prisma provider
 			}
 			if strings.Contains(fileContent, "\"mongoose\"") || strings.Contains(fileContent, "\"mongodb\"") {
 				seenDatabases["MongoDB"] = true
@@ -385,6 +387,29 @@ func (s *SignalScanner) detectFrameworks() {
 			if strings.Contains(fileContent, "tensorflow") || strings.Contains(fileContent, "torch") ||
 				strings.Contains(fileContent, "sklearn") || strings.Contains(fileContent, "keras") {
 				s.signals.HasMLMarkers = true
+			}
+
+		case "schema.prisma":
+			// Detect actual database provider from Prisma schema
+			seenFrameworks["Prisma"] = true
+			seenDatabases["Prisma"] = true
+			if strings.Contains(lowerContent, "provider = \"postgresql\"") || strings.Contains(lowerContent, "provider = \"postgres\"") {
+				seenDatabases["PostgreSQL"] = true
+			}
+			if strings.Contains(lowerContent, "provider = \"mysql\"") {
+				seenDatabases["MySQL"] = true
+			}
+			if strings.Contains(lowerContent, "provider = \"mongodb\"") {
+				seenDatabases["MongoDB"] = true
+			}
+			if strings.Contains(lowerContent, "provider = \"sqlite\"") {
+				seenDatabases["SQLite"] = true
+			}
+			if strings.Contains(lowerContent, "provider = \"sqlserver\"") {
+				seenDatabases["SQL Server"] = true
+			}
+			if strings.Contains(lowerContent, "provider = \"cockroachdb\"") {
+				seenDatabases["CockroachDB"] = true
 			}
 		}
 	}

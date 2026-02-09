@@ -59,6 +59,7 @@ export class ProfileService {
         company: data.company,
         website: data.website,
         twitterHandle: data.twitterHandle,
+        avatarUrl: data.avatarUrl,
         updatedAt: new Date(),
       },
     });

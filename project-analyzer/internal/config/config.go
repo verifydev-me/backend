@@ -16,6 +16,9 @@ type Config struct {
 	MaxRepoSizeMB      int
 	AnalysisTimeoutSec int
 	GitHubToken        string
+	// Worker Pool Configuration
+	WorkerCount   int // Number of concurrent workers (default: 4)
+	PrefetchCount int // RabbitMQ prefetch count (default: 4, should match WorkerCount)
 }
 
 func Load() *Config {
@@ -30,6 +33,9 @@ func Load() *Config {
 		MaxRepoSizeMB:      getEnvInt("MAX_REPO_SIZE_MB", 100),
 		AnalysisTimeoutSec: getEnvInt("ANALYSIS_TIMEOUT_SEC", 120),
 		GitHubToken:        getEnv("GITHUB_TOKEN", ""),
+		// Worker Pool - 4 workers by default for optimal CPU utilization
+		WorkerCount:   getEnvInt("WORKER_COUNT", 4),
+		PrefetchCount: getEnvInt("PREFETCH_COUNT", 4),
 	}
 }
 

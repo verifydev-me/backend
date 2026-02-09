@@ -220,9 +220,19 @@ func (ta *TrustAnalyzer) analyzeAuthenticity() AuthenticityAnalysis {
 	}
 
 	// Check for tutorial/boilerplate indicators using project type
+	// NOTE: Only check truly generic/template types, NOT valid project type classifications
 	if ta.Signals != nil {
 		projectType := string(ta.Signals.ProjectType)
-		if isGenericProjectName(projectType) {
+		// Only penalize explicitly tutorial/sample project types
+		tutorialTypes := []string{"unknown"}
+		isTutorial := false
+		for _, t := range tutorialTypes {
+			if strings.ToLower(projectType) == t {
+				isTutorial = true
+				break
+			}
+		}
+		if isTutorial {
 			result.AuthenticityScore -= 10
 			result.Signals = append(result.Signals, AuthenticitySignal{
 				Type:       SignalNegative,
@@ -360,27 +370,49 @@ func (ta *TrustAnalyzer) analyzeConsistency() ConsistencyAnalysis {
 
 	// Check for consistent infrastructure
 	if ta.Infra != nil && ta.Signals != nil {
-		// Having tests but no CI is mildly inconsistent
+		// Having tests but no CI is inconsistent for production-grade projects
 		if ta.Signals.FolderStructure.HasTests {
 			if !ta.Infra.HasSignal(signals.SignalGitHubActions) && !ta.Infra.HasSignal(signals.SignalGitLabCI) {
-				score -= 5
+				score -= 8
 				result.Issues = append(result.Issues, ConsistencyIssue{
 					Type:     "tests_without_ci",
-					Severity: "low",
-					Evidence: "Has tests but no CI pipeline",
+					Severity: "medium",
+					Evidence: "Has tests but no CI pipeline to run them",
 				})
 			}
 		}
 
-		// Docker without compose or compose without docker is slightly odd
+		// Docker without compose or compose without docker
 		hasDocker := ta.Infra.HasSignal(signals.SignalDocker)
 		hasCompose := ta.Infra.HasSignal(signals.SignalDockerCompose)
 		if hasCompose && !hasDocker {
-			score -= 3
+			score -= 5
 			result.Issues = append(result.Issues, ConsistencyIssue{
 				Type:     "compose_without_dockerfile",
 				Severity: "low",
 				Evidence: "Has docker-compose but no Dockerfile",
+			})
+		}
+
+		// Production signals without tests — significant inconsistency
+		hasProductionInfra := hasDocker || ta.Infra.HasSignal(signals.SignalKubernetes) || ta.Infra.HasSignal(signals.SignalAWS) || ta.Infra.HasSignal(signals.SignalGCP)
+		if hasProductionInfra && !ta.Signals.FolderStructure.HasTests {
+			score -= 15
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "production_without_tests",
+				Severity: "high",
+				Evidence: "Has production infrastructure but no test directory",
+			})
+		}
+
+		// Has monitoring but no CI pipeline — inconsistent ops maturity
+		hasMonitoring := ta.Infra.HasSignal(signals.SignalPrometheus) || ta.Infra.HasSignal(signals.SignalGrafana) || ta.Infra.HasSignal(signals.SignalDatadog)
+		if hasMonitoring && !ta.Signals.CodeSignals.HasCI {
+			score -= 8
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "monitoring_without_ci",
+				Severity: "medium",
+				Evidence: "Has monitoring setup but no CI/CD pipeline",
 			})
 		}
 	}
@@ -389,14 +421,47 @@ func (ta *TrustAnalyzer) analyzeConsistency() ConsistencyAnalysis {
 	if ta.Signals != nil {
 		code := ta.Signals.CodeSignals
 
-		// TypeScript project without types folder
-		if code.HasTypeScript && !ta.Signals.FolderStructure.HasTypes {
-			// This is minor, types can be co-located
+		// TypeScript project without strict typing indicators
+		if code.HasTypeScript && !ta.Signals.FolderStructure.HasTypes && !code.HasLinting {
+			score -= 5
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "typescript_without_strictness",
+				Severity: "low",
+				Evidence: "Uses TypeScript but no types folder or linting configured",
+			})
 		}
 
-		// Has linting but not prettier (or vice versa) - minor inconsistency
-		if code.HasLinting != code.HasPrettier {
-			// Not really an issue, just noting
+		// No README in a non-trivial project
+		if ta.Signals.TotalFiles > 10 && !ta.Signals.FolderStructure.HasDocs {
+			score -= 5
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "no_documentation",
+				Severity: "low",
+				Evidence: "Non-trivial project with no documentation folder",
+			})
+		}
+
+		// API project without middleware
+		if ta.Signals.FolderStructure.HasAPI && !ta.Signals.FolderStructure.HasMiddleware {
+			score -= 5
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "api_without_middleware",
+				Severity: "low",
+				Evidence: "API project without middleware layer",
+			})
+		}
+	}
+
+	// Check commit pattern consistency
+	if ta.CommitData != nil && ta.CommitData.TotalCommits > 0 {
+		// Single commit for a large project is suspicious
+		if ta.CommitData.TotalCommits == 1 && ta.Signals != nil && ta.Signals.TotalFiles > 20 {
+			score -= 10
+			result.Issues = append(result.Issues, ConsistencyIssue{
+				Type:     "single_commit_large_project",
+				Severity: "high",
+				Evidence: "Large project with only a single commit — likely squashed or copied",
+			})
 		}
 	}
 

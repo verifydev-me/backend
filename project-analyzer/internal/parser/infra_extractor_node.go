@@ -43,8 +43,8 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"nuxt":          signals.SignalVue,
 		"@angular/core": signals.SignalAngular,
 		"svelte":        signals.SignalSvelte,
-		"solid-js":      signals.SignalReact,
-		"preact":        signals.SignalReact,
+		"solid-js":      signals.SignalSolidJS,
+		"preact":        signals.SignalPreact,
 
 		// ===== BUILD TOOLS & BUNDLERS =====
 		// Note: vite, webpack, esbuild are framework-agnostic - don't assume React
