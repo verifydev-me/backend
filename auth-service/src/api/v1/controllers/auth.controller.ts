@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { GitHubService } from '../../../services/github.service.js';
+import { GoogleService } from '../../../services/google.service.js';
 import { AuthService } from '../../../services/auth.service.js';
 import { TokenService } from '../../../services/token.service.js';
 import { redis } from '../../../config/redis.js';
@@ -23,13 +24,13 @@ export class AuthController {
     try {
       // Generate unique state for CSRF protection
       const state = uuidv4();
-      
+
       // Check if this is a mobile request
       const isMobile = req.query.state === 'mobile';
       const mobileRedirectUri = req.query.mobile_redirect_uri as string | undefined;
 
       // Store state in Redis with mobile info if applicable
-      const stateData = isMobile && mobileRedirectUri 
+      const stateData = isMobile && mobileRedirectUri
         ? JSON.stringify({ mobile: true, redirectUri: mobileRedirectUri })
         : '1';
       await redis.setex(`oauth:state:${state}`, STATE_EXPIRY, stateData);
@@ -38,9 +39,9 @@ export class AuthController {
       const authUrl = GitHubService.getAuthorizationUrl(state);
 
       // Check if client wants JSON (API call) or redirect (browser)
-      const wantsJson = req.headers.accept?.includes('application/json') || 
-                        req.query.format === 'json';
-      
+      const wantsJson = req.headers.accept?.includes('application/json') ||
+        req.query.format === 'json';
+
       if (wantsJson) {
         res.json({
           success: true,
@@ -105,7 +106,7 @@ export class AuthController {
 
       // Delete used state
       await redis.del(`oauth:state:${state}`);
-      
+
       // Check if this is a mobile request
       let isMobile = false;
       let mobileRedirectUri = '';
@@ -140,7 +141,7 @@ export class AuthController {
           coreCount: user.coreCount,
           isVerified: user.isVerified,
         }));
-        
+
         logger.info({ redirectUrl: redirectUrl.toString() }, 'Redirecting to mobile app');
         res.redirect(redirectUrl.toString());
       } else {
@@ -161,6 +162,138 @@ export class AuthController {
       }
     } catch (error) {
       logger.error({ error }, 'GitHub callback failed');
+      res.redirect(`${env.FRONTEND_URL}/auth/error?message=Authentication failed`);
+    }
+  }
+
+  /**
+   * GET /auth/google
+   * Initiate Google OAuth flow
+   */
+  static async initiateGoogle(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const state = uuidv4();
+
+      const isMobile = req.query.state === 'mobile';
+      const mobileRedirectUri = req.query.mobile_redirect_uri as string | undefined;
+
+      const stateData = isMobile && mobileRedirectUri
+        ? JSON.stringify({ mobile: true, redirectUri: mobileRedirectUri })
+        : '1';
+      await redis.setex(`oauth:state:${state}`, STATE_EXPIRY, stateData);
+
+      const authUrl = GoogleService.getAuthorizationUrl(state);
+
+      const wantsJson = req.headers.accept?.includes('application/json') ||
+        req.query.format === 'json';
+
+      if (wantsJson) {
+        res.json({
+          success: true,
+          message: 'Redirect to this URL for Google authentication',
+          data: { authUrl },
+        });
+      } else {
+        res.redirect(authUrl);
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to initiate Google OAuth');
+      res.status(500).json({
+        success: false,
+        message: 'Failed to initiate authentication',
+        error: { code: 'AUTH_INIT_FAILED' },
+      });
+    }
+  }
+
+  /**
+   * GET /auth/google/callback
+   * Handle Google OAuth callback
+   */
+  static async handleGoogleCallback(
+    req: Request<unknown, unknown, unknown, { code?: string; state?: string; error?: string }>,
+    res: Response<AuthResponse>
+  ): Promise<void> {
+    try {
+      const { code, state, error: oauthError } = req.query;
+
+      if (oauthError) {
+        logger.warn({ oauthError }, 'Google OAuth error');
+        res.redirect(`${env.FRONTEND_URL}/auth/error?message=${encodeURIComponent(oauthError)}`);
+        return;
+      }
+
+      if (!code || !state) {
+        res.status(400).json({
+          success: false,
+          message: 'Missing code or state parameter',
+          error: { code: 'INVALID_CALLBACK' },
+        });
+        return;
+      }
+
+      const stateData = await redis.get(`oauth:state:${state}`);
+      if (!stateData) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid or expired state',
+          error: { code: 'INVALID_STATE' },
+        });
+        return;
+      }
+
+      await redis.del(`oauth:state:${state}`);
+
+      let isMobile = false;
+      let mobileRedirectUri = '';
+      try {
+        const parsed = JSON.parse(stateData);
+        if (parsed.mobile && parsed.redirectUri) {
+          isMobile = true;
+          mobileRedirectUri = parsed.redirectUri;
+        }
+      } catch {
+        // Not JSON — web request
+      }
+
+      // Process Google auth
+      const { user, tokens } = await AuthService.processGoogleAuth(code);
+
+      if (isMobile && mobileRedirectUri) {
+        const redirectUrl = new URL(mobileRedirectUri);
+        redirectUrl.searchParams.set('accessToken', tokens.accessToken);
+        redirectUrl.searchParams.set('refreshToken', tokens.refreshToken);
+        redirectUrl.searchParams.set('user', JSON.stringify({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          auraScore: user.auraScore,
+          coreCount: user.coreCount,
+          isVerified: user.isVerified,
+        }));
+        res.redirect(redirectUrl.toString());
+      } else {
+        res.cookie('refreshToken', tokens.refreshToken, {
+          httpOnly: true,
+          secure: env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/api/v1/auth',
+        });
+
+        const redirectUrl = new URL(`${env.FRONTEND_URL}/auth/callback`);
+        redirectUrl.searchParams.set('accessToken', tokens.accessToken);
+        redirectUrl.searchParams.set('userId', user.id);
+
+        res.redirect(redirectUrl.toString());
+      }
+    } catch (error) {
+      logger.error({ error }, 'Google callback failed');
       res.redirect(`${env.FRONTEND_URL}/auth/error?message=Authentication failed`);
     }
   }

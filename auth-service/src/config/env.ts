@@ -17,6 +17,11 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1),
   GITHUB_CALLBACK_URL: z.string().url(),
 
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().optional().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
+  GOOGLE_CALLBACK_URL: z.string().optional().default('http://localhost:8000/api/v1/auth/google/callback'),
+
   // JWT
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
