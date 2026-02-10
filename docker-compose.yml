@@ -1,11 +1,23 @@
-# ============================================
-# VERIFY BACKEND - Docker Compose Configuration
-# ============================================
-# SECURITY: All secrets loaded from .env file
-# Run: docker compose up -d
+# ══════════════════════════════════════════════════════════════════════════════
+#                         VERIFYDEV BACKEND INFRASTRUCTURE
+# ══════════════════════════════════════════════════════════════════════════════
+#  █░█ █▀▀ █▀█ █ █▀▀ █▄█ █▀▄ █▀▀ █░█
+#  ▀▄▀ ██▄ █▀▄ █ █▀░ ░█░ █▄▀ ██▄ ▀▄▀
+# ══════════════════════════════════════════════════════════════════════════════
+#
+#  🔐 SECURITY: All secrets loaded from .env file (never commit secrets!)
+#  🚀 QUICK START: docker compose up -d
+#  📊 MONITORING: docker compose logs -f [service-name]
+#  🔄 REBUILD: docker compose up -d --build [service-name]
+#
+# ══════════════════════════════════════════════════════════════════════════════
 
 services:
-  # ==================== API GATEWAY ====================
+
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │                           🌐 API GATEWAY                                  │
+  # │  NGINX-based reverse proxy for all microservices                         │
+  # └──────────────────────────────────────────────────────────────────────────┘
   gateway:
     build: ./gateway
     container_name: verifydev-gateway
@@ -21,7 +33,6 @@ services:
       - resume-service
       - project-analyzer
       - chat-service
-      - ai-service
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
@@ -41,7 +52,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== REDIS ====================
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │                         📦 INFRASTRUCTURE                                 │
+  # └──────────────────────────────────────────────────────────────────────────┘
+
+  # ─────────────────────────── Redis Cache ───────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: verifydev-redis
@@ -68,7 +83,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== RABBITMQ ====================
+  # ─────────────────────────── RabbitMQ Message Broker ───────────────────────
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: verifydev-rabbitmq
@@ -76,8 +91,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-verifydev}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS is required}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"      # AMQP protocol
+      - "15672:15672"    # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -98,7 +113,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== AUTH SERVICE ====================
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │                        🔐 CORE SERVICES (Node.js)                         │
+  # └──────────────────────────────────────────────────────────────────────────┘
+
+  # ─────────────────────────── Auth Service ──────────────────────────────────
   auth-service:
     build: ./auth-service
     container_name: verifydev-auth
@@ -133,7 +152,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== USER SERVICE ====================
+  # ─────────────────────────── User Service ──────────────────────────────────
   user-service:
     build:
       context: .
@@ -141,7 +160,7 @@ services:
     container_name: verifydev-user
     ports:
       - "${USER_SERVICE_PORT:-3002}:3002"
-      - "${USER_SERVICE_GRPC_PORT:-50051}:50051"  # gRPC port
+      - "${USER_SERVICE_GRPC_PORT:-50051}:50051"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3002
@@ -172,7 +191,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== JOB SERVICE ====================
+  # ─────────────────────────── Job Service ───────────────────────────────────
   job-service:
     build:
       context: .
@@ -203,7 +222,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== RECRUITER SERVICE ====================
+  # ─────────────────────────── Recruiter Service ─────────────────────────────
   recruiter-service:
     build:
       context: .
@@ -211,7 +230,7 @@ services:
     container_name: verifydev-recruiter
     ports:
       - "${RECRUITER_SERVICE_PORT:-3005}:3005"
-      - "${RECRUITER_SERVICE_GRPC_PORT:-50054}:50054"  # gRPC port
+      - "${RECRUITER_SERVICE_GRPC_PORT:-50054}:50054"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3005
@@ -239,7 +258,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== CHAT SERVICE ====================
+  # ─────────────────────────── Chat Service ──────────────────────────────────
   chat-service:
     build: ./chat-service
     container_name: verifydev-chat
@@ -273,7 +292,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== AURA PROCESSOR ====================
+  # ─────────────────────────── Aura Processor ────────────────────────────────
   aura-processor:
     build: ./aura-processor
     container_name: verifydev-aura
@@ -300,7 +319,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== PROJECT ANALYZER (Go) ====================
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │                        ⚡ HIGH-PERFORMANCE SERVICES (Go)                  │
+  # └──────────────────────────────────────────────────────────────────────────┘
+
+  # ─────────────────────────── Project Analyzer ──────────────────────────────
   project-analyzer:
     build: ./project-analyzer
     container_name: verifydev-analyzer
@@ -315,7 +338,7 @@ services:
       - PUBLISH_QUEUE=project.analyzed
       - CLONE_DIR=/tmp/repos
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      # Worker Pool Configuration - process multiple repos concurrently
+      # Worker Pool Configuration
       - WORKER_COUNT=${ANALYZER_WORKER_COUNT:-4}
       - PREFETCH_COUNT=${ANALYZER_PREFETCH_COUNT:-4}
       - ANALYSIS_TIMEOUT_SEC=${ANALYSIS_TIMEOUT_SEC:-120}
@@ -338,7 +361,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== RESUME SERVICE (Go) ====================
+  # ─────────────────────────── Resume Service ────────────────────────────────
   resume-service:
     build: ./resume-service
     container_name: verifydev-resume
@@ -363,77 +386,62 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ==================== OLLAMA (Local LLM) ====================
-  ollama:
-    image: ollama/ollama:latest
-    container_name: verifydev-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    restart: unless-stopped
-    networks:
-      - verifydev-network
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2.0'
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │                          🤖 AI SERVICES (DISABLED)                        │
+  # └──────────────────────────────────────────────────────────────────────────┘
+  # NOTE: ai-service temporarily disabled - uncomment when needed
+  # ai-service:
+  #   build:
+  #     context: ./ai-service
+  #     dockerfile: Dockerfile.dev
+  #   container_name: verifydev-ai
+  #   ports:
+  #     - "${AI_SERVICE_PORT:-3008}:3008"
+  #   environment:
+  #     - NODE_ENV=${NODE_ENV:-development}
+  #     - PORT=3008
+  #     - OLLAMA_HOST=${OLLAMA_HOST:-http://localhost:11434}
+  #     - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+  #     - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
+  #     - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+  #     - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-verifydev_webhook_secret}
+  #     - JOB_SERVICE_URL=http://job-service:3004
+  #     - USER_SERVICE_URL=http://user-service:3002
+  #   volumes:
+  #     - ./ai-service:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - job-service
+  #     - user-service
+  #   restart: unless-stopped
+  #   networks:
+  #     - verifydev-network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #         cpus: '0.5'
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
-  # ==================== AI SERVICE ====================
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile.dev
-    container_name: verifydev-ai
-    ports:
-      - "${AI_SERVICE_PORT:-3008}:3008"
-    environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - PORT=3008
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=llama3.2
-      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
-      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-verifydev_webhook_secret}
-      - JOB_SERVICE_URL=http://job-service:3004
-      - USER_SERVICE_URL=http://user-service:3002
-    volumes:
-      - ./ai-service:/app
-      - /app/node_modules
-    depends_on:
-      - ollama
-      - job-service
-      - user-service
-    restart: unless-stopped
-    networks:
-      - verifydev-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-# ==================== VOLUMES ====================
+# ══════════════════════════════════════════════════════════════════════════════
+#                              💾 PERSISTENT VOLUMES
+# ══════════════════════════════════════════════════════════════════════════════
 volumes:
   redis_data:
+    driver: local
   rabbitmq_data:
+    driver: local
   analyzer_repos:
-  ollama_data:
+    driver: local
 
-# ==================== NETWORKS ====================
+# ══════════════════════════════════════════════════════════════════════════════
+#                              🔗 NETWORK CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
 networks:
   verifydev-network:
     driver: bridge
+    name: verifydev-network
