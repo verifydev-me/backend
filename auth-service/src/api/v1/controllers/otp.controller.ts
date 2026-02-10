@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '@/prisma/client'
 import { OtpService } from '@/services/otp.service'
+import { TokenService } from '@/services/token.service'
 import { logger } from '@/utils/logger'
 
 export class OtpController {
@@ -10,7 +11,8 @@ export class OtpController {
    */
   static async requestEmailOtp(req: Request, res: Response): Promise<Response | void> {
     try {
-      const { email, type = 'login' } = req.body
+      const { email, type: rawType = 'login' } = req.body
+      const type = rawType.toUpperCase()
 
       if (!email) {
         return res.status(400).json({ error: 'Email is required' })
@@ -36,25 +38,16 @@ export class OtpController {
       const otp = OtpService.generateOtp()
       const expiresAt = OtpService.getExpiryTime()
 
-      // Store OTP in database (replace if already exists)
-      await prisma.otpVerification.upsert({
-        where: {
-          email_type: {
-            email,
-            type: type as any,
-          },
-        },
-        create: {
+      // Delete any existing OTP for this email+type, then create new one
+      await prisma.otpVerification.deleteMany({
+        where: { email, type: type as any },
+      })
+      await prisma.otpVerification.create({
+        data: {
           email,
           code: otp,
           type: type as any,
           expiresAt,
-        },
-        update: {
-          code: otp,
-          expiresAt,
-          isUsed: false,
-          usedAt: null,
         },
       })
 
@@ -69,7 +62,7 @@ export class OtpController {
       logger.info({ email, type }, 'OTP requested via email')
       res.json({
         message: 'OTP sent to your email',
-        email: email.replace(/(.{2})(.*)(.{2}@.*)/, '$1***$3'), // Hide partial email
+        email: email.replace(/(.{2})(.*)(.{2}@.*)/, '$1***$3'),
       })
     } catch (error) {
       logger.error({ error }, 'OTP request error')
@@ -83,45 +76,34 @@ export class OtpController {
    */
   static async requestPhoneOtp(req: Request, res: Response): Promise<Response | void> {
     try {
-      const { phone, type = 'mobile_verify' } = req.body
+      const { phone, type: rawType = 'mobile_verify' } = req.body
+      const type = rawType.toUpperCase()
 
       if (!phone) {
         return res.status(400).json({ error: 'Phone number is required' })
       }
 
-      // Validate phone format (basic check)
       const phoneRegex = /^\+?[1-9]\d{1,14}$/
       if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
         return res.status(400).json({ error: 'Invalid phone number format' })
       }
 
-      // Generate OTP
       const otp = OtpService.generateOtp()
       const expiresAt = OtpService.getExpiryTime()
 
-      // Store OTP in database
-      await prisma.otpVerification.upsert({
-        where: {
-          phone_type: {
-            phone,
-            type: type as any,
-          },
-        },
-        create: {
+      // Delete any existing OTP for this phone+type, then create new one
+      await prisma.otpVerification.deleteMany({
+        where: { phone, type: type as any },
+      })
+      await prisma.otpVerification.create({
+        data: {
           phone,
           code: otp,
           type: type as any,
           expiresAt,
         },
-        update: {
-          code: otp,
-          expiresAt,
-          isUsed: false,
-          usedAt: null,
-        },
       })
 
-      // Send OTP via SMS
       const sent = await OtpService.sendSmsOtp(phone, otp)
       if (!sent) {
         return res
@@ -132,7 +114,7 @@ export class OtpController {
       logger.info({ phone, type }, 'OTP requested via SMS')
       res.json({
         message: 'OTP sent to your phone',
-        phone: phone.replace(/(.{2})(.*)(.{2})/, '$1***$3'), // Hide partial phone
+        phone: phone.replace(/(.{2})(.*)(.{2})/, '$1***$3'),
       })
     } catch (error) {
       logger.error({ error }, 'Phone OTP request error')
@@ -146,7 +128,8 @@ export class OtpController {
    */
   static async verifyOtp(req: Request, res: Response): Promise<Response | void> {
     try {
-      const { email, phone, otp, type = 'login' } = req.body
+      const { email, phone, otp, type: rawType = 'login' } = req.body
+      const type = rawType.toUpperCase()
 
       if (!otp) {
         return res.status(400).json({ error: 'OTP is required' })
@@ -162,40 +145,25 @@ export class OtpController {
           .json({ error: 'Email or phone is required' })
       }
 
-      // Find OTP record
-      const otpRecord = email
-        ? await prisma.otpVerification.findUnique({
-            where: {
-              email_type: {
-                email,
-                type: type as any,
-              },
-            },
-          })
-        : await prisma.otpVerification.findUnique({
-            where: {
-              phone_type: {
-                phone,
-                type: type as any,
-              },
-            },
-          })
+      // Find OTP record using findFirst instead of findUnique with compound key
+      const otpRecord = await prisma.otpVerification.findFirst({
+        where: email
+          ? { email, type: type as any }
+          : { phone, type: type as any },
+      })
 
       if (!otpRecord) {
         return res.status(400).json({ error: 'OTP not found. Request a new one.' })
       }
 
-      // Check if OTP is expired
       if (OtpService.isExpired(otpRecord.expiresAt)) {
         return res.status(400).json({ error: 'OTP expired. Request a new one.' })
       }
 
-      // Check if OTP is already used
       if (otpRecord.isUsed) {
         return res.status(400).json({ error: 'OTP already used. Request a new one.' })
       }
 
-      // Verify OTP code
       if (otpRecord.code !== otp) {
         return res.status(400).json({ error: 'Invalid OTP' })
       }
@@ -212,12 +180,11 @@ export class OtpController {
       // Find or create user
       let user = email
         ? await prisma.user.findUnique({
-            where: { email },
-          })
+          where: { email },
+        })
         : null
 
       if (!user && type === 'signup') {
-        // Create new user for signup
         const username = email
           ? email.split('@')[0] + '_' + Math.random().toString(36).substr(2, 9)
           : 'user_' + Math.random().toString(36).substr(2, 9)
@@ -226,7 +193,6 @@ export class OtpController {
           data: {
             username,
             email: email || undefined,
-            githubId: '', // Will be empty for OTP-based signup
           },
         })
 
@@ -237,31 +203,15 @@ export class OtpController {
         })
       }
 
-      // Create session
-      const refreshToken = require('crypto').randomBytes(32).toString('hex')
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + 7)
-
-      await prisma.session.create({
-        data: {
-          userId: user!.id,
-          refreshToken,
-          userAgent: req.get('user-agent'),
-          ipAddress: req.ip,
-          expiresAt,
-        },
-      })
-
-      // Generate JWT tokens (assuming you have a token service)
-      // This would typically be done in a TokenService
-      const accessToken = 'temp-access-token' // Replace with actual JWT generation
+      // Generate JWT tokens via TokenService
+      const tokens = await TokenService.generateTokens(user!.id)
 
       logger.info({ userId: user!.id }, 'User authenticated via OTP')
 
       res.json({
         message: 'OTP verified successfully',
-        accessToken,
-        refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         user: {
           id: user!.id,
           username: user!.username,
@@ -280,7 +230,8 @@ export class OtpController {
    */
   static async resendOtp(req: Request, res: Response): Promise<Response | void> {
     try {
-      const { email, phone, type = 'login' } = req.body
+      const { email, phone, type: rawType = 'login' } = req.body
+      const type = rawType.toUpperCase()
 
       if (!email && !phone) {
         return res
@@ -288,59 +239,35 @@ export class OtpController {
           .json({ error: 'Email or phone is required' })
       }
 
-      // Generate new OTP
       const otp = OtpService.generateOtp()
       const expiresAt = OtpService.getExpiryTime()
 
       if (email) {
-        // Update email OTP
-        await prisma.otpVerification.upsert({
-          where: {
-            email_type: {
-              email,
-              type: type as any,
-            },
-          },
-          create: {
+        // Delete existing + create new
+        await prisma.otpVerification.deleteMany({
+          where: { email, type: type as any },
+        })
+        await prisma.otpVerification.create({
+          data: {
             email,
             code: otp,
             type: type as any,
             expiresAt,
           },
-          update: {
-            code: otp,
-            expiresAt,
-            isUsed: false,
-            usedAt: null,
-          },
         })
-
-        // Send OTP
         await OtpService.sendEmailOtp(email, otp)
       } else {
-        // Update phone OTP
-        await prisma.otpVerification.upsert({
-          where: {
-            phone_type: {
-              phone,
-              type: type as any,
-            },
-          },
-          create: {
+        await prisma.otpVerification.deleteMany({
+          where: { phone, type: type as any },
+        })
+        await prisma.otpVerification.create({
+          data: {
             phone,
             code: otp,
             type: type as any,
             expiresAt,
           },
-          update: {
-            code: otp,
-            expiresAt,
-            isUsed: false,
-            usedAt: null,
-          },
         })
-
-        // Send OTP
         await OtpService.sendSmsOtp(phone, otp)
       }
 

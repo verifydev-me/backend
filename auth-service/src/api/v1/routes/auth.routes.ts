@@ -19,6 +19,20 @@ router.get('/github', AuthController.initiateGitHub);
 router.get('/github/callback', AuthController.handleGitHubCallback);
 
 /**
+ * @route   GET /api/v1/auth/google
+ * @desc    Initiate Google OAuth flow
+ * @access  Public
+ */
+router.get('/google', AuthController.initiateGoogle);
+
+/**
+ * @route   GET /api/v1/auth/google/callback
+ * @desc    Handle Google OAuth callback
+ * @access  Public
+ */
+router.get('/google/callback', AuthController.handleGoogleCallback);
+
+/**
  * @route   POST /api/v1/auth/refresh
  * @desc    Refresh access token
  * @access  Public (with refresh token)

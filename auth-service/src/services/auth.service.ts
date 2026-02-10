@@ -1,5 +1,7 @@
 import prisma from '../prisma/client.js';
 import { GitHubService } from './github.service.js';
+import { GoogleService } from './google.service.js';
+import type { GoogleUser } from './google.service.js';
 import { TokenService } from './token.service.js';
 import { logger } from '../utils/logger.js';
 import { TaggingService } from './tagging.service.js';
@@ -52,6 +54,110 @@ export class AuthService {
         refreshToken: tokens.refreshToken,
       },
     };
+  }
+
+  /**
+   * Process Google OAuth callback - create or update user
+   */
+  static async processGoogleAuth(
+    code: string
+  ): Promise<{ user: UserResponse; tokens: AuthTokens }> {
+    // Exchange code for access token
+    const googleAccessToken = await GoogleService.exchangeCodeForToken(code);
+
+    // Fetch user profile
+    const googleUser = await GoogleService.getUserProfile(googleAccessToken);
+
+    // Create or update user in database
+    const user = await this.upsertGoogleUser(googleUser);
+
+    // Generate JWT tokens
+    const tokens = await TokenService.generateTokens(user.id);
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'LOGIN',
+        description: 'Google OAuth login',
+        auraPoints: 1,
+      },
+    });
+
+    logger.info({ userId: user.id, username: user.username }, 'User logged in via Google');
+
+    return {
+      user: this.formatUserResponse(user),
+      tokens: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      },
+    };
+  }
+
+  /**
+   * Create or update user from Google data
+   */
+  private static async upsertGoogleUser(googleUser: GoogleUser) {
+    // Try to find by googleId first
+    let existingUser = await prisma.user.findUnique({
+      where: { googleId: googleUser.sub },
+    });
+
+    // If not found by googleId, try by email (link accounts)
+    if (!existingUser && googleUser.email) {
+      existingUser = await prisma.user.findUnique({
+        where: { email: googleUser.email },
+      });
+    }
+
+    const userData = {
+      email: googleUser.email,
+      name: googleUser.name,
+      avatarUrl: googleUser.picture,
+      googleId: googleUser.sub,
+    };
+
+    if (existingUser) {
+      // Update existing user — link Google account
+      return prisma.user.update({
+        where: { id: existingUser.id },
+        data: userData,
+      });
+    }
+
+    // Generate a unique username from email
+    const emailPrefix = googleUser.email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '');
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const username = `${emailPrefix}_${randomSuffix}`;
+
+    // Create new user
+    const newUser = await prisma.user.create({
+      data: {
+        ...userData,
+        username,
+        coreCount: 1,
+        auraScore: 10, // Small bonus for signing up
+      },
+    });
+
+    // Add profile complete activity for new users
+    await prisma.activity.create({
+      data: {
+        userId: newUser.id,
+        type: 'PROFILE_COMPLETE',
+        description: 'Profile created via Google',
+        auraPoints: 50,
+      },
+    });
+
+    return newUser;
   }
 
   /**
@@ -128,10 +234,10 @@ export class AuthService {
   private static calculateInitialCoreCount(githubUser: GitHubUser): number {
     const repoScore = githubUser.public_repos >= 50 ? 3 : githubUser.public_repos >= 10 ? 2 : 1;
     const followerScore = githubUser.followers >= 1000 ? 3 : githubUser.followers >= 100 ? 2 : 1;
-    
+
     // Average of both scores
     const avgScore = (repoScore + followerScore) / 2;
-    
+
     if (avgScore >= 2.5) return 3;
     if (avgScore >= 1.5) return 2;
     return 1;
@@ -230,7 +336,7 @@ export class AuthService {
    */
   static async logoutAll(userId: string): Promise<void> {
     await TokenService.revokeAllSessions(userId);
-    
+
     // Also invalidate all sessions in database
     await prisma.session.updateMany({
       where: { userId },
@@ -254,7 +360,7 @@ export class AuthService {
     const skills = await prisma.skill.findMany({
       where: { userId: user.id }
     });
-    
+
     const tags = TaggingService.generateProfileTags(skills);
 
     const formattedUser = this.formatUserResponse(user);
