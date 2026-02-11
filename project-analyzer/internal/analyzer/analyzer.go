@@ -24,10 +24,13 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 
+	astengine "github.com/verifydev/project-analyzer/internal/ast"
+	confengine "github.com/verifydev/project-analyzer/internal/confidence"
 	"github.com/verifydev/project-analyzer/internal/config"
 	"github.com/verifydev/project-analyzer/internal/extractor"
 	"github.com/verifydev/project-analyzer/internal/forensics"
 	"github.com/verifydev/project-analyzer/internal/git"
+	"github.com/verifydev/project-analyzer/internal/graph"
 	"github.com/verifydev/project-analyzer/internal/inference"
 	"github.com/verifydev/project-analyzer/internal/intelligence"
 	"github.com/verifydev/project-analyzer/internal/parser"
@@ -314,6 +317,21 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		mu.Unlock()
 	}()
 
+	// 6. AST Deep Analysis (Multi-language - Run for ALL types)
+	var astResult *astengine.ProjectASTResult
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Info().Msg("🧬 Running AST Deep Analysis (TypeScript + Go + Python)...")
+		astAnalyzer := astengine.NewProjectAnalyzer(analysisRoot)
+		astResult = astAnalyzer.Analyze()
+		log.Info().
+			Int("files", astResult.Summary.TotalFiles).
+			Int("technologies", len(astResult.TechnologyUsage)).
+			Int("patterns", astResult.Summary.TotalPatterns).
+			Msg("✅ AST Deep Analysis complete")
+	}()
+
 	// Wait for Phase 1
 	wg.Wait()
 
@@ -398,6 +416,31 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// ENTERPRISE ANALYSIS: Phase 3 (Inference & Scoring)
 	// ============================================
 
+	// 0. Map AST results to ProjectSignals
+	if astResult != nil {
+		result.ASTDeepAnalysis = mapASTToSignals(astResult)
+		log.Info().
+			Int("technologies", len(result.ASTDeepAnalysis.DetectedTechnologies)).
+			Int("patterns", len(result.ASTDeepAnalysis.Patterns)).
+			Str("complexity", result.ASTDeepAnalysis.ComplexityLevel).
+			Msg("📊 AST Deep Analysis mapped to signals")
+	}
+
+	// 0.5 Phase 2: Build Technology Dependency Graph
+	log.Info().Msg("🔗 Building Technology Dependency Graph (Phase 2)...")
+	graphBuilder := graph.NewBuilder()
+	techGraph := graphBuilder.BuildFromSources(astResult, infraSignals)
+	graphAnalysis := graphBuilder.Analyze()
+
+	// Map graph results to ProjectSignals
+	result.TechDependencyGraph = mapGraphToSignals(techGraph, graphAnalysis)
+	log.Info().
+		Int("nodes", graphAnalysis.TotalNodes).
+		Int("edges", graphAnalysis.TotalEdges).
+		Int("stacks", len(graphAnalysis.DetectedStacks)).
+		Int("inferredSkills", len(graphAnalysis.InferredSkills)).
+		Msg("✅ Technology Graph analysis complete")
+
 	// 1. Complexity Score
 	result.Complexity = infraExtractor.CalculateComplexity()
 
@@ -444,7 +487,27 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		enrichVerdictWithDimensionalAnalysis(result, intelligenceResult, infraSignals)
 	}
 
-	// Calculate final totals (only set once — already computed in Phase 1)
+	// ============================================
+	// BAYESIAN CONFIDENCE ENGINE: Phase 3
+	// Final confidence calibration using all prior data
+	// ============================================
+	log.Info().Msg("🔬 Running Bayesian Confidence Engine (Phase 3)...")
+	confEngine := confengine.NewEngine()
+	confEngine.SetAST(astResult)
+	confEngine.SetGraph(graphAnalysis)
+	confEngine.SetInfra(infraSignals)
+	confEngine.SetIndustry(result.IndustryAnalysis)
+	confEngine.SetForensics(result.GitForensics, result.AuthorshipVerdict)
+	confEngine.SetCodeSignals(&result.CodeSignals)
+
+	confReport := confEngine.Run()
+	result.ConfidenceReport = mapConfidenceToSignals(confReport)
+	log.Info().
+		Float64("ensembleScore", confReport.EnsembleVerdict.FinalScore).
+		Str("scoreLabel", confReport.EnsembleVerdict.ScoreLabel).
+		Int("resumeReady", confReport.EnsembleVerdict.ResumeReadySkills).
+		Float64("analysisConf", confReport.AnalysisConfidence).
+		Msg("✅ Phase 3: Bayesian Confidence Engine complete")
 	// TotalLines was set in Phase 1 line ~244, TotalFiles was set by language parser.
 	// Only compute here if they haven't been set yet (defensive)
 	if result.TotalLines == 0 || result.TotalFiles == 0 {

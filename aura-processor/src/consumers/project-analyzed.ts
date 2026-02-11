@@ -2,7 +2,7 @@ import { ConsumeMessage } from 'amqplib';
 import { logger } from '../utils/logger.js';
 import prisma from '../prisma/client.js';
 import { auraCalculator } from '../processors/aura-calculator.js';
-import type { ProjectSignals, SkillScore, AuraCalculation, IndustryAnalysis } from '../processors/types.js';
+import type { ProjectSignals, SkillScore, AuraCalculation, IndustryAnalysis, TechDependencyGraph, ConfidenceReport } from '../processors/types.js';
 
 // ============================================
 // DIMENSIONAL ANALYSIS TYPES (from Go pkg/dimensions)
@@ -57,6 +57,12 @@ interface DimensionalAnalysis {
 
 interface ProjectSignalsExtended extends ProjectSignals {
   industryAnalysis?: IndustryAnalysis;
+
+  // Phase 2: Tech Dependency Graph
+  techDependencyGraph?: TechDependencyGraph;
+
+  // Phase 3: Bayesian Confidence Report
+  confidenceReport?: ConfidenceReport;
 
   // NEW: Dimensional Analysis (from Go pkg/dimensions)
   dimensionalAnalysis?: DimensionalAnalysis;
@@ -313,6 +319,8 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
     hasIndustryAnalysis: !!signals.industryAnalysis,
     hasIntelligenceVerdict: !!signals.intelligenceVerdict,
     hasDimensionalAnalysis: !!signals.intelligenceVerdict?.dimensions,
+    hasTechGraph: !!signals.techDependencyGraph,
+    hasConfidenceReport: !!signals.confidenceReport,
     skillsCount: signals.industryAnalysis?.verifiedSkills?.length || 0,
   }, '📥 Processing analyzed project');
 
@@ -566,6 +574,103 @@ async function updateProject(
       analysisFields.authorship_reasons = signals.authorshipVerdict.reasons || [];
     }
 
+    // Phase 2: Tech Dependency Graph
+    if (signals.techDependencyGraph) {
+      const tg = signals.techDependencyGraph;
+      analysisFields.graph_total_nodes = tg.totalNodes || 0;
+      analysisFields.graph_total_edges = tg.totalEdges || 0;
+      analysisFields.graph_density = tg.graphDensity || 0;
+      analysisFields.graph_detected_stacks = (tg.detectedStacks || []).map(s => ({
+        name: s.name,
+        category: s.category,
+        skillLevel: s.skillLevel,
+        matched: s.matched || [],
+        missing: s.missing || [],
+        confidence: s.confidence || 0,
+      }));
+      analysisFields.graph_inferred_skills = (tg.inferredSkills || []).map(s => ({
+        name: s.name,
+        category: s.category,
+        level: s.level,
+        confidence: s.confidence || 0,
+        reasoning: s.reasoning || '',
+        resumeReady: s.resumeReady || false,
+      }));
+      analysisFields.graph_clusters = (tg.clusters || []).map(c => ({
+        name: c.name,
+        technologies: c.technologies || [],
+        category: c.category || '',
+        strength: c.strength || 0,
+      }));
+    }
+
+    // Phase 3: Bayesian Confidence Report
+    if (signals.confidenceReport) {
+      const cr = signals.confidenceReport;
+      analysisFields.confidence_analysis_confidence = cr.analysisConfidence || 0;
+
+      // Quality metrics
+      if (cr.qualityMetrics) {
+        analysisFields.quality_organization_score = cr.qualityMetrics.organizationScore || 0;
+        analysisFields.quality_modularity_score = cr.qualityMetrics.modularityScore || 0;
+        analysisFields.quality_test_coverage_proxy = cr.qualityMetrics.testCoverageProxy || 0;
+        analysisFields.quality_test_maturity = cr.qualityMetrics.testMaturity || 'none';
+        analysisFields.quality_documentation_score = cr.qualityMetrics.documentationScore || 0;
+        analysisFields.quality_complexity_score = cr.qualityMetrics.complexityScore || 0;
+        analysisFields.quality_complexity_level = cr.qualityMetrics.complexityLevel || 'unknown';
+        analysisFields.quality_production_readiness = cr.qualityMetrics.productionReadiness || 0;
+        analysisFields.quality_overall = cr.qualityMetrics.overallQuality || 0;
+        analysisFields.quality_tier = cr.qualityMetrics.qualityTier || 'low';
+      }
+
+      // Evolution signals
+      if (cr.evolutionSignals) {
+        analysisFields.evolution_authorship_level = cr.evolutionSignals.authorshipLevel || 'UNKNOWN';
+        analysisFields.evolution_authorship_factor = cr.evolutionSignals.authorshipFactor || 0;
+        analysisFields.evolution_development_pattern = cr.evolutionSignals.developmentPattern || 'unknown';
+        analysisFields.evolution_iteration_count = cr.evolutionSignals.iterationCount || 0;
+        analysisFields.evolution_refactor_ratio = cr.evolutionSignals.refactorRatio || 0;
+        analysisFields.evolution_project_age = cr.evolutionSignals.projectAge || 'unknown';
+        analysisFields.evolution_maturity_factor = cr.evolutionSignals.maturityFactor || 0;
+        analysisFields.evolution_commit_consistency = cr.evolutionSignals.commitConsistency || 0;
+      }
+
+      // Ensemble verdict
+      if (cr.ensembleVerdict) {
+        analysisFields.ensemble_ast_score = cr.ensembleVerdict.astScore || 0;
+        analysisFields.ensemble_graph_score = cr.ensembleVerdict.graphScore || 0;
+        analysisFields.ensemble_infra_score = cr.ensembleVerdict.infraScore || 0;
+        analysisFields.ensemble_intelligence_score = cr.ensembleVerdict.intelligenceScore || 0;
+        analysisFields.ensemble_quality_score = cr.ensembleVerdict.qualityScore || 0;
+        analysisFields.ensemble_git_score = cr.ensembleVerdict.gitScore || 0;
+        analysisFields.ensemble_final_score = cr.ensembleVerdict.finalScore || 0;
+        analysisFields.ensemble_confidence = cr.ensembleVerdict.confidence || 0;
+        analysisFields.ensemble_score_label = cr.ensembleVerdict.scoreLabel || 'Novice';
+        analysisFields.ensemble_total_skills = cr.ensembleVerdict.totalSkills || 0;
+        analysisFields.ensemble_high_conf_skills = cr.ensembleVerdict.highConfSkills || 0;
+        analysisFields.ensemble_resume_ready_skills = cr.ensembleVerdict.resumeReadySkills || 0;
+        analysisFields.ensemble_top_factors = cr.ensembleVerdict.topFactors || [];
+        analysisFields.ensemble_risk_factors = cr.ensembleVerdict.riskFactors || [];
+      }
+
+      // Bayesian posteriors per skill (stored as array of objects)
+      if (cr.skillConfidences?.length) {
+        analysisFields.bayesian_skill_confidences = cr.skillConfidences.map(sc => ({
+          skillName: sc.skillName,
+          category: sc.category,
+          prior: sc.prior,
+          posterior: sc.posterior,
+          astEvidence: sc.astEvidence,
+          infraEvidence: sc.infraEvidence,
+          graphEvidence: sc.graphEvidence,
+          lowerBound: sc.lowerBound,
+          upperBound: sc.upperBound,
+          resumeReady: sc.resumeReady,
+          usageVerified: sc.usageVerified,
+        }));
+      }
+    }
+
     // Intelligence Verdict top-level
     if (signals.intelligenceVerdict) {
       analysisFields.verdict_project_intent = signals.intelligenceVerdict.projectIntentSummary || '';
@@ -740,14 +845,12 @@ async function updateSkills(userId: string, skills: SkillScore[]): Promise<void>
         userId,
         name: skill.name,
         category: skill.category,
-        source: 'ANALYSIS',
         isVerified: skill.score >= 50,
         verifiedScore: skill.score,
         projectCount: 1,
         auraContribution: Math.round(skill.score / 10),
       },
       update: {
-        source: 'ANALYSIS',
         verifiedScore: { set: Math.max(skill.score, existingSkill?.verifiedScore || 0) },
         projectCount: { increment: 1 },
         isVerified: shouldBeVerified,

@@ -81,9 +81,24 @@ type ProjectSignals struct {
 	ArchitectureGraph *ArchitectureGraph `json:"architectureGraph,omitempty"`
 
 	// ============================================
+	// AST DEEP ANALYSIS (Phase 1 - Multi-Language)
+	// ============================================
+	ASTDeepAnalysis *ASTDeepAnalysis `json:"astDeepAnalysis,omitempty"`
+
+	// ============================================
+	// TECH DEPENDENCY GRAPH (Phase 2 - Graph + Rule Engine)
+	// ============================================
+	TechDependencyGraph *TechDependencyGraph `json:"techDependencyGraph,omitempty"`
+
+	// ============================================
 	// AUTONOMOUS INTELLIGENCE ENGINE OUTPUT
 	// ============================================
 	IntelligenceVerdict *IntelligenceVerdict `json:"intelligenceVerdict,omitempty"`
+
+	// ============================================
+	// BAYESIAN CONFIDENCE ENGINE (Phase 3 - Weighted Confidence + Quality)
+	// ============================================
+	ConfidenceReport *ConfidenceAnalysis `json:"confidenceReport,omitempty"`
 
 	// Metadata
 	TotalFiles      int    `json:"totalFiles"`
@@ -494,6 +509,230 @@ type OrganizationMetrics struct {
 	AvgLinesPerFunc float64 `json:"avgLinesPerFunc"`
 	LongFunctions   int     `json:"longFunctions"`
 	SmallFunctions  int     `json:"smallFunctions"`
+}
+
+// ============================================
+// AST DEEP ANALYSIS OUTPUT (Phase 1)
+// ============================================
+
+// ASTDeepAnalysis contains results from multi-language AST parsing
+type ASTDeepAnalysis struct {
+	// Summary Stats
+	TotalFilesAnalyzed int `json:"totalFilesAnalyzed"`
+	TotalImports       int `json:"totalImports"`
+	UniqueModules      int `json:"uniqueModules"`
+	TotalFunctions     int `json:"totalFunctions"`
+	TotalPatterns      int `json:"totalPatterns"`
+
+	// Technology Usage (from import analysis)
+	DetectedTechnologies []ASTTechnology `json:"detectedTechnologies"`
+
+	// Code Complexity
+	AverageComplexity float64        `json:"averageComplexity"`
+	MaxComplexity     int            `json:"maxComplexity"`
+	ComplexityLevel   string         `json:"complexityLevel"` // "simple", "moderate", "complex", "highly_complex"
+	Distribution      map[string]int `json:"distribution"`
+
+	// Import Graph (file -> modules mapping)
+	ImportGraph map[string][]string `json:"importGraph,omitempty"`
+
+	// Detected Patterns
+	Patterns []ASTPattern `json:"patterns,omitempty"`
+}
+
+// ASTTechnology represents a technology detected via AST
+type ASTTechnology struct {
+	Name       string   `json:"name"`
+	FileCount  int      `json:"fileCount"`
+	CallCount  int      `json:"callCount"`
+	Intensity  float64  `json:"intensity"`  // 0.0 - 1.0
+	Confidence float64  `json:"confidence"` // 0.0 - 1.0
+	Evidence   []string `json:"evidence"`
+}
+
+// ASTPattern represents a code pattern detected via AST
+type ASTPattern struct {
+	Type       string  `json:"type"`
+	Name       string  `json:"name"`
+	Confidence float64 `json:"confidence"`
+	Count      int     `json:"count"`
+	Evidence   string  `json:"evidence"`
+}
+
+// ============================================
+// TECH DEPENDENCY GRAPH OUTPUT (Phase 2)
+// ============================================
+
+// TechDependencyGraph contains the graph-based analysis results
+type TechDependencyGraph struct {
+	// Graph Structure
+	Nodes []TechGraphNode `json:"nodes"`
+	Edges []TechGraphEdge `json:"edges"`
+
+	// Stack Detection
+	DetectedStacks []DetectedTechStack `json:"detectedStacks,omitempty"`
+
+	// Graph-Inferred Skills
+	InferredSkills []GraphInferredSkill `json:"inferredSkills,omitempty"`
+
+	// Technology Clusters
+	Clusters []TechnologyCluster `json:"clusters,omitempty"`
+
+	// Metrics
+	TotalNodes     int     `json:"totalNodes"`
+	TotalEdges     int     `json:"totalEdges"`
+	GraphDensity   float64 `json:"graphDensity"`
+	AvgNodeWeight  float64 `json:"avgNodeWeight"`
+	MaxConnections int     `json:"maxConnections"`
+}
+
+// TechGraphNode represents a technology node in the dependency graph
+type TechGraphNode struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	SubCategory string   `json:"subCategory"`
+	Weight      float64  `json:"weight"`
+	FileCount   int      `json:"fileCount"`
+	Evidence    []string `json:"evidence,omitempty"`
+	Sources     []string `json:"sources"` // "ast", "infra", "config"
+}
+
+// TechGraphEdge represents a relationship between two technologies
+type TechGraphEdge struct {
+	From       string  `json:"from"`
+	To         string  `json:"to"`
+	Type       string  `json:"type"` // "depends_on", "uses_with", "extends"
+	Weight     float64 `json:"weight"`
+	Confidence float64 `json:"confidence"`
+}
+
+// DetectedTechStack represents a recognized technology stack
+type DetectedTechStack struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"` // "fullstack", "backend", "frontend"
+	SkillLevel  string   `json:"skillLevel"`
+	MatchCount  int      `json:"matchCount"`
+	Matched     []string `json:"matched"`
+	Missing     []string `json:"missing,omitempty"`
+	Confidence  float64  `json:"confidence"`
+}
+
+// GraphInferredSkill is a skill that was inferred from graph structure
+type GraphInferredSkill struct {
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Level       string   `json:"level"`
+	Confidence  float64  `json:"confidence"`
+	Reasoning   string   `json:"reasoning"`
+	BasedOn     []string `json:"basedOn"`
+	ResumeReady bool     `json:"resumeReady"`
+}
+
+// TechnologyCluster is a group of related technologies
+type TechnologyCluster struct {
+	Name         string   `json:"name"`
+	Technologies []string `json:"technologies"`
+	Category     string   `json:"category"`
+	Strength     float64  `json:"strength"`
+}
+
+// ============================================
+// CONFIDENCE ANALYSIS OUTPUT (Phase 3)
+// ============================================
+
+// ConfidenceAnalysis contains the Bayesian confidence engine output
+type ConfidenceAnalysis struct {
+	// Per-skill Bayesian posteriors
+	SkillConfidences []SkillBayesianResult `json:"skillConfidences"`
+
+	// Code quality assessment
+	QualityMetrics CodeQualityMetrics `json:"qualityMetrics"`
+
+	// Git evolution assessment
+	EvolutionSignals GitEvolutionSignals `json:"evolutionSignals"`
+
+	// Ensemble verdict
+	EnsembleVerdict EnsembleResult `json:"ensembleVerdict"`
+
+	// Overall confidence in analysis
+	AnalysisConfidence float64 `json:"analysisConfidence"`
+}
+
+// SkillBayesianResult holds the Bayesian posterior for a single skill
+type SkillBayesianResult struct {
+	SkillName     string  `json:"skillName"`
+	Category      string  `json:"category"`
+	Prior         float64 `json:"prior"`
+	Likelihood    float64 `json:"likelihood"`
+	Posterior     float64 `json:"posterior"`
+	ASTEvidence   float64 `json:"astEvidence"`
+	InfraEvidence float64 `json:"infraEvidence"`
+	GraphEvidence float64 `json:"graphEvidence"`
+	QualityWeight float64 `json:"qualityWeight"`
+	GitWeight     float64 `json:"gitWeight"`
+	LowerBound    float64 `json:"lowerBound"`
+	UpperBound    float64 `json:"upperBound"`
+	ResumeReady   bool    `json:"resumeReady"`
+	UsageVerified bool    `json:"usageVerified"`
+	UsageStrength float64 `json:"usageStrength"`
+}
+
+// CodeQualityMetrics captures code quality dimensions
+type CodeQualityMetrics struct {
+	OrganizationScore   float64 `json:"organizationScore"`
+	ModularityScore     float64 `json:"modularityScore"`
+	TestCoverageProxy   float64 `json:"testCoverageProxy"`
+	TestMaturity        string  `json:"testMaturity"`
+	DocumentationScore  float64 `json:"documentationScore"`
+	ComplexityScore     float64 `json:"complexityScore"`
+	ComplexityLevel     string  `json:"complexityLevel"`
+	ProductionReadiness float64 `json:"productionReadiness"`
+	OverallQuality      float64 `json:"overallQuality"`
+	QualityTier         string  `json:"qualityTier"`
+}
+
+// GitEvolutionSignals captures git history-based confidence adjustments
+type GitEvolutionSignals struct {
+	AuthorshipLevel    string  `json:"authorshipLevel"`
+	AuthorshipFactor   float64 `json:"authorshipFactor"`
+	DevelopmentPattern string  `json:"developmentPattern"`
+	IterationCount     int     `json:"iterationCount"`
+	RefactorRatio      float64 `json:"refactorRatio"`
+	ProjectAge         string  `json:"projectAge"`
+	MaturityFactor     float64 `json:"maturityFactor"`
+	CommitConsistency  float64 `json:"commitConsistency"`
+}
+
+// EnsembleResult is the final combined verdict
+type EnsembleResult struct {
+	ASTScore          float64          `json:"astScore"`
+	GraphScore        float64          `json:"graphScore"`
+	InfraScore        float64          `json:"infraScore"`
+	IntelligenceScore float64          `json:"intelligenceScore"`
+	QualityScore      float64          `json:"qualityScore"`
+	GitScore          float64          `json:"gitScore"`
+	Weights           EnsembleWeightsV `json:"weights"`
+	FinalScore        float64          `json:"finalScore"`
+	Confidence        float64          `json:"confidence"`
+	ScoreLabel        string           `json:"scoreLabel"`
+	ScoreBand         [2]int           `json:"scoreBand"`
+	TotalSkills       int              `json:"totalSkills"`
+	HighConfSkills    int              `json:"highConfSkills"`
+	ResumeReadySkills int              `json:"resumeReadySkills"`
+	TopFactors        []string         `json:"topFactors"`
+	RiskFactors       []string         `json:"riskFactors"`
+}
+
+// EnsembleWeightsV defines component weights for ensemble scoring
+type EnsembleWeightsV struct {
+	AST          float64 `json:"ast"`
+	Graph        float64 `json:"graph"`
+	Infra        float64 `json:"infra"`
+	Intelligence float64 `json:"intelligence"`
+	Quality      float64 `json:"quality"`
+	Git          float64 `json:"git"`
 }
 
 // SecurityReport - from internal/intelligence/security_scanner.go

@@ -47,7 +47,22 @@ export class ProjectAnalysisController {
 
       logger.info({ projectId, userId }, 'Detailed analysis requested');
 
-      const analysis = project.analysis;
+      // Fetch raw MongoDB doc to get Phase 2/3 fields not in Prisma schema
+      let rawAnalysis: any = {};
+      try {
+        const rawResult: any = await prisma.$runCommandRaw({
+          find: 'project_analyses',
+          filter: { project_id: { $oid: projectId } },
+          limit: 1,
+        });
+        if (rawResult?.cursor?.firstBatch?.[0]) {
+          rawAnalysis = rawResult.cursor.firstBatch[0];
+        }
+      } catch (err) {
+        logger.warn({ err, projectId }, 'Failed to fetch raw analysis fields');
+      }
+
+      const analysis = { ...project.analysis, ...rawAnalysis };
 
       return res.json({
         success: true,
@@ -143,7 +158,7 @@ export class ProjectAnalysisController {
               projectTypeBonus: analysis.projectTypeBonus,
             },
             // Verified Skills
-            verifiedSkills: analysis.verifiedSkills.map(skill => ({
+            verifiedSkills: analysis.verifiedSkills.map((skill: any) => ({
               name: skill.name,
               category: skill.category,
               confidence: skill.confidence,
@@ -155,7 +170,7 @@ export class ProjectAnalysisController {
               usageStrength: (skill as any).usageStrength, // NEW
             })),
             // Optimization Suggestions
-            optimizations: analysis.optimizationSuggestions.map(opt => ({
+            optimizations: analysis.optimizationSuggestions.map((opt: any) => ({
               category: opt.category,
               priority: opt.priority,
               title: opt.title,
@@ -179,6 +194,58 @@ export class ProjectAnalysisController {
               advancedUsage: analysis.reactAnalysis.advancedUsage,
               suggestions: analysis.reactAnalysis.suggestions,
             } : null,
+            // ========== PHASE 2: TECH DEPENDENCY GRAPH ==========
+            techDependencyGraph: analysis.graph_total_nodes ? {
+              totalNodes: analysis.graph_total_nodes || 0,
+              totalEdges: analysis.graph_total_edges || 0,
+              graphDensity: analysis.graph_density || 0,
+              detectedStacks: analysis.graph_detected_stacks || [],
+              inferredSkills: analysis.graph_inferred_skills || [],
+              clusters: analysis.graph_clusters || [],
+            } : undefined,
+            // ========== PHASE 3: BAYESIAN CONFIDENCE REPORT ==========
+            confidenceReport: analysis.confidence_analysis_confidence ? {
+              analysisConfidence: analysis.confidence_analysis_confidence || 0,
+              qualityMetrics: {
+                organizationScore: analysis.quality_organization_score || 0,
+                modularityScore: analysis.quality_modularity_score || 0,
+                testCoverageProxy: analysis.quality_test_coverage_proxy || 0,
+                testMaturity: analysis.quality_test_maturity || 'none',
+                documentationScore: analysis.quality_documentation_score || 0,
+                complexityScore: analysis.quality_complexity_score || 0,
+                complexityLevel: analysis.quality_complexity_level || 'unknown',
+                productionReadiness: analysis.quality_production_readiness || 0,
+                overallQuality: analysis.quality_overall || 0,
+                qualityTier: analysis.quality_tier || 'low',
+              },
+              evolutionSignals: {
+                authorshipLevel: analysis.evolution_authorship_level || 'UNKNOWN',
+                authorshipFactor: analysis.evolution_authorship_factor || 0,
+                developmentPattern: analysis.evolution_development_pattern || 'unknown',
+                iterationCount: analysis.evolution_iteration_count || 0,
+                refactorRatio: analysis.evolution_refactor_ratio || 0,
+                projectAge: analysis.evolution_project_age || 'unknown',
+                maturityFactor: analysis.evolution_maturity_factor || 0,
+                commitConsistency: analysis.evolution_commit_consistency || 0,
+              },
+              ensembleVerdict: {
+                astScore: analysis.ensemble_ast_score || 0,
+                graphScore: analysis.ensemble_graph_score || 0,
+                infraScore: analysis.ensemble_infra_score || 0,
+                intelligenceScore: analysis.ensemble_intelligence_score || 0,
+                qualityScore: analysis.ensemble_quality_score || 0,
+                gitScore: analysis.ensemble_git_score || 0,
+                finalScore: analysis.ensemble_final_score || 0,
+                confidence: analysis.ensemble_confidence || 0,
+                scoreLabel: analysis.ensemble_score_label || 'Novice',
+                totalSkills: analysis.ensemble_total_skills || 0,
+                highConfSkills: analysis.ensemble_high_conf_skills || 0,
+                resumeReadySkills: analysis.ensemble_resume_ready_skills || 0,
+                topFactors: analysis.ensemble_top_factors || [],
+                riskFactors: analysis.ensemble_risk_factors || [],
+              },
+              skillConfidences: analysis.bayesian_skill_confidences || [],
+            } : undefined,
           },
         },
       });

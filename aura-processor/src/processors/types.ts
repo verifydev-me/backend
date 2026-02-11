@@ -300,3 +300,148 @@ export interface OptimizationSuggestion {
   impact: string;
 }
 
+// ============================================
+// TECH DEPENDENCY GRAPH (Phase 2 - Go Engine)
+// ============================================
+
+export interface TechDependencyGraph {
+  totalNodes: number;
+  totalEdges: number;
+  graphDensity: number;
+  avgNodeWeight: number;
+  maxConnections: number;
+  nodes: TechGraphNode[];
+  edges: TechGraphEdge[];
+  detectedStacks: DetectedTechStack[];
+  inferredSkills: GraphInferredSkill[];
+  clusters: TechnologyCluster[];
+}
+
+export interface TechGraphNode {
+  id: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  weight: number;
+  fileCount: number;
+  evidence: string[];
+  sources: string[];
+}
+
+export interface TechGraphEdge {
+  from: string;
+  to: string;
+  type: string;
+  weight: number;
+  confidence: number;
+}
+
+export interface DetectedTechStack {
+  name: string;
+  description: string;
+  category: string;
+  skillLevel: string;
+  matchCount: number;
+  matched: string[];
+  missing: string[];
+  confidence: number;
+}
+
+export interface GraphInferredSkill {
+  name: string;
+  category: string;
+  level: string;
+  confidence: number;
+  reasoning: string;
+  basedOn: string[];
+  resumeReady: boolean;
+}
+
+export interface TechnologyCluster {
+  name: string;
+  technologies: string[];
+  category: string;
+  strength: number;
+}
+
+// ============================================
+// CONFIDENCE REPORT (Phase 3 - Bayesian Engine)
+// ============================================
+
+export interface ConfidenceReport {
+  skillConfidences: SkillBayesianResult[];
+  qualityMetrics: CodeQualityMetrics;
+  evolutionSignals: GitEvolutionSignals;
+  ensembleVerdict: EnsembleVerdict;
+  analysisConfidence: number;
+}
+
+export interface SkillBayesianResult {
+  skillName: string;
+  category: string;
+  prior: number;
+  likelihood: number;
+  posterior: number;
+  astEvidence: number;
+  infraEvidence: number;
+  graphEvidence: number;
+  qualityWeight: number;
+  gitWeight: number;
+  lowerBound: number;
+  upperBound: number;
+  resumeReady: boolean;
+  usageVerified: boolean;
+  usageStrength: number;
+}
+
+export interface CodeQualityMetrics {
+  organizationScore: number;
+  modularityScore: number;
+  testCoverageProxy: number;
+  testMaturity: string;
+  documentationScore: number;
+  complexityScore: number;
+  complexityLevel: string;
+  productionReadiness: number;
+  overallQuality: number;
+  qualityTier: string;
+}
+
+export interface GitEvolutionSignals {
+  authorshipLevel: string;
+  authorshipFactor: number;
+  developmentPattern: string;
+  iterationCount: number;
+  refactorRatio: number;
+  projectAge: string;
+  maturityFactor: number;
+  commitConsistency: number;
+}
+
+export interface EnsembleVerdict {
+  astScore: number;
+  graphScore: number;
+  infraScore: number;
+  intelligenceScore: number;
+  qualityScore: number;
+  gitScore: number;
+  weights: EnsembleWeights;
+  finalScore: number;
+  confidence: number;
+  scoreLabel: string;
+  scoreBand: [number, number];
+  totalSkills: number;
+  highConfSkills: number;
+  resumeReadySkills: number;
+  topFactors: string[];
+  riskFactors: string[];
+}
+
+export interface EnsembleWeights {
+  ast: number;
+  graph: number;
+  infra: number;
+  intelligence: number;
+  quality: number;
+  git: number;
+}
