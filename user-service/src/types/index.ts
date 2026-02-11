@@ -36,21 +36,23 @@ export interface UserProfile {
   company: string | null;
   website: string | null;
   twitterHandle: string | null;
-  
+  leetcodeUsername?: string | null;
+  linkedinUrl?: string | null;
+
   // Core & Aura
   coreCount: number;
   auraScore: number;
-  
+
   // Status
   isPublic: boolean;
   isOpenToWork: boolean;
   isVerified: boolean;
-  
+
   // GitHub stats
   githubFollowers: number;
   githubRepos: number;
   githubContributions: number;
-  
+
   // Timestamps
   createdAt: Date;
   lastLoginAt: Date | null;
@@ -115,6 +117,7 @@ export interface SkillSummary {
   isVerified: boolean;
   verifiedScore: number;
   projectCount: number;
+  source: string;
 }
 
 export interface ProjectSummary {
@@ -150,6 +153,7 @@ export interface UpdateProfileDto {
   website?: string;
   twitterHandle?: string;
   avatarUrl?: string;
+  linkedinUrl?: string;
 }
 
 export interface UpdateSettingsDto {

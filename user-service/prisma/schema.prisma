@@ -21,7 +21,8 @@ model User {
   location      String?
   company       String?
   website       String?
-  twitterHandle String? @map("twitter_handle")
+  twitterHandle   String? @map("twitter_handle")
+  leetcodeUsername String? @map("leetcode_username")
 
   // ========== STUDENT INFO ==========
   isStudent      Boolean @default(false) @map("is_student")

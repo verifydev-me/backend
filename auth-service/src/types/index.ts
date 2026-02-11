@@ -83,6 +83,7 @@ export interface UserResponse {
   isOpenToWork: boolean;
   role: string;
   tags?: string[];
+  leetcodeUsername?: string | null;
 }
 
 // API Response Types

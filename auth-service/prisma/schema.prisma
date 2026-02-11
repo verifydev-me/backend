@@ -21,7 +21,8 @@ model User {
   location      String?
   company       String?
   website       String?
-  twitterHandle String? @map("twitter_handle")
+  twitterHandle   String? @map("twitter_handle")
+  leetcodeUsername String? @map("leetcode_username")
 
   // ========== PROFILE VISIBILITY ==========
   isPublic     Boolean @default(true) @map("is_public")

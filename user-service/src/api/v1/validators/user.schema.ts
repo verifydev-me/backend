@@ -8,6 +8,7 @@ export const updateProfileSchema = z.object({
   company: z.string().max(100).optional(),
   website: z.string().url().max(200).optional().or(z.literal('')),
   twitterHandle: z.string().max(50).optional(),
+  linkedinUrl: z.string().url().max(200).optional().or(z.literal('')),
 });
 
 // Update settings validation
