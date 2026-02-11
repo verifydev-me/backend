@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rs/zerolog/log"
+	"github.com/verifydev/project-analyzer/internal/debug"
 )
 
 // ============================================
@@ -31,6 +31,8 @@ const (
 // findFiles finds files matching patterns (with production limits)
 // IMPROVEMENT: Priority scanning - checks important dirs first
 func (e *InfraExtractor) findFiles(patterns ...string) []string {
+	defer debug.Profile("findFiles:" + strings.Join(patterns, ","))()
+
 	var results []string
 	filesScanned := 0
 	visited := make(map[string]bool) // Prevent duplicate scanning
@@ -43,14 +45,8 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		"handlers", "controllers", "routes", "middleware",
 	}
 
-	// Debug: Check if repoPath exists and list root files
-	if entries, err := os.ReadDir(e.repoPath); err == nil {
-		var rootFiles []string
-		for _, entry := range entries {
-			rootFiles = append(rootFiles, entry.Name())
-		}
-		log.Debug().Strs("patterns", patterns).Strs("rootFiles", rootFiles).Str("repoPath", e.repoPath).Msg("🔍 findFiles called")
-	}
+	// Debug: Log scan start with root files
+	debug.LogScanStart(patterns, e.repoPath)
 
 	// Helper to scan a directory
 	scanDir := func(baseDir string) {
@@ -128,20 +124,15 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 
 		// Skip build artifacts (for FILES, just skip this file; for dirs, SkipDir)
 		if shouldSkipPath(path) {
-			// Since we already check info.IsDir() == false above, this is a file
-			// inside a build artifact directory - just skip this file
+			debug.LogFileSkip(path, "build artifact")
 			return nil
 		}
 
 		relPath, _ := filepath.Rel(e.repoPath, path)
-		// Debug: Log file name matching for package.json specifically
-		if len(patterns) == 1 && patterns[0] == "package.json" {
-			log.Debug().Str("fileName", info.Name()).Str("relPath", relPath).Msg("📄 Checking file for package.json match")
-		}
 		for _, pattern := range patterns {
 			matched, _ := filepath.Match(pattern, info.Name())
 			if matched {
-				log.Debug().Str("pattern", pattern).Str("file", relPath).Msg("🎯 Pattern matched file")
+				debug.LogFileFound(relPath, pattern)
 				results = append(results, relPath)
 				break
 			}
@@ -150,7 +141,7 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		return nil
 	})
 
-	log.Debug().Int("totalResults", len(results)).Strs("patterns", patterns).Msg("🔍 findFiles completed")
+	debug.LogScan(strings.Join(patterns, ","), len(results), e.repoPath)
 
 	return results
 }
