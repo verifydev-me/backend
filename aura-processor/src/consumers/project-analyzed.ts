@@ -431,15 +431,43 @@ async function updateProject(
       // Code quality basics
       has_readme: signals.codeSignals.hasReadme || false,
       has_license: signals.codeSignals.hasLicense || false,
+      has_gitignore: signals.codeSignals.hasGitignore || false,
+      has_env_example: signals.codeSignals.hasEnvExample || false,
       has_dockerfile: signals.codeSignals.hasDockerfile || false,
+      has_docker_compose: signals.codeSignals.hasDockerCompose || false,
+      has_ci: signals.codeSignals.hasCI || false,
+      has_linting: signals.codeSignals.hasLinting || false,
+      has_prettier: signals.codeSignals.hasPrettier || false,
       has_typescript: signals.codeSignals.hasTypeScript || false,
+      has_makefile: signals.codeSignals.hasMakefile || false,
       test_files_count: signals.codeSignals.testFilesCount || 0,
 
       // Folder structure basics
       has_src_folder: signals.folderStructure.hasSrcFolder || false,
+      has_components: signals.folderStructure.hasComponents || false,
+      has_utils: signals.folderStructure.hasUtils || false,
       has_tests: signals.folderStructure.hasTests || false,
+      has_types: signals.folderStructure.hasTypes || false,
+      has_config: signals.folderStructure.hasConfig || false,
+      has_docs: signals.folderStructure.hasDocs || false,
+      has_api: signals.folderStructure.hasApi || false,
+      has_models: signals.folderStructure.hasModels || false,
+      has_services: signals.folderStructure.hasServices || false,
+      has_middleware: signals.folderStructure.hasMiddleware || false,
+      has_controllers: signals.folderStructure.hasControllers || false,
+      has_internal: signals.folderStructure.hasInternal || false,
+      has_pkg: signals.folderStructure.hasPkg || false,
+      has_cmd: signals.folderStructure.hasCmd || false,
+      has_gateway: signals.folderStructure.hasGateway || false,
       max_depth: signals.folderStructure.maxDepth || 0,
+      organization_score: signals.folderStructure.organizationScore || 0,
       top_level_folders: signals.folderStructure.topLevelFolders || [],
+      
+      // Tech Stack arrays (from Go: Frameworks, Databases, Tools, Infrastructure)
+      frameworks: signals.frameworks || [],
+      databases: signals.databases || [],
+      tools: signals.tools || [],
+      infrastructure: signals.infrastructure || [],
     };
 
     // Architecture type (enum stored as string)

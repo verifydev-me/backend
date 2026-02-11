@@ -11,10 +11,13 @@ import (
 // extractCodePatternSignals scans code for architecture patterns
 func (e *InfraExtractor) extractCodePatternSignals() {
 	// Check for producer/consumer patterns
-	if e.findCodePattern(`publish|produce|emit|sendMessage`) {
+	// CRITICAL FIX: Previous patterns were too generic — "publish", "emit", "sendMessage",
+	// "subscribe", "onMessage" are extremely common in frontend code (chat, events, JSX props).
+	// Now require message-queue-specific context (channel, queue, exchange, broker, amqp, kafka, etc.)
+	if e.findCodePattern(`channel\.(publish|sendToQueue|assertQueue)|producer\.send|kafka\.produce|amqp.*publish|rabbitmq.*publish|nats\.publish`) {
 		e.signals.AddSignal(signals.SignalMessageProducer, 0.8, []string{"Message publishing code detected"}, "code")
 	}
-	if e.findCodePattern(`consume|subscribe|onMessage|handleMessage`) {
+	if e.findCodePattern(`channel\.(consume|ack|nack)|consumer\.run|kafka\.consumer|amqp.*consume|rabbitmq.*consume|nats\.subscribe`) {
 		e.signals.AddSignal(signals.SignalMessageConsumer, 0.8, []string{"Message consuming code detected"}, "code")
 	}
 
@@ -24,7 +27,9 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 	}
 
 	// Event sourcing patterns
-	if e.findCodePattern(`eventStore|EventSourcing|aggregate|DomainEvent`) {
+	// CRITICAL FIX: "aggregate" alone is too generic — matches aggregatedDimensions, aggregateRating, etc.
+	// Now requires actual event sourcing terms (AggregateRoot, EventStore, DomainEvent, ApplyEvent)
+	if e.findCodePattern(`EventStore|EventSourcing|AggregateRoot|DomainEvent|ApplyEvent|EventBus\.publish`) {
 		e.signals.AddSignal(signals.SignalEventSourcing, 0.8, []string{"Event sourcing pattern detected"}, "code")
 	}
 
@@ -34,7 +39,10 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 	}
 
 	// Circuit breaker
-	if e.findCodePattern(`circuitBreaker|CircuitBreaker|fallback|retry`) {
+	// CRITICAL FIX: "fallback" and "retry" are extremely common in frontend code
+	// (ErrorBoundary fallback, axios retry config, REST fallback, etc.)
+	// Now requires actual circuit breaker library/pattern names
+	if e.findCodePattern(`circuitBreaker|CircuitBreaker|circuit_breaker|opossum|cockatiel|Polly\.CircuitBreaker|gobreaker`) {
 		e.signals.AddSignal(signals.SignalCircuitBreaker, 0.75, []string{"Circuit breaker pattern detected"}, "code")
 	}
 
@@ -53,9 +61,12 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalHealthEndpoints, 0.85, []string{"Health check endpoints detected"}, "code")
 	}
 
-	// API versioning
-	if e.findCodePattern(`/v1/|/v2/|/api/v\d`) {
-		e.signals.AddSignal(signals.SignalAPIVersioning, 0.85, []string{"API versioning detected"}, "code")
+	// API versioning — only count if this is a backend project defining routes
+	// Frontend projects naturally have /v1/ in their API client URLs — that's not "API versioning"
+	if e.projectType != "frontend" {
+		if e.findCodePattern(`/v1/|/v2/|/api/v\d`) {
+			e.signals.AddSignal(signals.SignalAPIVersioning, 0.85, []string{"API versioning detected"}, "code")
+		}
 	}
 
 	// ===========================================
@@ -84,11 +95,14 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalStrategyPattern, 0.8, []string{"Strategy pattern implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`Decorator\s*{|Wrapper\s*{`) {
+	// CRITICAL FIX: "Wrapper {" matches JSX <Wrapper> components in React code
+	// Now requires class/struct/implements patterns, not just the word
+	if e.findCodePattern(`class\s+\w*Decorator|Decorator\s*(struct|class|interface)|implements\s+Decorator`) {
 		e.signals.AddSignal(signals.SignalDecoratorPattern, 0.8, []string{"Decorator pattern implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`Adapter\s*{|Wrapper\s*{`) {
+	// CRITICAL FIX: "Adapter {" and "Wrapper {" too generic for frontend
+	if e.findCodePattern(`class\s+\w*Adapter|Adapter\s*(struct|class|interface)|implements\s+Adapter|AdapterPattern`) {
 		e.signals.AddSignal(signals.SignalAdapterPattern, 0.8, []string{"Adapter pattern implementation detected"}, "code")
 	}
 
@@ -109,7 +123,9 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalCleanArchitecture, 0.85, []string{"Clean Architecture pattern detected"}, "code")
 	}
 
-	if e.findCodePattern(`Hexagonal|Port\s*interface|Adapter\s*struct`) {
+	// CRITICAL FIX: "Adapter struct" too generic — matches React/Go adapter components
+	// Now requires explicit hexagonal architecture naming
+	if e.findCodePattern(`HexagonalArchitecture|hexagonal.*architecture|ports.*adapters|Port\s*interface.*Adapter`) {
 		e.signals.AddSignal(signals.SignalHexagonalArch, 0.85, []string{"Hexagonal Architecture pattern detected"}, "code")
 	}
 
@@ -146,7 +162,9 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalSecurityHeaders, 0.9, []string{"Security headers implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`PrepareStatement|PreparedStatement|\$1|\?|sql\.Named`) {
+	// CRITICAL FIX: "$1" and "?" match literally every template string and ternary in JS/TS
+	// Now requires actual SQL prepared statement patterns
+	if e.findCodePattern(`PrepareStatement|PreparedStatement|sql\.Named|db\.Prepare|stmt\.Exec|parameterized.*query`) {
 		e.signals.AddSignal(signals.SignalSQLInjection, 0.85, []string{"Prepared statements (SQLi prevention) detected"}, "code")
 	}
 
@@ -154,11 +172,14 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 		e.signals.AddSignal(signals.SignalXSSPrevention, 0.85, []string{"XSS prevention implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`AES|RSA|Encrypt|Decrypt|Cipher`) {
+	// Require specific crypto algorithm or library usage, not just generic words
+	if e.findCodePattern(`crypto\.createCipher|AES-256|RSA\.encrypt|cipher\.Block|crypto/aes|crypto/rsa|SubtleCrypto`) {
 		e.signals.AddSignal(signals.SignalEncryption, 0.85, []string{"Encryption implementation detected"}, "code")
 	}
 
-	if e.findCodePattern(`Hash|Bcrypt|Argon2|PBKDF2|Scrypt`) {
+	// CRITICAL FIX: "Hash" alone matches window.location.hash, URL hash routing, hash maps, etc.
+	// Now requires actual password hashing / crypto hashing library usage
+	if e.findCodePattern(`bcrypt|Bcrypt|Argon2|PBKDF2|Scrypt|crypto\.createHash|sha256|sha512|hashPassword`) {
 		e.signals.AddSignal(signals.SignalHashing, 0.9, []string{"Hashing implementation detected"}, "code")
 	}
 
@@ -181,11 +202,16 @@ func (e *InfraExtractor) extractCodePatternSignals() {
 
 // extractCloudNativeSignals detects cloud-native patterns
 func (e *InfraExtractor) extractCloudNativeSignals() {
-	if e.findCodePattern(`lambda|serverless|function.*handler`) {
+	// CRITICAL FIX: "function.*handler" matches EVERY React event handler (onClick handler, etc.)
+	// "lambda" can match variable names. "s3" matches CSS selectors.
+	// Now requires actual serverless framework/SDK patterns
+	if e.findCodePattern(`serverless\.yml|serverless\.ts|@aws-cdk|aws-lambda|exports\.handler\s*=|module\.exports\.handler|APIGatewayEvent|APIGatewayProxy`) {
 		e.signals.AddSignal(signals.SignalServerless, 0.85, []string{"Serverless/Lambda code detected"}, "code")
 	}
 
-	if e.findCodePattern(`sqs|sns|kinesis|dynamodb|s3`) {
+	// CRITICAL FIX: "s3" alone matches CSS class selectors, IDs, variable names.
+	// Now requires actual AWS SDK import/usage patterns
+	if e.findCodePattern(`aws-sdk|@aws-sdk|AWS\.SQS|AWS\.SNS|AWS\.DynamoDB|AWS\.S3|new\s+S3Client|new\s+SQSClient|new\s+DynamoDBClient`) {
 		e.signals.AddSignal(signals.SignalAWS, 0.85, []string{"AWS services code detected"}, "code")
 	}
 }
@@ -233,15 +259,19 @@ func (e *InfraExtractor) extractTestingSignals() {
 		e.signals.AddSignal(signals.SignalLoadTesting, 0.9, []string{"Load testing code detected"}, "code")
 	}
 
-	if e.findCodePattern(`Benchmark|bench`) {
+	// CRITICAL FIX: "bench" alone too generic. Require Go Benchmark functions or actual benchmark tools
+	if e.findCodePattern(`func\s+Benchmark|b\.Run\(|b\.ResetTimer|benchmark\.js|vitest\.bench`) {
 		e.signals.AddSignal(signals.SignalBenchmarking, 0.9, []string{"Benchmarking code detected"}, "code")
 	}
 
-	if e.findCodePattern(`Fuzz|fuzz`) {
+	// CRITICAL FIX: "fuzz" alone too generic. Require Go Fuzz functions or actual fuzzing tools
+	if e.findCodePattern(`func\s+Fuzz|f\.Fuzz\(|go-fuzz|jazzer|atheris`) {
 		e.signals.AddSignal(signals.SignalFuzzTesting, 0.9, []string{"Fuzz testing code detected"}, "code")
 	}
 
-	if e.findCodePattern(`Property|QuickCheck|rapid`) {
+	// CRITICAL FIX: "Property" alone matches style.setProperty(), JSON-LD PropertyValue, etc.
+	// Now requires actual property-based testing library names
+	if e.findCodePattern(`QuickCheck|fast-check|fc\.property|rapid\.Check|gopter|hypothesis\.given|@given`) {
 		e.signals.AddSignal(signals.SignalPropertyTesting, 0.85, []string{"Property-based testing detected"}, "code")
 	}
 }
@@ -249,7 +279,9 @@ func (e *InfraExtractor) extractTestingSignals() {
 // extractObservabilitySignals detects observability patterns
 func (e *InfraExtractor) extractObservabilitySignals() {
 	// Custom metrics
-	if e.findCodePattern(`Counter\(|Histogram\(|Gauge\(|metrics\.New`) {
+	// CRITICAL FIX: "Counter(" matches useAnimatedCounter(), AnimatedCounter, etc. in frontend code
+	// Now requires actual Prometheus/metrics library patterns
+	if e.findCodePattern(`prometheus\.NewCounter|prometheus\.NewHistogram|prometheus\.NewGauge|promauto\.|metrics\.New|prom\.Counter|statsd\.`) {
 		e.signals.AddSignal(signals.SignalMetricsCollection, 0.85, []string{"Custom metrics collection detected"}, "code")
 	}
 

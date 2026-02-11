@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -225,18 +226,29 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// PARALLEL EXECUTION: Phase 1 (Project-Type-Aware)
 	// ============================================
 
-	// Complete routing logic based on userProjectType
+	// PHASE 0: Quick project type pre-detection when userProjectType is empty
+	// This prevents running ALL parsers when the type can be inferred from folder structure
+	effectiveProjectType := userProjectType
+	if effectiveProjectType == "" {
+		effectiveProjectType = quickDetectProjectType(analysisRoot)
+		log.Info().
+			Str("autoDetected", effectiveProjectType).
+			Msg("🔍 Auto-detected project type (userProjectType was empty)")
+	}
+
+	// Complete routing logic based on effectiveProjectType
 	// frontend → only frontend analysis
 	// backend → only backend analysis
 	// fullstack → BOTH frontend + backend
 	// ml → ML-specific + backend
 	// library → all analysis
-	runFrontend := userProjectType == "frontend" || userProjectType == "fullstack" || userProjectType == "" || userProjectType == "library"
-	runBackend := userProjectType == "backend" || userProjectType == "fullstack" || userProjectType == "ml" || userProjectType == "" || userProjectType == "library"
-	runML := userProjectType == "ml"
+	runFrontend := effectiveProjectType == "frontend" || effectiveProjectType == "fullstack" || effectiveProjectType == "library"
+	runBackend := effectiveProjectType == "backend" || effectiveProjectType == "fullstack" || effectiveProjectType == "ml" || effectiveProjectType == "library"
+	runML := effectiveProjectType == "ml"
 
 	log.Info().
 		Str("userProjectType", userProjectType).
+		Str("effectiveProjectType", effectiveProjectType).
 		Bool("runFrontend", runFrontend).
 		Bool("runBackend", runBackend).
 		Bool("runML", runML).
@@ -432,7 +444,27 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	}
 
 	// Filter signals based on project type for clean response
-	filterSignalsByProjectType(result, userProjectType)
+	// Use effectiveProjectType (auto-detected when user didn't specify)
+	// Also reconcile with the auto-detected ProjectType from Phase 2
+	filterProjectType := effectiveProjectType
+	if filterProjectType == "" {
+		// Last resort: use auto-detected ProjectType from DetectProjectType()
+		switch result.ProjectType {
+		case signals.ProjectTypeFrontend:
+			filterProjectType = "frontend"
+		case signals.ProjectTypeBackend, signals.ProjectTypeAPI:
+			filterProjectType = "backend"
+		case signals.ProjectTypeFullstack, signals.ProjectTypeMonorepo:
+			filterProjectType = "fullstack"
+		default:
+			filterProjectType = "fullstack" // Safe default: keep everything rather than lose signals
+		}
+		log.Info().
+			Str("fallbackFilterType", filterProjectType).
+			Str("autoProjectType", string(result.ProjectType)).
+			Msg("🔄 Using auto-detected ProjectType for signal filtering")
+	}
+	filterSignalsByProjectType(result, filterProjectType)
 
 	log.Info().
 		Str("projectId", req.ProjectID).
@@ -495,6 +527,22 @@ func filterSignalsByProjectType(result *signals.ProjectSignals, projectType stri
 			}
 		}
 		result.Tools = filteredTools
+
+		// CRITICAL FIX: Filter Frameworks to remove backend frameworks for frontend projects
+		// This prevents Express/NestJS/Gin etc. from appearing in tech stack
+		var filteredFrontendFrameworks []string
+		backendFrameworks := map[string]bool{
+			"Express": true, "NestJS": true, "Fastify": true, "Koa": true,
+			"Gin": true, "Fiber": true, "Echo": true, "Chi": true,
+			"Django": true, "Flask": true, "FastAPI": true,
+			"gRPC": true, "GraphQL": true,
+		}
+		for _, fw := range result.Frameworks {
+			if !backendFrameworks[fw] {
+				filteredFrontendFrameworks = append(filteredFrontendFrameworks, fw)
+			}
+		}
+		result.Frameworks = filteredFrontendFrameworks
 
 		log.Debug().Msg("Filtered out backend signals & skills for frontend project")
 
@@ -1055,4 +1103,132 @@ func extractTrustFlags(trustResult *trust.TrustAnalysis) []string {
 		flags = append(flags, fmt.Sprintf("[%s] %s: %s", issue.Severity, issue.Type, issue.Evidence))
 	}
 	return flags
+}
+
+// quickDetectProjectType performs a fast heuristic detection of project type
+// by checking key files and folders WITHOUT running full analysis.
+// This runs BEFORE Phase 1 to gate which parsers run.
+func quickDetectProjectType(repoPath string) string {
+	// Check for monorepo tools first
+	monorepoFiles := []string{"lerna.json", "nx.json", "turbo.json", "rush.json", "pnpm-workspace.yaml"}
+	for _, f := range monorepoFiles {
+		if fileExists(filepath.Join(repoPath, f)) {
+			return "fullstack" // Monorepos need full analysis
+		}
+	}
+
+	// Read root package.json for framework detection
+	pkgData, pkgErr := os.ReadFile(filepath.Join(repoPath, "package.json"))
+	pkgContent := ""
+	if pkgErr == nil {
+		pkgContent = string(pkgData)
+
+		// Check for workspaces (monorepo)
+		if strings.Contains(pkgContent, "\"workspaces\"") {
+			return "fullstack"
+		}
+	}
+
+	// Check for Go project
+	hasGoMod := fileExists(filepath.Join(repoPath, "go.mod"))
+
+	// Detect frontend signals
+	hasFrontendFramework := false
+	if pkgContent != "" {
+		hasFrontendFramework = strings.Contains(pkgContent, "\"react\"") ||
+			strings.Contains(pkgContent, "\"vue\"") ||
+			strings.Contains(pkgContent, "\"@angular/core\"") ||
+			strings.Contains(pkgContent, "\"svelte\"") ||
+			strings.Contains(pkgContent, "\"next\"")
+	}
+
+	// Detect backend signals from SAME package.json
+	hasBackendFramework := false
+	if pkgContent != "" {
+		hasBackendFramework = strings.Contains(pkgContent, "\"express\"") ||
+			strings.Contains(pkgContent, "\"@nestjs/core\"") ||
+			strings.Contains(pkgContent, "\"fastify\"") ||
+			strings.Contains(pkgContent, "\"koa\"") ||
+			strings.Contains(pkgContent, "\"hapi\"")
+	}
+
+	// Detect folder structure hints
+	hasComponentsDir := dirExists(filepath.Join(repoPath, "components")) ||
+		dirExists(filepath.Join(repoPath, "src", "components"))
+	hasPagesDir := dirExists(filepath.Join(repoPath, "pages")) ||
+		dirExists(filepath.Join(repoPath, "src", "pages")) ||
+		dirExists(filepath.Join(repoPath, "app")) // Next.js App Router
+	hasAPIDir := dirExists(filepath.Join(repoPath, "api")) ||
+		dirExists(filepath.Join(repoPath, "src", "api")) ||
+		dirExists(filepath.Join(repoPath, "routes")) ||
+		dirExists(filepath.Join(repoPath, "src", "routes")) ||
+		dirExists(filepath.Join(repoPath, "controllers")) ||
+		dirExists(filepath.Join(repoPath, "src", "controllers"))
+	hasInternalDir := dirExists(filepath.Join(repoPath, "internal"))
+	hasCmdDir := dirExists(filepath.Join(repoPath, "cmd"))
+
+	// Pure Go backend (no JS/TS)
+	if hasGoMod && !hasFrontendFramework {
+		return "backend"
+	}
+
+	// Frontend with backend framework in same package.json
+	// BUT: if the backend framework is Express AND it's a Next.js project with custom server,
+	// treat as frontend (Next.js uses express for custom server, not as a separate backend)
+	if hasFrontendFramework && hasBackendFramework {
+		// Check if it's a Next.js custom server pattern (not a real backend)
+		isNextJS := strings.Contains(pkgContent, "\"next\"")
+		hasExpressOnly := strings.Contains(pkgContent, "\"express\"") &&
+			!strings.Contains(pkgContent, "\"@nestjs/core\"") &&
+			!strings.Contains(pkgContent, "\"fastify\"")
+
+		// Next.js + Express with no dedicated backend folders → treat as frontend
+		if isNextJS && hasExpressOnly && !hasAPIDir && !hasInternalDir {
+			return "frontend"
+		}
+
+		// Real fullstack: has both framework types + backend folder structure
+		return "fullstack"
+	}
+
+	// Pure frontend signals
+	if hasFrontendFramework && !hasBackendFramework && !hasGoMod {
+		// Even if there's an "api" dir, if it's Next.js API routes, that's still frontend
+		return "frontend"
+	}
+
+	// Pure backend signals (Node.js backend without frontend)
+	if hasBackendFramework && !hasFrontendFramework {
+		return "backend"
+	}
+
+	// Go standard layout
+	if hasGoMod && (hasInternalDir || hasCmdDir) {
+		return "backend"
+	}
+
+	// Component-heavy structure without backend folders → frontend
+	if (hasComponentsDir || hasPagesDir) && !hasAPIDir && !hasInternalDir && !hasCmdDir {
+		return "frontend"
+	}
+
+	// Backend-heavy structure without frontend folders
+	if (hasAPIDir || hasInternalDir || hasCmdDir) && !hasComponentsDir && !hasPagesDir {
+		return "backend"
+	}
+
+	// Mixed signals → fullstack (safe default)
+	return "fullstack"
+}
+
+// fileExists checks if a file exists at the given path
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// dirExists checks if a directory exists at the given path
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }

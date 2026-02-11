@@ -722,23 +722,59 @@ func minInt(a, b int) int {
 }
 
 // runStackAnalyzers executes stack-specific analyzers based on detected signals
+// Respects userProjectType to prevent cross-contamination (e.g., running
+// NodeBackendAnalyzer on a pure React project)
 func (p *Pipeline) runStackAnalyzers(signals *FastSignals, selection *ModuleSelection) []*StackAnalysisResult {
 	results := []*StackAnalysisResult{}
 
-	// Check for Next.js/React frontend
-	for _, fw := range signals.DetectedFrameworks {
-		if fw == "Next.js" || fw == "React" {
-			analyzer := NewNextJSAnalyzer()
-			result := analyzer.Analyze(p.repoPath)
-			if result != nil && (len(result.Risks) > 0 || len(result.Strengths) > 0) {
-				results = append(results, result)
+	isFrontend := p.userProjectType == "frontend"
+	isBackend := p.userProjectType == "backend"
+	// If empty or fullstack, use signal-based detection
+	runFrontendAnalyzers := isFrontend || p.userProjectType == "fullstack" || p.userProjectType == ""
+	runBackendAnalyzers := isBackend || p.userProjectType == "fullstack" || p.userProjectType == "ml"
+
+	// When userProjectType is empty, use signal-based heuristic to avoid running both
+	if p.userProjectType == "" {
+		hasFrontendFw := false
+		hasBackendFw := false
+		for _, fw := range signals.DetectedFrameworks {
+			switch fw {
+			case "React", "Vue", "Angular", "Next.js", "Svelte":
+				hasFrontendFw = true
+			case "Express", "NestJS", "Fastify":
+				hasBackendFw = true
 			}
-			break
+		}
+		if signals.DominantLanguage == "Go" {
+			hasBackendFw = true
+		}
+
+		// If only frontend signals, don't run backend analyzers
+		if hasFrontendFw && !hasBackendFw {
+			runBackendAnalyzers = false
+		}
+		// If only backend signals, don't run frontend analyzers
+		if hasBackendFw && !hasFrontendFw {
+			runFrontendAnalyzers = false
+		}
+	}
+
+	// Check for Next.js/React frontend
+	if runFrontendAnalyzers {
+		for _, fw := range signals.DetectedFrameworks {
+			if fw == "Next.js" || fw == "React" {
+				analyzer := NewNextJSAnalyzer()
+				result := analyzer.Analyze(p.repoPath)
+				if result != nil && (len(result.Risks) > 0 || len(result.Strengths) > 0) {
+					results = append(results, result)
+				}
+				break
+			}
 		}
 	}
 
 	// Check for Go backend
-	if signals.DominantLanguage == "Go" {
+	if runBackendAnalyzers && signals.DominantLanguage == "Go" {
 		analyzer := NewGoBackendAnalyzer()
 		result := analyzer.Analyze(p.repoPath)
 		if result != nil && (len(result.Risks) > 0 || len(result.Strengths) > 0) {
@@ -747,14 +783,16 @@ func (p *Pipeline) runStackAnalyzers(signals *FastSignals, selection *ModuleSele
 	}
 
 	// Check for Node backend
-	for _, fw := range signals.DetectedFrameworks {
-		if fw == "Express" || fw == "NestJS" {
-			analyzer := NewNodeBackendAnalyzer()
-			result := analyzer.Analyze(p.repoPath)
-			if result != nil && (len(result.Risks) > 0 || len(result.Strengths) > 0) {
-				results = append(results, result)
+	if runBackendAnalyzers {
+		for _, fw := range signals.DetectedFrameworks {
+			if fw == "Express" || fw == "NestJS" {
+				analyzer := NewNodeBackendAnalyzer()
+				result := analyzer.Analyze(p.repoPath)
+				if result != nil && (len(result.Risks) > 0 || len(result.Strengths) > 0) {
+					results = append(results, result)
+				}
+				break
 			}
-			break
 		}
 	}
 

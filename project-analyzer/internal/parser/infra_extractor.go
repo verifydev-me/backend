@@ -368,10 +368,21 @@ func (e *InfraExtractor) analyzeEnvFiles(files []string) {
 			continue
 		}
 
-		contentStr := strings.ToUpper(string(content))
-		for pattern, signal := range envPatterns {
-			if strings.Contains(contentStr, pattern) {
-				e.signals.AddSignal(signal, 0.85, []string{file + " contains " + pattern}, "env_file")
+		// CRITICAL FIX: Only match UNCOMMENTED lines in .env files
+		// Previously, commented-out lines like "# REDIS_URL=..." would trigger
+		// false signals (Redis, PostgreSQL, OAuth, etc.)
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			trimmedLine := strings.TrimSpace(line)
+			// Skip empty lines and comments
+			if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+				continue
+			}
+			upperLine := strings.ToUpper(trimmedLine)
+			for pattern, signal := range envPatterns {
+				if strings.Contains(upperLine, pattern) {
+					e.signals.AddSignal(signal, 0.85, []string{file + " contains " + pattern}, "env_file")
+				}
 			}
 		}
 	}
