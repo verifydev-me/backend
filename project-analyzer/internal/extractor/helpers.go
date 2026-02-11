@@ -1,4 +1,4 @@
-package parser
+package extractor
 
 import (
 	"bufio"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/verifydev/project-analyzer/internal/debug"
 )
 
 // ============================================
@@ -29,6 +31,8 @@ const (
 // findFiles finds files matching patterns (with production limits)
 // IMPROVEMENT: Priority scanning - checks important dirs first
 func (e *InfraExtractor) findFiles(patterns ...string) []string {
+	defer debug.Profile("findFiles:" + strings.Join(patterns, ","))()
+
 	var results []string
 	filesScanned := 0
 	visited := make(map[string]bool) // Prevent duplicate scanning
@@ -40,6 +44,9 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		"backend", "frontend", "server", "client",
 		"handlers", "controllers", "routes", "middleware",
 	}
+
+	// Debug: Log scan start with root files
+	debug.LogScanStart(patterns, e.repoPath)
 
 	// Helper to scan a directory
 	scanDir := func(baseDir string) {
@@ -67,9 +74,9 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 				return filepath.SkipAll
 			}
 
-			// Skip build artifacts
+			// Skip build artifacts (for files, just skip this file)
 			if shouldSkipPath(path) {
-				return filepath.SkipDir
+				return nil
 			}
 
 			relPath, _ := filepath.Rel(e.repoPath, path)
@@ -115,15 +122,17 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 			return filepath.SkipAll
 		}
 
-		// Skip build artifacts
+		// Skip build artifacts (for FILES, just skip this file; for dirs, SkipDir)
 		if shouldSkipPath(path) {
-			return filepath.SkipDir
+			debug.LogFileSkip(path, "build artifact")
+			return nil
 		}
 
 		relPath, _ := filepath.Rel(e.repoPath, path)
 		for _, pattern := range patterns {
 			matched, _ := filepath.Match(pattern, info.Name())
 			if matched {
+				debug.LogFileFound(relPath, pattern)
 				results = append(results, relPath)
 				break
 			}
@@ -132,19 +141,27 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		return nil
 	})
 
+	debug.LogScan(strings.Join(patterns, ","), len(results), e.repoPath)
+
 	return results
 }
 
 // shouldSkipPath returns true if the path should be skipped (build artifacts, vendor, etc.)
+// This checks for DIRECTORY names in the path, not substrings of filenames
 func shouldSkipPath(path string) bool {
-	skipPatterns := []string{
-		"node_modules", "vendor", ".git",
-		"dist", "build", ".next", "coverage",
-		".output", "__pycache__", ".cache",
-		"target", "bin", "obj", // Rust, Go binaries, .NET
+	// Skip directories that are build artifacts or dependencies
+	skipDirs := []string{
+		"/node_modules/", "/vendor/", "/.git/",
+		"/dist/", "/build/", "/.next/", "/coverage/",
+		"/.output/", "/__pycache__/", "/.cache/",
+		"/target/", "/bin/", "/obj/",
 	}
-	for _, pattern := range skipPatterns {
-		if strings.Contains(path, pattern) {
+
+	// Normalize path separators for consistent matching
+	normalizedPath := "/" + strings.ReplaceAll(path, "\\", "/") + "/"
+
+	for _, pattern := range skipDirs {
+		if strings.Contains(normalizedPath, pattern) {
 			return true
 		}
 	}

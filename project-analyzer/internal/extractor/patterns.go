@@ -1,4 +1,4 @@
-package parser
+package extractor
 
 import (
 	"github.com/verifydev/project-analyzer/pkg/signals"
