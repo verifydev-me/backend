@@ -339,6 +339,19 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
       breakdown: auraResult.breakdown,
     }, 'Aura calculated');
 
+    // Debug: Log what we're about to send to MongoDB
+    logger.debug({
+      projectId: signals.projectId,
+      hasFolderStructure: !!signals.folderStructure,
+      folderStructureKeys: signals.folderStructure ? Object.keys(signals.folderStructure).length : 0,
+      hasComponents: signals.folderStructure?.hasComponents,
+      hasUtils: signals.folderStructure?.hasUtils,
+      frameworks: signals.frameworks?.length,
+      databases: signals.databases?.length,
+      tools: signals.tools?.length,
+      infrastructure: signals.infrastructure?.length,
+    }, '🔍 Signals content before MongoDB update');
+
     // Update project and save analysis
     const projectUpdated = await updateProject(signals, auraResult);
     
@@ -581,6 +594,19 @@ async function updateProject(
 
     // 3. Use raw MongoDB updateOne with $set to bypass Prisma's pipeline limit
     // MongoDB native $set is a single pipeline stage regardless of field count
+    logger.debug({
+      projectId: signals.projectId,
+      analysisFieldsKeys: Object.keys(analysisFields).length,
+      sampleFields: {
+        has_components: analysisFields.has_components,
+        has_utils: analysisFields.has_utils,
+        frameworks: analysisFields.frameworks,
+        databases: analysisFields.databases,
+        tools: analysisFields.tools,
+        infrastructure: analysisFields.infrastructure,
+      },
+    }, '💾 About to write to MongoDB with $set');
+
     const rawResult: any = await prisma.$runCommandRaw({
       update: 'project_analyses',
       updates: [
@@ -591,6 +617,8 @@ async function updateProject(
         },
       ],
     });
+    
+    logger.debug({ projectId: signals.projectId, rawResult }, '✅ MongoDB update result');
     
     // Get the analysis ID for creating related records
     const analysisDoc = await prisma.projectAnalysis.findUnique({

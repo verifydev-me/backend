@@ -514,6 +514,47 @@ func filterSignalsByProjectType(result *signals.ProjectSignals, projectType stri
 
 			// Remove Architecture/Microservices Graph for Frontend
 			result.IndustryAnalysis.Architecture = signals.SystemArchitecture{}
+
+			// CRITICAL FIX: Filter infraSignals to remove backend-only signals for frontend projects
+			if result.IndustryAnalysis.InfraSignals != nil {
+				backendOnlySignals := map[signals.InfraSignal]bool{
+					signals.SignalRabbitMQ:          true,
+					signals.SignalKafka:             true,
+					signals.SignalNATS:              true,
+					signals.SignalCaching:           true,
+					signals.SignalRedis:             true,
+					signals.SignalCircuitBreaker:    true,
+					signals.SignalEventSourcing:     true,
+					signals.SignalPropertyTesting:   true,
+					signals.SignalServerless:        true,
+					signals.SignalSQLInjection:      true,
+					signals.SignalRateLimiting:      true,
+					signals.SignalHashing:           true,
+					signals.SignalEncryption:        true,
+					signals.SignalDecoratorPattern:  true,
+					signals.SignalAdapterPattern:    true,
+					signals.SignalHexagonalArch:     true,
+					signals.SignalMetricsCollection: true,
+					signals.SignalPrometheus:        true,
+					signals.SignalPenetrationTest:   true,
+					signals.SignalAPIVersioning:     true,
+					signals.SignalMessageProducer:   true,
+					signals.SignalMessageConsumer:   true,
+				}
+				// Filter signals list
+				var filteredSignals []signals.InfraSignal
+				for _, sig := range result.IndustryAnalysis.InfraSignals.Signals {
+					if !backendOnlySignals[sig] {
+						filteredSignals = append(filteredSignals, sig)
+					}
+				}
+				result.IndustryAnalysis.InfraSignals.Signals = filteredSignals
+				// Also filter the SignalDetails map
+				for sig := range backendOnlySignals {
+					delete(result.IndustryAnalysis.InfraSignals.SignalDetails, sig)
+				}
+				log.Debug().Int("filteredInfraSignals", len(filteredSignals)).Msg("Filtered backend-only infraSignals for frontend project")
+			}
 		}
 
 		// Clear Backend-specific Tech Stacks
