@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 // ============================================
@@ -41,6 +43,15 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		"handlers", "controllers", "routes", "middleware",
 	}
 
+	// Debug: Check if repoPath exists and list root files
+	if entries, err := os.ReadDir(e.repoPath); err == nil {
+		var rootFiles []string
+		for _, entry := range entries {
+			rootFiles = append(rootFiles, entry.Name())
+		}
+		log.Debug().Strs("patterns", patterns).Strs("rootFiles", rootFiles).Str("repoPath", e.repoPath).Msg("🔍 findFiles called")
+	}
+
 	// Helper to scan a directory
 	scanDir := func(baseDir string) {
 		targetPath := filepath.Join(e.repoPath, baseDir)
@@ -67,9 +78,9 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 				return filepath.SkipAll
 			}
 
-			// Skip build artifacts
+			// Skip build artifacts (for files, just skip this file)
 			if shouldSkipPath(path) {
-				return filepath.SkipDir
+				return nil
 			}
 
 			relPath, _ := filepath.Rel(e.repoPath, path)
@@ -115,15 +126,22 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 			return filepath.SkipAll
 		}
 
-		// Skip build artifacts
+		// Skip build artifacts (for FILES, just skip this file; for dirs, SkipDir)
 		if shouldSkipPath(path) {
-			return filepath.SkipDir
+			// Since we already check info.IsDir() == false above, this is a file
+			// inside a build artifact directory - just skip this file
+			return nil
 		}
 
 		relPath, _ := filepath.Rel(e.repoPath, path)
+		// Debug: Log file name matching for package.json specifically
+		if len(patterns) == 1 && patterns[0] == "package.json" {
+			log.Debug().Str("fileName", info.Name()).Str("relPath", relPath).Msg("📄 Checking file for package.json match")
+		}
 		for _, pattern := range patterns {
 			matched, _ := filepath.Match(pattern, info.Name())
 			if matched {
+				log.Debug().Str("pattern", pattern).Str("file", relPath).Msg("🎯 Pattern matched file")
 				results = append(results, relPath)
 				break
 			}
@@ -132,19 +150,27 @@ func (e *InfraExtractor) findFiles(patterns ...string) []string {
 		return nil
 	})
 
+	log.Debug().Int("totalResults", len(results)).Strs("patterns", patterns).Msg("🔍 findFiles completed")
+
 	return results
 }
 
 // shouldSkipPath returns true if the path should be skipped (build artifacts, vendor, etc.)
+// This checks for DIRECTORY names in the path, not substrings of filenames
 func shouldSkipPath(path string) bool {
-	skipPatterns := []string{
-		"node_modules", "vendor", ".git",
-		"dist", "build", ".next", "coverage",
-		".output", "__pycache__", ".cache",
-		"target", "bin", "obj", // Rust, Go binaries, .NET
+	// Skip directories that are build artifacts or dependencies
+	skipDirs := []string{
+		"/node_modules/", "/vendor/", "/.git/",
+		"/dist/", "/build/", "/.next/", "/coverage/",
+		"/.output/", "/__pycache__/", "/.cache/",
+		"/target/", "/bin/", "/obj/",
 	}
-	for _, pattern := range skipPatterns {
-		if strings.Contains(path, pattern) {
+
+	// Normalize path separators for consistent matching
+	normalizedPath := "/" + strings.ReplaceAll(path, "\\", "/") + "/"
+
+	for _, pattern := range skipDirs {
+		if strings.Contains(normalizedPath, pattern) {
 			return true
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
@@ -201,9 +202,12 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 		"typescript": signals.SignalTypeScript,
 	}
 
+	log.Debug().Str("serviceName", serviceName).Str("servicePath", servicePath).Msg("📦 Scanning package.json for dependencies")
+
 	// Check dependencies and devDependencies
 	for _, depType := range []string{"dependencies", "devDependencies"} {
 		if deps, ok := pkg[depType].(map[string]interface{}); ok {
+			log.Debug().Str("depType", depType).Int("count", len(deps)).Msg("📦 Found dependencies section")
 			for dep := range deps {
 				depLower := strings.ToLower(dep)
 				for pattern, signal := range depSignals {
@@ -211,6 +215,7 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 					// e.g. @typescript-eslint should NOT match "react"
 					if dep == pattern || depLower == strings.ToLower(pattern) {
 						evidence := fmt.Sprintf("%s detected in %s/package.json", dep, serviceName)
+						log.Debug().Str("dependency", dep).Str("signal", string(signal)).Msg("📦 Matched dependency → signal")
 						e.signals.AddSignal(signal, 0.9, []string{evidence}, "deep_service_scan")
 					}
 				}
@@ -222,11 +227,13 @@ func (e *InfraExtractor) scanServicePackageJSON(servicePath, serviceName string)
 // analyzePackageJSON extracts signals from package.json files in the repo
 func (e *InfraExtractor) analyzePackageJSON() {
 	files := e.findFiles("package.json")
+	log.Debug().Int("packageJsonCount", len(files)).Str("repoPath", e.repoPath).Msg("📦 analyzePackageJSON called")
 	if len(files) > 0 {
 		e.signals.AddSignal(signals.SignalNode, 1.0, []string{"Found package.json"}, "runtime_detection")
 	}
 
 	for _, file := range files {
+		log.Debug().Str("file", file).Msg("📦 Processing package.json file")
 		// Use scanServicePackageJSON logic but adapt evidence
 		// For simplicity, we can just call scanServicePackageJSON if path adaptation fits,
 		// but findFiles returns relative paths.
