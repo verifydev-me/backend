@@ -477,11 +477,29 @@ func (a *NodeBackendAnalyzer) Analyze(repoPath string) *StackAnalysisResult {
 			return filepath.SkipDir
 		}
 
+		// CRITICAL FIX: Skip frontend directories to prevent React code
+		// from being counted as backend patterns
+		relPath := strings.TrimPrefix(path, repoPath)
+		if isFrontendPath(relPath) {
+			return nil
+		}
+
+		// Skip JSX/TSX files — these are React components, not backend code
+		if strings.HasSuffix(path, ".tsx") || strings.HasSuffix(path, ".jsx") {
+			return nil
+		}
+
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
 		contentStr := string(content)
+
+		// Additional check: skip files that contain React-specific patterns
+		// (some React code lives in .ts files, e.g., hooks, contexts)
+		if isReactFileContent(contentStr) {
+			return nil
+		}
 
 		if strings.Contains(contentStr, "async") && strings.Contains(contentStr, "await") {
 			hasAsyncAwait = true
@@ -544,4 +562,76 @@ func (a *NodeBackendAnalyzer) Analyze(repoPath string) *StackAnalysisResult {
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// isFrontendPath checks if a file path belongs to a frontend directory.
+// Used to prevent NodeBackendAnalyzer from scanning React/Vue/Angular code.
+func isFrontendPath(relPath string) bool {
+	// Normalize separators
+	normalized := strings.ToLower(strings.ReplaceAll(relPath, "\\", "/"))
+
+	frontendDirs := []string{
+		"/components/", "/pages/", "/views/", "/layouts/", "/hooks/",
+		"/contexts/", "/providers/", "/features/", "/screens/",
+		"/widgets/", "/ui/", "/atoms/", "/molecules/", "/organisms/",
+		"/templates/", "/stories/", "/storybook/",
+		// Next.js App Router
+		"/app/",
+	}
+
+	for _, dir := range frontendDirs {
+		if strings.Contains(normalized, dir) {
+			return true
+		}
+	}
+
+	// Check if the file is directly in a frontend root
+	frontendRoots := []string{
+		"/src/components", "/src/pages", "/src/views", "/src/hooks",
+		"/src/contexts", "/src/providers", "/src/features", "/src/screens",
+		"/src/app/",
+	}
+
+	for _, root := range frontendRoots {
+		if strings.HasPrefix(normalized, root) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isReactFileContent checks if file content contains React-specific patterns.
+// Used to identify React code in .ts files (hooks, contexts) that live outside
+// typical frontend directories.
+func isReactFileContent(content string) bool {
+	reactPatterns := []string{
+		"from 'react'",
+		"from \"react\"",
+		"import React",
+		"useState(",
+		"useEffect(",
+		"useContext(",
+		"useReducer(",
+		"useMemo(",
+		"useCallback(",
+		"useRef(",
+		"React.FC",
+		"React.Component",
+		"JSX.Element",
+		"ReactNode",
+		"<div",
+		"<span",
+		"className=",
+	}
+
+	matchCount := 0
+	for _, pattern := range reactPatterns {
+		if strings.Contains(content, pattern) {
+			matchCount++
+		}
+	}
+
+	// Need at least 2 React patterns to be sure (avoid false positives from comments)
+	return matchCount >= 2
 }

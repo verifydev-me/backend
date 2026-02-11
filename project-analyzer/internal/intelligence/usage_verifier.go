@@ -253,11 +253,28 @@ func (v *NodeBackendUsageVerifier) verifyNodeFramework(repoPath string, name str
 
 		ext := filepath.Ext(path)
 		if ext == ".ts" || ext == ".js" {
+			// CRITICAL FIX: Skip frontend directories and React files
+			// to prevent false positive backend framework detection
+			relPath := strings.TrimPrefix(path, repoPath)
+			if isFrontendFilePath(relPath) {
+				return nil
+			}
+
+			// Skip JSX/TSX files entirely
+			if ext == ".tsx" || ext == ".jsx" {
+				return nil
+			}
+
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return nil
 			}
 			contentStr := string(content)
+
+			// Skip files with React imports (React code in .ts files)
+			if hasReactImports(contentStr) {
+				return nil
+			}
 
 			// Express/Fastify Initialization
 			if strings.Contains(contentStr, "express()") ||
@@ -885,4 +902,50 @@ func minFloat64(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+// isFrontendFilePath checks if a relative file path belongs to a frontend directory.
+// Used by usage verifiers to avoid scanning React/Vue/Angular component files
+// when verifying backend framework usage (Express/NestJS/Fastify).
+func isFrontendFilePath(relPath string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(relPath, "\\", "/"))
+
+	frontendDirs := []string{
+		"/components/", "/pages/", "/views/", "/layouts/", "/hooks/",
+		"/contexts/", "/providers/", "/features/", "/screens/",
+		"/widgets/", "/ui/", "/atoms/", "/molecules/", "/organisms/",
+		"/templates/", "/stories/", "/storybook/",
+		"/app/", // Next.js App Router
+	}
+
+	for _, dir := range frontendDirs {
+		if strings.Contains(normalized, dir) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasReactImports checks if file content contains React-specific imports.
+// Used to identify React code in .ts files that may live outside
+// typical frontend directories (e.g., shared hooks, custom providers).
+func hasReactImports(content string) bool {
+	reactIndicators := []string{
+		"from 'react'",
+		"from \"react\"",
+		"import React",
+		"from 'react-dom'",
+		"from \"react-dom\"",
+		"from 'next",
+		"from \"next",
+	}
+
+	for _, indicator := range reactIndicators {
+		if strings.Contains(content, indicator) {
+			return true
+		}
+	}
+
+	return false
 }

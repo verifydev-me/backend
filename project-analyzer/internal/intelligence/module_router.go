@@ -235,14 +235,46 @@ func (r *ModuleRouter) isFrontendProject() bool {
 	if r.userProjectType == "backend" || r.userProjectType == "ml" {
 		return false // Explicit backend/ml skips frontend
 	}
-	// Fallback to signal-based detection
+
+	// Signal-based detection with mutual exclusion
+	hasFrontendSignals := false
+	hasBackendSignals := false
+
+	// Check frontend signals
 	if r.signals.HasComponentsFolder {
-		return true
+		hasFrontendSignals = true
 	}
 	for _, fw := range r.signals.DetectedFrameworks {
-		if fw == "React" || fw == "Vue" || fw == "Angular" || fw == "Next.js" {
-			return true
+		switch fw {
+		case "React", "Vue", "Angular", "Next.js", "Svelte", "Solid.js", "Preact":
+			hasFrontendSignals = true
+		case "Express", "NestJS", "Gin", "Fiber", "Echo", "Chi",
+			"FastAPI", "Django", "Flask", "gRPC", "Fastify":
+			hasBackendSignals = true
 		}
+	}
+	// Go is almost always backend
+	if r.signals.DominantLanguage == "Go" {
+		hasBackendSignals = true
+	}
+	if r.signals.HasServicesFolder || r.signals.HasGateway {
+		hasBackendSignals = true
+	}
+
+	// If ONLY frontend signals (no backend signals), it's frontend
+	// If BOTH signals exist, check if frontend dominates
+	if hasFrontendSignals && !hasBackendSignals {
+		return true
+	}
+	if hasFrontendSignals && hasBackendSignals {
+		// Both present → check if dominant language is JS/TS (likely frontend-primary)
+		// and backend signals are weak (e.g., Express just for Next.js custom server)
+		if r.signals.HasComponentsFolder &&
+			(r.signals.DominantLanguage == "TypeScript" || r.signals.DominantLanguage == "JavaScript") &&
+			!r.signals.HasServicesFolder && !r.signals.HasGateway {
+			return true // Frontend-dominant
+		}
+		return true // Fullstack — still run frontend analysis
 	}
 	return false
 }
@@ -256,22 +288,45 @@ func (r *ModuleRouter) isBackendProject() bool {
 	if r.userProjectType == "frontend" {
 		return false // Explicit frontend skips backend
 	}
-	// Fallback to signal-based detection
-	// Go is almost always backend
-	if r.signals.DominantLanguage == "Go" {
-		return true
+
+	// Signal-based detection with mutual exclusion
+	hasFrontendSignals := false
+	hasBackendSignals := false
+
+	// Check frontend signals
+	if r.signals.HasComponentsFolder {
+		hasFrontendSignals = true
 	}
-	// Check for backend frameworks
 	for _, fw := range r.signals.DetectedFrameworks {
 		switch fw {
+		case "React", "Vue", "Angular", "Next.js", "Svelte", "Solid.js", "Preact":
+			hasFrontendSignals = true
 		case "Express", "NestJS", "Gin", "Fiber", "Echo", "Chi",
-			"FastAPI", "Django", "Flask", "gRPC":
-			return true
+			"FastAPI", "Django", "Flask", "gRPC", "Fastify":
+			hasBackendSignals = true
 		}
 	}
-	// Check for API patterns
+	// Go is almost always backend
+	if r.signals.DominantLanguage == "Go" {
+		hasBackendSignals = true
+	}
 	if r.signals.HasServicesFolder || r.signals.HasGateway {
+		hasBackendSignals = true
+	}
+
+	// If ONLY backend signals (no frontend signals), it's backend
+	if hasBackendSignals && !hasFrontendSignals {
 		return true
+	}
+	// If BOTH present and frontend dominates (components, no services), skip backend
+	if hasBackendSignals && hasFrontendSignals {
+		if r.signals.HasComponentsFolder &&
+			(r.signals.DominantLanguage == "TypeScript" || r.signals.DominantLanguage == "JavaScript") &&
+			!r.signals.HasServicesFolder && !r.signals.HasGateway &&
+			r.signals.DominantLanguage != "Go" {
+			return false // Frontend-dominant — skip backend analysis
+		}
+		return true // Fullstack — run backend analysis too
 	}
 	return false
 }

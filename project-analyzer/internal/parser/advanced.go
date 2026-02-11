@@ -663,12 +663,23 @@ func (p *FileParser) DetectProjectType(folderAnalysis signals.FolderAnalysis, co
 	}
 
 	// Check for frontend
-	if folderAnalysis.HasComponents && !folderAnalysis.HasAPI && !folderAnalysis.HasControllers {
-		return signals.ProjectTypeFrontend
+	// CRITICAL FIX: Next.js projects with API routes (HasAPI=true) should still be "frontend"
+	// because Next.js API routes are part of the frontend framework, not a separate backend.
+	// Only classify as fullstack if there are backend-specific folders (controllers, services)
+	isNextJSProject := p.fileContains("package.json", "\"next\"") || p.fileExists("next.config.js") || p.fileExists("next.config.ts") || p.fileExists("next.config.mjs")
+	if folderAnalysis.HasComponents && !folderAnalysis.HasControllers {
+		if isNextJSProject {
+			// Next.js with API routes is still frontend (API routes are built into Next.js)
+			return signals.ProjectTypeFrontend
+		}
+		if !folderAnalysis.HasAPI {
+			return signals.ProjectTypeFrontend
+		}
 	}
 
 	// Check for fullstack (has both frontend and backend indicators)
-	if folderAnalysis.HasComponents && (folderAnalysis.HasAPI || folderAnalysis.HasControllers) {
+	// But only if there are genuine backend folders (controllers, middleware, services)
+	if folderAnalysis.HasComponents && (folderAnalysis.HasControllers || (folderAnalysis.HasAPI && !isNextJSProject)) {
 		return signals.ProjectTypeFullstack
 	}
 
