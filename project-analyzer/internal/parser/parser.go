@@ -601,3 +601,9 @@ func (p *FileParser) fileContains(filename, substr string) bool {
 	}
 	return strings.Contains(strings.ToLower(string(content)), strings.ToLower(substr))
 }
+
+// fileExists checks if a file exists at the given path (standalone helper)
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
