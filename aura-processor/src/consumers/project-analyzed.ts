@@ -57,10 +57,10 @@ interface DimensionalAnalysis {
 
 interface ProjectSignalsExtended extends ProjectSignals {
   industryAnalysis?: IndustryAnalysis;
-  
+
   // NEW: Dimensional Analysis (from Go pkg/dimensions)
   dimensionalAnalysis?: DimensionalAnalysis;
-  
+
   // Git Forensics
   gitForensics?: {
     commitCount: number;
@@ -71,14 +71,14 @@ interface ProjectSignalsExtended extends ProjectSignals {
     primaryAuthorPct: number;
     isPremium: boolean;
   };
-  
+
   // Authorship Verdict
   authorshipVerdict?: {
     level: string;
     confidence: string;
     reasons: string[];
   };
-  
+
   // Complexity Score
   complexity?: {
     totalScore: number;
@@ -87,7 +87,7 @@ interface ProjectSignalsExtended extends ProjectSignals {
     codeQualityScore: number;
     scaleLabel: string;
   };
-  
+
   // Intelligence Verdict
   intelligenceVerdict?: {
     projectIntentSummary: string;
@@ -120,7 +120,7 @@ interface ProjectSignalsExtended extends ProjectSignals {
     modulesSkipped: string[];
     earlyTermination: boolean;
     exitReason?: string;
-    
+
     // NEW: Dimensional Analysis (from Go enrichVerdictWithDimensionalAnalysis)
     dimensions?: {
       fundamentals?: { score: number; confidence: number };
@@ -292,7 +292,7 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
   const startTime = Date.now();
 
   let signals: ProjectSignalsExtended;
-  
+
   try {
     signals = JSON.parse(msg.content.toString());
   } catch (parseError) {
@@ -341,7 +341,7 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
 
     // Update project and save analysis
     const projectUpdated = await updateProject(signals, auraResult);
-    
+
     if (!projectUpdated) {
       logger.warn({ projectId: signals.projectId }, '⏭️ Project not found, skipping');
       return;
@@ -366,10 +366,10 @@ export async function handleProjectAnalyzed(msg: ConsumeMessage): Promise<void> 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    logger.error({ 
-      errorMessage, 
+    logger.error({
+      errorMessage,
       errorStack,
-      projectId: signals.projectId 
+      projectId: signals.projectId
     }, '❌ Failed to process project');
     throw error;
   }
@@ -405,13 +405,13 @@ async function updateProject(
     // MongoDB Atlas's 50-stage aggregation pipeline limit (P2010 error).
     // Prisma's update/upsert generates one pipeline stage per field,
     // and this model has 90+ fields which exceeds the 50-stage limit.
-    
+
     const now = new Date();
     const analysisFields: Record<string, any> = {
       analyzer_version: signals.analysisVersion || '3.0.0',
       analyzed_at: { $date: now.toISOString() },
       updated_at: { $date: now.toISOString() },
-      
+
       // Scores
       overall_score: projectScore,
       structure_score: breakdown.structure,
@@ -419,22 +419,22 @@ async function updateProject(
       testing_score: breakdown.testing || 0,
       documentation_score: breakdown.documentation || 0,
       best_practices_score: breakdown.bestPractices || 0,
-      
+
       // Basic info
       primary_language: signals.primaryLanguage,
       total_files: signals.totalFiles || 0,
       total_lines: signals.totalLines || 0,
-      
+
       // Architecture
       service_count: signals.industryAnalysis?.architecture?.serviceCount || 0,
-      
+
       // Code quality basics
       has_readme: signals.codeSignals.hasReadme || false,
       has_license: signals.codeSignals.hasLicense || false,
       has_dockerfile: signals.codeSignals.hasDockerfile || false,
       has_typescript: signals.codeSignals.hasTypeScript || false,
       test_files_count: signals.codeSignals.testFilesCount || 0,
-      
+
       // Folder structure basics
       has_src_folder: signals.folderStructure.hasSrcFolder || false,
       has_tests: signals.folderStructure.hasTests || false,
@@ -445,7 +445,7 @@ async function updateProject(
     // Architecture type (enum stored as string)
     const archType = mapArchitectureType(signals.industryAnalysis?.architecture?.type);
     if (archType) analysisFields.architecture_type = archType;
-    
+
     const engLevel = mapEngineeringLevel(signals.industryAnalysis?.engineeringLevel);
     if (engLevel) analysisFields.engineering_level = engLevel;
 
@@ -465,7 +465,7 @@ async function updateProject(
       if (dims.infraDevOps?.score != null) analysisFields.infra_devops_score = Math.round(dims.infraDevOps.score);
       if (dims.infraDevOps?.confidence != null) analysisFields.infra_devops_confidence = dims.infraDevOps.confidence;
     }
-    
+
     // Experience
     if (signals.intelligenceVerdict?.experienceAnalysis) {
       const exp = signals.intelligenceVerdict.experienceAnalysis;
@@ -475,7 +475,7 @@ async function updateProject(
       const yearRange = formatYearRange(exp.yearsMin, exp.yearsMax, exp.yearsEstimate);
       if (yearRange) analysisFields.experience_year_range = yearRange;
     }
-    
+
     // Trust
     if (signals.intelligenceVerdict?.trustAnalysis) {
       const trust = signals.intelligenceVerdict.trustAnalysis;
@@ -488,7 +488,7 @@ async function updateProject(
       if (trust.hasOriginalWork != null) analysisFields.has_original_work = trust.hasOriginalWork;
       analysisFields.authenticity_flags = trust.flags || [];
     }
-    
+
     // Verdict
     if (signals.intelligenceVerdict?.verdictDetailed) {
       const v = signals.intelligenceVerdict.verdictDetailed;
@@ -562,17 +562,17 @@ async function updateProject(
         },
       ],
     });
-    
+
     // Get the analysis ID for creating related records
     const analysisDoc = await prisma.projectAnalysis.findUnique({
       where: { projectId: signals.projectId },
       select: { id: true },
     });
-    
+
     if (!analysisDoc) {
       throw new Error('Failed to create/update ProjectAnalysis');
     }
-    
+
     const analysis = analysisDoc;
 
     // 4. Store Language Stats
@@ -613,7 +613,7 @@ async function updateProject(
     // 6. Store Infra Signals
     if (signals.industryAnalysis?.infraSignals?.signals?.length) {
       await prisma.analysisInfraSignal.deleteMany({ where: { analysisId: analysis.id } });
-      
+
       const infraData = signals.industryAnalysis.infraSignals.signals.map((sig: string) => ({
         analysisId: analysis.id,
         signal: sig,
@@ -621,7 +621,7 @@ async function updateProject(
         source: 'go-analyzer',
         evidence: [],
       }));
-      
+
       await prisma.analysisInfraSignal.createMany({ data: infraData });
     }
 
@@ -645,14 +645,14 @@ async function updateProject(
     // For now, we skip storing individual dimension signals since the Go engine
     // returns aggregated scores in intelligenceVerdict.dimensions
     // Future enhancement: Extract signals from DimensionMatrix if needed
-    
+
     logger.info({
       projectId: signals.projectId,
       projectType: signals.projectType,
       score: projectScore,
       skillsCount: signals.industryAnalysis?.verifiedSkills?.length || 0,
     }, '💾 Analysis saved');
-    
+
     return true;
   } catch (error: any) {
     if (error.code === 'P2025') {
@@ -665,19 +665,19 @@ async function updateProject(
 
 async function updateSkills(userId: string, skills: SkillScore[]): Promise<void> {
   logger.info({ userId, skillCount: skills.length }, '🔧 Updating skills');
-  
+
   for (const skill of skills) {
     const existingSkill = await prisma.skill.findUnique({
       where: { userId_name: { userId, name: skill.name } },
       select: { isVerified: true, verifiedScore: true },
     });
 
-    // Hysteresis: verify at 70+, un-verify only below 50
+    // Hysteresis: verify at 50+, un-verify only below 40
     let shouldBeVerified: boolean;
     if (existingSkill?.isVerified) {
-      shouldBeVerified = skill.score >= 50;
+      shouldBeVerified = skill.score >= 40;
     } else {
-      shouldBeVerified = skill.score >= 70;
+      shouldBeVerified = skill.score >= 50;
     }
 
     await prisma.skill.upsert({
@@ -686,12 +686,14 @@ async function updateSkills(userId: string, skills: SkillScore[]): Promise<void>
         userId,
         name: skill.name,
         category: skill.category,
-        isVerified: skill.score >= 70,
+        source: 'ANALYSIS',
+        isVerified: skill.score >= 50,
         verifiedScore: skill.score,
         projectCount: 1,
         auraContribution: Math.round(skill.score / 10),
       },
       update: {
+        source: 'ANALYSIS',
         verifiedScore: { set: Math.max(skill.score, existingSkill?.verifiedScore || 0) },
         projectCount: { increment: 1 },
         isVerified: shouldBeVerified,

@@ -57,7 +57,7 @@ export class GitHubService {
   static async getUserRepos(username: string, userToken?: string): Promise<GitHubRepo[]> {
     try {
       logger.info({ username, hasToken: !!userToken }, 'Fetching GitHub repos for user');
-      
+
       const headers = this.getAuthHeaders(userToken);
       const allRepos: GitHubRepo[] = [];
       let page = 1;
@@ -67,20 +67,20 @@ export class GitHubService {
       while (true) {
         const url = `${GITHUB_API}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=updated&type=all`;
         logger.debug({ url, page }, 'GitHub API request URL');
-        
+
         const response = await fetch(url, { headers });
 
         if (!response.ok) {
           const errorBody = await response.text();
-          logger.error({ 
-            username, 
-            status: response.status, 
+          logger.error({
+            username,
+            status: response.status,
             statusText: response.statusText,
             errorBody,
             rateLimit: response.headers.get('x-ratelimit-remaining'),
             rateLimitReset: response.headers.get('x-ratelimit-reset')
           }, 'Failed to fetch GitHub repos');
-          
+
           // If we got some repos before failing, return them
           if (allRepos.length > 0) break;
           return [];
@@ -88,28 +88,28 @@ export class GitHubService {
 
         const repos = (await response.json()) as GitHubRepo[];
         if (repos.length === 0) break;
-        
+
         allRepos.push(...repos);
-        
+
         // If less than perPage, we've reached the end
         if (repos.length < perPage) break;
         page++;
-        
+
         // Safety limit - max 5 pages (500 repos)
         if (page > 5) break;
       }
 
       // Filter to only public repos and repos owned by this user
-      const publicRepos = allRepos.filter((repo) => 
+      const publicRepos = allRepos.filter((repo) =>
         !repo.private && repo.owner.login.toLowerCase() === username.toLowerCase()
       );
-      
-      logger.info({ 
-        username, 
-        totalRepos: allRepos.length, 
+
+      logger.info({
+        username,
+        totalRepos: allRepos.length,
         publicRepos: publicRepos.length,
       }, 'GitHub repos fetched successfully');
-      
+
       return publicRepos;
     } catch (error) {
       logger.error({ error, username }, 'Error fetching GitHub repos');
@@ -286,6 +286,69 @@ export class GitHubService {
     } catch (error) {
       logger.error({ error, username }, 'Error fetching pinned repos');
       return [];
+    }
+  }
+  /**
+   * Get user's contribution calendar (uses GraphQL API)
+   */
+  static async getContributionCalendar(username: string, userToken?: string): Promise<Record<string, number>> {
+    try {
+      const headers = this.getAuthHeaders(userToken);
+      const query = `
+        query($userName:String!) {
+          user(login: $userName){
+            contributionsCollection {
+              contributionCalendar {
+                weeks {
+                  contributionDays {
+                    contributionCount
+                    date
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await fetch(`${GITHUB_API}/graphql`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query,
+          variables: { userName: username },
+        }),
+      });
+
+      if (!response.ok) {
+        logger.warn({ username, status: response.status }, 'Failed to fetch GitHub contributions');
+        return {};
+      }
+
+      const data: any = await response.json();
+      const weeks = data?.data?.user?.contributionsCollection?.contributionCalendar?.weeks;
+
+      if (!weeks) {
+        return {};
+      }
+
+      const contributions: Record<string, number> = {};
+      let totalCount = 0;
+
+      weeks.forEach((week: any) => {
+        week.contributionDays.forEach((day: any) => {
+          if (day.contributionCount > 0) {
+            contributions[day.date] = day.contributionCount;
+            totalCount += day.contributionCount;
+          }
+        });
+      });
+
+      logger.info({ username, totalCount, daysWithContribs: Object.keys(contributions).length }, 'fetched GitHub contributions');
+      return contributions;
+    } catch (error) {
+      logger.error({ error, username }, 'Error fetching GitHub contributions');
+      return {};
     }
   }
 }

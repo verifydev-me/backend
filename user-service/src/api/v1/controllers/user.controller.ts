@@ -2,9 +2,12 @@ import { Request, Response } from 'express';
 import { ProfileService } from '../../../domain/profile.service.js';
 import { AuraService } from '../../../domain/aura.service.js';
 import { VisibilityService } from '../../../domain/visibility.service.js';
+import { LeetcodeService } from '../../../domain/leetcode.service.js';
+import { GitHubService } from '../../../domain/github.service.js';
 import { updateProfileSchema, updateSettingsSchema } from '../validators/user.schema.js';
 import { logger } from '../../../utils/logger.js';
 import { uploadImage, isCloudinaryConfigured } from '../../../utils/cloudinary.js';
+import { prisma } from '../../../prisma/client.js';
 import type { AuthenticatedRequest, ApiResponse } from '../../../types/index.js';
 
 export class UserController {
@@ -232,10 +235,10 @@ export class UserController {
 
       // Check if Cloudinary is configured
       if (!isCloudinaryConfigured()) {
-        res.status(503).json({ 
-          success: false, 
-          message: 'Image upload service not configured', 
-          error: { code: 'SERVICE_UNAVAILABLE' } 
+        res.status(503).json({
+          success: false,
+          message: 'Image upload service not configured',
+          error: { code: 'SERVICE_UNAVAILABLE' }
         });
         return;
       }
@@ -243,10 +246,10 @@ export class UserController {
       const { image } = req.body as { image?: string };
 
       if (!image) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Image is required. Provide base64 encoded image.', 
-          error: { code: 'VALIDATION_ERROR' } 
+        res.status(400).json({
+          success: false,
+          message: 'Image is required. Provide base64 encoded image.',
+          error: { code: 'VALIDATION_ERROR' }
         });
         return;
       }
@@ -254,10 +257,10 @@ export class UserController {
       // Validate base64 image size (max 5MB)
       const base64Size = (image.length * 3) / 4;
       if (base64Size > 5 * 1024 * 1024) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Image too large. Maximum size is 5MB.', 
-          error: { code: 'VALIDATION_ERROR' } 
+        res.status(400).json({
+          success: false,
+          message: 'Image too large. Maximum size is 5MB.',
+          error: { code: 'VALIDATION_ERROR' }
         });
         return;
       }
@@ -275,9 +278,9 @@ export class UserController {
       res.json({
         success: true,
         message: 'Avatar uploaded successfully',
-        data: { 
+        data: {
           avatarUrl: result.url,
-          profile 
+          profile
         },
       });
     } catch (error) {
@@ -296,15 +299,15 @@ export class UserController {
   ): Promise<void> {
     try {
       const { userId } = req.params;
-      
+
       const [skills, user] = await Promise.all([
         ProfileService.getUserSkills(userId),
         ProfileService.getMyProfile(userId)
       ]);
 
       if (!user) {
-         res.status(404).json({ success: false, message: 'User not found', error: { code: 'NOT_FOUND' } });
-         return;
+        res.status(404).json({ success: false, message: 'User not found', error: { code: 'NOT_FOUND' } });
+        return;
       }
 
       res.json({
@@ -445,6 +448,211 @@ export class UserController {
       res.status(500).json({ success: false, message: 'Failed to get projects', error: { code: 'INTERNAL_ERROR' } });
     }
   }
+
+  // ============================================
+  // LEETCODE ENDPOINTS
+  // ============================================
+
+  /**
+   * PUT /users/me/leetcode
+   * Connect LeetCode account by username
+   */
+  static async connectLeetcode(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { username } = req.body;
+      if (!username || typeof username !== 'string' || username.trim().length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'LeetCode username is required',
+          error: { code: 'VALIDATION_ERROR' },
+        });
+        return;
+      }
+
+      const cleanUsername = username.trim();
+
+      // Validate username exists on LeetCode
+      const isValid = await LeetcodeService.validateUsername(cleanUsername);
+      if (!isValid) {
+        res.status(400).json({
+          success: false,
+          message: 'LeetCode username not found. Please check the username and try again.',
+          error: { code: 'INVALID_USERNAME' },
+        });
+        return;
+      }
+
+      // Save to database
+      await prisma.user.update({
+        where: { id: req.user.userId },
+        data: { leetcodeUsername: cleanUsername },
+      });
+
+      logger.info({ userId: req.user.userId, leetcodeUsername: cleanUsername }, 'LeetCode connected');
+
+      res.json({
+        success: true,
+        message: 'LeetCode account connected successfully',
+        data: { leetcodeUsername: cleanUsername },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to connect LeetCode');
+      res.status(500).json({ success: false, message: 'Failed to connect LeetCode', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * DELETE /users/me/leetcode
+   * Disconnect LeetCode account
+   */
+  static async disconnectLeetcode(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      await prisma.user.update({
+        where: { id: req.user.userId },
+        data: { leetcodeUsername: null },
+      });
+
+      logger.info({ userId: req.user.userId }, 'LeetCode disconnected');
+
+      res.json({
+        success: true,
+        message: 'LeetCode account disconnected',
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to disconnect LeetCode');
+      res.status(500).json({ success: false, message: 'Failed to disconnect LeetCode', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /users/me/leetcode
+   * Get LeetCode stats for connected account
+   */
+  static async getLeetcodeStats(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { leetcodeUsername: true },
+      });
+
+      if (!user?.leetcodeUsername) {
+        res.status(404).json({
+          success: false,
+          message: 'LeetCode account not connected',
+          error: { code: 'NOT_CONNECTED' },
+        });
+        return;
+      }
+
+      const profile = await LeetcodeService.getProfile(user.leetcodeUsername);
+
+      if (!profile) {
+        res.status(502).json({
+          success: false,
+          message: 'Failed to fetch LeetCode data. Please try again later.',
+          error: { code: 'EXTERNAL_API_ERROR' },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'LeetCode stats retrieved',
+        data: profile,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get LeetCode stats');
+      res.status(500).json({ success: false, message: 'Failed to get LeetCode stats', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+  /**
+   * GET /users/me/github
+   * Get GitHub stats for connected account
+   */
+  static async getGithubStats(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      // Allow unauthenticated requests for public profiles if we pass a username query param?
+      // For now, keep it authenticated for "me"
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: {
+          githubId: true,
+          username: true,
+          githubAccessToken: true
+        },
+      });
+
+      // GitHub username = username when user logged in via GitHub (githubId exists)
+      const githubUsername = user?.githubId ? user.username : null;
+
+      logger.info({
+        userId: req.user.userId,
+        githubUsername,
+        githubId: user?.githubId,
+        hasToken: !!user?.githubAccessToken
+      }, 'Fetching GitHub stats');
+
+      if (!githubUsername) {
+        res.status(404).json({
+          success: false,
+          message: 'GitHub account not connected',
+          error: { code: 'NOT_CONNECTED' },
+        });
+        return;
+      }
+
+      // Fetch contributions
+      const contributions = await GitHubService.getContributionCalendar(githubUsername, user?.githubAccessToken || undefined);
+
+      // We can also fetch other stats here if needed (repos, stars, etc)
+      // For now, just return the calendar
+
+      res.json({
+        success: true,
+        message: 'GitHub stats retrieved',
+        data: {
+          username: githubUsername,
+          submissionCalendar: contributions,
+        },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get GitHub stats');
+      res.status(500).json({ success: false, message: 'Failed to get GitHub stats', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
 }
+
 
 export default UserController;

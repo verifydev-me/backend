@@ -282,6 +282,7 @@ export class AuthService {
     coreCount: number;
     isVerified: boolean;
     isOpenToWork: boolean;
+    leetcodeUsername?: string | null;
   }): UserResponse {
     return {
       id: user.id,
@@ -305,6 +306,7 @@ export class AuthService {
       isVerified: user.isVerified,
       isOpenToWork: user.isOpenToWork,
       role: 'developer',
+      leetcodeUsername: user.leetcodeUsername || null,
     };
   }
 

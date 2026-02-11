@@ -52,6 +52,13 @@ router.post('/me/projects/analyze', authenticate, ProjectController.addProject);
 router.post('/me/sync-github', authenticate, UserController.syncGitHub);
 
 /**
+ * @route   GET /api/v1/users/me/github
+ * @desc    Get GitHub stats
+ * @access  Private
+ */
+router.get('/me/github', authenticate, UserController.getGithubStats);
+
+/**
  * @route   GET /api/v1/users/me/skills
  * @desc    Get user's skills
  * @access  Private
@@ -63,7 +70,7 @@ router.get('/me/skills', authenticate, UserController.getMySkills);
  * @desc    Get user settings
  * @access  Private
  */
-router.get('/settings', authenticate, UserController.getSettings); 
+router.get('/settings', authenticate, UserController.getSettings);
 
 /**
  * @route   PUT /api/v1/users/settings
@@ -78,6 +85,27 @@ router.put('/settings', authenticate, UserController.updateSettings);
  * @access  Private
  */
 router.get('/me/aura', authenticate, UserController.getMyAura);
+
+/**
+ * @route   PUT /api/v1/users/me/leetcode
+ * @desc    Connect LeetCode account
+ * @access  Private
+ */
+router.put('/me/leetcode', authenticate, UserController.connectLeetcode);
+
+/**
+ * @route   DELETE /api/v1/users/me/leetcode
+ * @desc    Disconnect LeetCode account
+ * @access  Private
+ */
+router.delete('/me/leetcode', authenticate, UserController.disconnectLeetcode);
+
+/**
+ * @route   GET /api/v1/users/me/leetcode
+ * @desc    Get LeetCode stats
+ * @access  Private
+ */
+router.get('/me/leetcode', authenticate, UserController.getLeetcodeStats);
 
 // ============================================
 // PUBLIC ROUTES

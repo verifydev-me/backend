@@ -10,6 +10,7 @@ export class ProfileService {
   static async getMyProfile(userId: string): Promise<UserProfile | null> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      include: { socialLinks: true },
     });
 
     if (!user) return null;
@@ -17,6 +18,9 @@ export class ProfileService {
     // Generate tags from skills
     const skills = await prisma.skill.findMany({ where: { userId } });
     const tags = TaggingService.generateProfileTags(skills);
+
+    // Get LinkedIn URL from social links
+    const linkedinLink = user.socialLinks?.find((l: any) => l.platform === 'LINKEDIN');
 
     return {
       id: user.id,
@@ -29,6 +33,8 @@ export class ProfileService {
       company: user.company,
       website: user.website,
       twitterHandle: user.twitterHandle,
+      leetcodeUsername: user.leetcodeUsername,
+      linkedinUrl: linkedinLink?.url || null,
       coreCount: user.coreCount,
       auraScore: user.auraScore,
       isPublic: user.isPublic,
@@ -64,6 +70,35 @@ export class ProfileService {
       },
     });
 
+    // Handle LinkedIn social link upsert
+    if (data.linkedinUrl !== undefined) {
+      const existingLink = await prisma.socialLink.findFirst({
+        where: { userId, platform: 'LINKEDIN' },
+      });
+
+      if (data.linkedinUrl && data.linkedinUrl.trim() !== '') {
+        if (existingLink) {
+          await prisma.socialLink.update({
+            where: { id: existingLink.id },
+            data: { url: data.linkedinUrl },
+          });
+        } else {
+          await prisma.socialLink.create({
+            data: {
+              userId,
+              platform: 'LINKEDIN',
+              url: data.linkedinUrl,
+            },
+          });
+        }
+      } else if (existingLink) {
+        // Empty string means remove LinkedIn link
+        await prisma.socialLink.delete({
+          where: { id: existingLink.id },
+        });
+      }
+    }
+
     logger.info({ userId }, 'Profile updated');
 
     return this.getMyProfile(userId);
@@ -98,6 +133,7 @@ export class ProfileService {
       isVerified: s.isVerified,
       verifiedScore: s.verifiedScore,
       projectCount: s.projectCount,
+      source: s.source,
     }));
 
     const projects: ProjectSummary[] = user.projects.map((p) => ({
@@ -175,6 +211,7 @@ export class ProfileService {
       isVerified: s.isVerified,
       verifiedScore: s.verifiedScore,
       projectCount: s.projectCount,
+      source: s.source,
     }));
   }
 
