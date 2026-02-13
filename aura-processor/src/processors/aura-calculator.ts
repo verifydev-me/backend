@@ -499,9 +499,9 @@ export class AuraCalculator {
       const react = signals.reactSignals;
       if (react.usesHooks) score += 10;
       if (react.usesMemo || react.usesCallback) score += 10;
-      if (react.hasCustomHooks) score += 15;
-      if (react.usesContext || react.usesRedux) score += 10;
-      if (react.hasLazyLoading) score += 5;
+      if (react.customHooksCount > 0) score += 15;
+      if (react.usesContext || react.stateManagement) score += 10;
+      if (react.usesLazyLoading) score += 5;
     }
 
     return Math.min(score, 100);
@@ -513,13 +513,15 @@ export class AuraCalculator {
     if (framework === 'React' && signals.reactSignals) {
       const react = signals.reactSignals;
       if (react.usesHooks) evidence.push('Uses React Hooks');
-      if (react.hasCustomHooks) evidence.push(`custom hooks detected custom hooks`);
+      if (react.customHooksCount > 0) evidence.push(`${react.customHooksCount} custom hooks detected`);
       if (react.componentCount > 0) evidence.push(`${react.componentCount} components`);
-      if (react.usesRedux) evidence.push("State: Redux");
+      if (react.stateManagement) evidence.push(`State: ${react.stateManagement}`);
       if (react.usesMemo) evidence.push('Performance: useMemo');
       if (react.usesCallback) evidence.push('Performance: useCallback');
-      if (react.hasLazyLoading) evidence.push('Lazy loading');
-      if (react.hasErrorBoundaries) evidence.push('Error boundaries');
+      if (react.usesLazyLoading) evidence.push('Lazy loading');
+      if (react.usesErrorBoundary) evidence.push('Error boundaries');
+      if (react.usesForwardRef) evidence.push('ForwardRef pattern');
+      if (react.componentPatterns?.length > 0) evidence.push(`Patterns: ${react.componentPatterns.join(', ')}`);
     }
 
     return evidence;
@@ -719,7 +721,7 @@ export class AuraCalculator {
           impact: 'Reduces unnecessary re-renders',
         });
       }
-      if (!react.hasLazyLoading) {
+      if (!react.usesLazyLoading) {
         suggestions.push({
           category: 'performance',
           priority: 2,
@@ -728,7 +730,7 @@ export class AuraCalculator {
           impact: 'Faster initial load time',
         });
       }
-      if (!react.hasErrorBoundaries) {
+      if (!react.usesErrorBoundary) {
         suggestions.push({
           category: 'structure',
           priority: 3,
@@ -792,31 +794,44 @@ export class AuraCalculator {
 
     // Patterns detected
     if (react.usesHooks) patterns.push('React Hooks');
-    if (react.hasCustomHooks) patterns.push(`custom hooks detected Custom Hooks`);
+    if (react.customHooksCount > 0) patterns.push(`${react.customHooksCount} Custom Hooks`);
     if (react.usesContext) patterns.push('Context API');
-    if (react.usesRedux) patterns.push('useReducer for state');
-    if (react.usesRedux) patterns.push(`State: ${react.usesRedux}`);
+    if (react.usesReducer) patterns.push('useReducer for state');
+    if (react.stateManagement) patterns.push(`State: ${react.stateManagement}`);
+    if (react.componentPatterns?.length > 0) {
+      patterns.push(...react.componentPatterns.map(p => `Pattern: ${p}`));
+    }
 
     // Advanced usage
     if (react.usesMemo) advancedUsage.push('useMemo optimization');
     if (react.usesCallback) advancedUsage.push('useCallback optimization');
-    if (react.hasLazyLoading) advancedUsage.push('Code splitting with lazy()');
-    if (react.hasErrorBoundaries) advancedUsage.push('Error boundaries');
-    if (react.usesCallback) advancedUsage.push('useRef for DOM/values');
+    if (react.usesRef) advancedUsage.push('useRef for DOM/values');
+    if (react.usesLazyLoading) advancedUsage.push('Code splitting with lazy()');
+    if (react.usesErrorBoundary) advancedUsage.push('Error boundaries');
+    if (react.usesSuspense) advancedUsage.push('Suspense for data fetching');
+    if (react.usesPortal) advancedUsage.push('Portal for modals/tooltips');
+    if (react.usesForwardRef) advancedUsage.push('ForwardRef for DOM access');
 
     // Suggestions
-    if (react.usesContext) {
+    if (react.usesContext && !react.stateManagement) {
       suggestions.push('Consider Zustand or Jotai for complex state');
     }
     if (!react.usesMemo && react.componentCount > 5) {
       suggestions.push('Add useMemo for expensive computations');
     }
-    if (!react.hasLazyLoading) {
+    if (!react.usesLazyLoading) {
       suggestions.push('Implement route-based code splitting');
+    }
+    if (!react.usesErrorBoundary) {
+      suggestions.push('Add error boundaries for resilient UI');
     }
 
     return {
       framework: 'React',
+      componentCount: react.componentCount,
+      customHooksCount: react.customHooksCount,
+      stateManagement: react.stateManagement || 'none',
+      styleApproach: react.styleApproach || 'unknown',
       patternsDetected: patterns,
       suggestions,
       advancedUsage,

@@ -106,7 +106,6 @@ func mapIntelligenceVerdict(result *intelligence.PipelineResult) *signals.Intell
 		StrengthSignals:       v.StrengthSignals,
 		RiskSignals:           v.RiskSignals,
 		SeniorEngineerVerdict: v.SeniorEngineerVerdict,
-		HireSignal:            string(v.HireSignal),
 		AnalysisTimeMs:        result.AnalysisTimeMs,
 		ModulesExecuted:       result.ModulesExecuted,
 		ModulesSkipped:        result.ModulesSkipped,

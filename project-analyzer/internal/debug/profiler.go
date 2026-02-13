@@ -227,35 +227,10 @@ func (p *Profiler) LogReport() {
 // GLOBAL PROFILER FUNCTIONS
 // ============================================
 
-// ProfileStart starts timing using global profiler
-func ProfileStart(operation string) {
-	globalProfiler.Start(operation)
-}
-
-// ProfileStop stops timing using global profiler
-func ProfileStop(operation string) time.Duration {
-	return globalProfiler.Stop(operation)
-}
-
 // Profile returns a defer-able function using global profiler
 // Usage: defer debug.Profile("operation")()
 func Profile(operation string) func() {
 	return globalProfiler.Track(operation)
-}
-
-// ProfileCount increments a counter
-func ProfileCount(operation string) {
-	globalProfiler.Increment(operation)
-}
-
-// ProfileReport prints the global profile report
-func ProfileReport() {
-	globalProfiler.PrintReport()
-}
-
-// ProfileReset clears global profiler
-func ProfileReset() {
-	globalProfiler.Reset()
 }
 
 // ============================================
@@ -293,49 +268,4 @@ func formatBytes(b uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
-}
-
-// ============================================
-// ANALYSIS-SPECIFIC PROFILERS
-// ============================================
-
-// AnalysisProfiler provides pre-defined profile points for analysis
-type AnalysisProfiler struct {
-	*Profiler
-	projectId string
-	startTime time.Time
-}
-
-// NewAnalysisProfiler creates a profiler for a specific analysis
-func NewAnalysisProfiler(projectId string) *AnalysisProfiler {
-	return &AnalysisProfiler{
-		Profiler:  NewProfiler(),
-		projectId: projectId,
-		startTime: time.Now(),
-	}
-}
-
-// Standard analysis phases
-const (
-	PhaseClone           = "1_clone"
-	PhaseLanguageDetect  = "2_language_detect"
-	PhaseInfraExtract    = "3_infra_extract"
-	PhasePatternAnalysis = "4_pattern_analysis"
-	PhaseInference       = "5_inference"
-	PhaseIntelligence    = "6_intelligence"
-	PhaseEnrichment      = "7_enrichment"
-)
-
-// TrackPhase tracks an analysis phase
-func (ap *AnalysisProfiler) TrackPhase(phase string) func() {
-	return ap.Track(phase)
-}
-
-// Summary prints a summary for this analysis
-func (ap *AnalysisProfiler) Summary() {
-	totalTime := time.Since(ap.startTime)
-
-	fmt.Printf("\n📊 Analysis Summary for %s\n", ap.projectId)
-	fmt.Printf("Total Time: %s\n", formatDuration(totalTime))
-	ap.PrintReport()
 }

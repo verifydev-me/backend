@@ -3,7 +3,6 @@
 package debug
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,9 +10,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 )
-
-// TraceID key for context
-type traceIDKey struct{}
 
 // Span represents a traced operation
 type Span struct {
@@ -41,19 +37,6 @@ func NewTracer(traceID string) *Tracer {
 		traceID: traceID,
 		enabled: true,
 	}
-}
-
-// WithTraceID adds a trace ID to context
-func WithTraceID(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, traceIDKey{}, traceID)
-}
-
-// GetTraceID extracts trace ID from context
-func GetTraceID(ctx context.Context) string {
-	if id, ok := ctx.Value(traceIDKey{}).(string); ok {
-		return id
-	}
-	return "unknown"
 }
 
 // StartSpan begins a new span
@@ -190,79 +173,4 @@ func (t *Tracer) ToJSON() string {
 	return fmt.Sprintf(`{"traceId":"%s","totalDuration":"%s"}`,
 		t.traceID,
 		t.rootSpan.Duration.String())
-}
-
-// ============================================
-// GLOBAL TRACER (for simple use cases)
-// ============================================
-
-var (
-	globalTracerMu sync.Mutex
-	globalTracers  = make(map[string]*Tracer)
-)
-
-// StartTrace begins a new global trace
-func StartTrace(traceID string) *Tracer {
-	globalTracerMu.Lock()
-	defer globalTracerMu.Unlock()
-
-	tracer := NewTracer(traceID)
-	globalTracers[traceID] = tracer
-	return tracer
-}
-
-// GetTrace gets an existing tracer
-func GetTrace(traceID string) *Tracer {
-	globalTracerMu.Lock()
-	defer globalTracerMu.Unlock()
-	return globalTracers[traceID]
-}
-
-// EndTrace ends and removes a trace
-func EndTrace(traceID string) *Tracer {
-	globalTracerMu.Lock()
-	defer globalTracerMu.Unlock()
-
-	tracer := globalTracers[traceID]
-	delete(globalTracers, traceID)
-	return tracer
-}
-
-// ============================================
-// CONVENIENCE FUNCTIONS
-// ============================================
-
-// TraceRequest creates a tracer for a project analysis
-func TraceRequest(projectId string) *Tracer {
-	tracer := StartTrace(projectId)
-	tracer.StartSpan("analysis")
-	return tracer
-}
-
-// FinishTrace ends and prints the trace
-func FinishTrace(tracer *Tracer) {
-	if tracer == nil {
-		return
-	}
-	tracer.EndSpan() // End root span
-	tracer.PrintTrace()
-	EndTrace(tracer.traceID)
-}
-
-// QuickTrace is a simple trace function for one-off tracing
-// Usage: defer debug.QuickTrace("operation", "projectId")()
-func QuickTrace(operation string, projectId string) func() {
-	start := time.Now()
-	log.Debug().
-		Str("operation", operation).
-		Str("projectId", projectId).
-		Msg("→ Starting")
-
-	return func() {
-		log.Debug().
-			Str("operation", operation).
-			Str("projectId", projectId).
-			Dur("duration", time.Since(start)).
-			Msg("← Completed")
-	}
 }

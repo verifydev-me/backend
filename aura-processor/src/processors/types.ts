@@ -17,7 +17,7 @@ export type ProjectType =
   | 'mobile'
   | 'unknown';
 
-// Main signals from Go engine
+// Main signals from Go engine (matches Go `ProjectSignals` JSON tags exactly)
 export interface ProjectSignals {
   projectId: string;
   userId: string;
@@ -40,7 +40,7 @@ export interface ProjectSignals {
   // Code Quality
   codeSignals: CodeSignals;
 
-  // Framework-Specific
+  // Framework-Specific (Go: *ReactSignals, *NodeSignals, etc.)
   reactSignals?: ReactSignals;
   nodeSignals?: NodeSignals;
   goSignals?: GoSignals;
@@ -103,74 +103,130 @@ export interface CodeSignals {
 
 // ============================================
 // FRAMEWORK-SPECIFIC SIGNALS
+// Exact match of Go engine JSON output
 // ============================================
 
+// Go: ReactSignals struct (pkg/signals/types.go)
 export interface ReactSignals {
-  usesHooks: boolean;
-  usesContext: boolean;
-  usesRedux: boolean;
-  usesRouter: boolean;
-  componentCount: number;
-  hasCustomHooks: boolean;
-  usesMemo: boolean;
-  usesCallback: boolean;
-  usesPortals: boolean;
-  hasLazyLoading: boolean;
-  usesZustand?: boolean;
-  usesReactQuery?: boolean;
-  hasErrorBoundaries?: boolean;
-  hasSuspense?: boolean;
+  componentCount: number;        // json:"componentCount"
+  customHooksCount: number;      // json:"customHooksCount"
+  usesHooks: boolean;            // json:"usesHooks"
+  usesMemo: boolean;             // json:"usesMemo"
+  usesCallback: boolean;         // json:"usesCallback"
+  usesContext: boolean;          // json:"usesContext"
+  usesReducer: boolean;          // json:"usesReducer"
+  usesRef: boolean;              // json:"usesRef"
+  stateManagement: string;       // json:"stateManagement" — "redux", "zustand", "context", etc.
+  usesLazyLoading: boolean;      // json:"usesLazyLoading"
+  usesErrorBoundary: boolean;    // json:"usesErrorBoundary"
+  usesSuspense: boolean;         // json:"usesSuspense"
+  usesPortal: boolean;           // json:"usesPortal"
+  usesForwardRef: boolean;       // json:"usesForwardRef"
+  styleApproach: string;         // json:"styleApproach" — "css", "tailwind", "styled-components"
+  hasPropTypes: boolean;         // json:"hasPropTypes"
+  componentPatterns: string[];   // json:"componentPatterns" — ["compound", "render-prop", "hoc"]
 }
 
+// Go: NodeSignals struct (pkg/signals/types.go)
 export interface NodeSignals {
-  usesExpress: boolean;
-  usesFastify: boolean;
-  usesNestJS: boolean;
-  hasMiddleware: boolean;
-  hasRoutes: boolean;
-  usesCluster: boolean;
-  hasErrorHandler: boolean;
-  usesStreams: boolean;
-  hasWebSocket?: boolean;
-  usesGraphQL?: boolean;
+  framework: string;             // json:"framework" — "express", "fastify", "nest"
+  usesTypeScript: boolean;       // json:"usesTypeScript"
+  hasMiddleware: boolean;        // json:"hasMiddleware"
+  hasErrorHandling: boolean;     // json:"hasErrorHandling"
+  hasValidation: boolean;        // json:"hasValidation"
+  hasAuthentication: boolean;    // json:"hasAuthentication"
+  hasRateLimiting: boolean;      // json:"hasRateLimiting"
+  hasLogging: boolean;           // json:"hasLogging"
+  hasCaching: boolean;           // json:"hasCaching"
+  hasWebSocket: boolean;         // json:"hasWebSocket"
+  hasGraphQL: boolean;           // json:"hasGraphQL"
+  hasSwagger: boolean;           // json:"hasSwagger"
+  databaseORM: string;           // json:"databaseORM" — "prisma", "typeorm", "mongoose"
+  routesCount: number;           // json:"routesCount"
+  middlewareCount: number;       // json:"middlewareCount"
 }
 
+// Go: GoSignals struct (pkg/signals/types.go)
 export interface GoSignals {
-  usesGin: boolean;
-  usesEcho: boolean;
-  usesFiber: boolean;
-  hasGoroutines: boolean;
-  usesChannels: boolean;
-  hasInterfaces: boolean;
-  usesContext: boolean;
-  hasErrorHandling: boolean;
-  usesGRPC?: boolean;
-  hasInternalPkg?: boolean;
+  framework: string;             // json:"framework" — "gin", "echo", "fiber", "chi"
+  usesInterfaces: boolean;       // json:"usesInterfaces"
+  usesGoroutines: boolean;       // json:"usesGoroutines"
+  usesChannels: boolean;         // json:"usesChannels"
+  usesMutex: boolean;            // json:"usesMutex"
+  usesContext: boolean;          // json:"usesContext"
+  usesDefer: boolean;            // json:"usesDefer"
+  errorHandlingStyle: string;    // json:"errorHandlingStyle" — "standard", "pkg/errors", "wrap"
+  hasTests: boolean;             // json:"hasTests"
+  hasBenchmarks: boolean;        // json:"hasBenchmarks"
+  testCoverage: number;          // json:"testCoverage"
+  moduleCount: number;           // json:"moduleCount"
+  packageStructure: string;      // json:"packageStructure" — "flat", "standard", "clean-arch"
 }
 
+// Go: PythonSignals struct (pkg/signals/types.go)
 export interface PythonSignals {
-  usesDjango: boolean;
-  usesFlask: boolean;
-  usesFastAPI: boolean;
-  hasAsyncio: boolean;
-  usesTyping: boolean;
-  hasTesting: boolean;
-  usesVirtualenv: boolean;
-  hasDocstrings: boolean;
-  usesDecorators?: boolean;
-  hasMLLibraries?: boolean;
+  framework: string;             // json:"framework" — "django", "flask", "fastapi"
+  usesTypeHints: boolean;        // json:"usesTypeHints"
+  usesAsyncAwait: boolean;       // json:"usesAsyncAwait"
+  usesDataclasses: boolean;      // json:"usesDataclasses"
+  usesPydantic: boolean;         // json:"usesPydantic"
+  usesDecorators: boolean;       // json:"usesDecorators"
+  usesGenerators: boolean;       // json:"usesGenerators"
+  usesContextMgr: boolean;       // json:"usesContextMgr"
+  usesComprehensions: boolean;   // json:"usesComprehensions"
+  hasVirtualEnv: boolean;        // json:"hasVirtualEnv"
+  hasRequirements: boolean;      // json:"hasRequirements"
+  hasPyproject: boolean;         // json:"hasPyproject"
+  packageManager: string;        // json:"packageManager" — "pip", "poetry", "pipenv"
+  testFramework: string;         // json:"testFramework" — "pytest", "unittest"
+  lintTools: string[];           // json:"lintTools" — ["black", "flake8", "mypy"]
 }
 
+// Go: AdvancedPatterns struct (pkg/signals/types.go)
 export interface AdvancedPatterns {
-  hasDI: boolean;
-  hasEventSourcing: boolean;
-  hasCQRS: boolean;
-  usesDesignPatterns: string[];
-  hasCleanArch: boolean;
-  hasAPIVersioning: boolean;
-  hasRateLimiting: boolean;
-  hasCircuitBreaker?: boolean;
-  hasSagaPattern?: boolean;
+  // Architecture Patterns
+  usesCleanArch: boolean;        // json:"usesCleanArch"
+  usesMvc: boolean;              // json:"usesMvc"
+  usesMvvm: boolean;             // json:"usesMvvm"
+  usesHexagonal: boolean;        // json:"usesHexagonal"
+  usesRepository: boolean;       // json:"usesRepository"
+  usesFactory: boolean;          // json:"usesFactory"
+  usesSingleton: boolean;        // json:"usesSingleton"
+  usesObserver: boolean;         // json:"usesObserver"
+  usesDependencyInj: boolean;    // json:"usesDependencyInj"
+
+  // Performance Patterns
+  usesLazyLoading: boolean;      // json:"usesLazyLoading"
+  usesMemoization: boolean;      // json:"usesMemoization"
+  usesCaching: boolean;          // json:"usesCaching"
+  usesDebouncing: boolean;       // json:"usesDebouncing"
+  usesThrottling: boolean;       // json:"usesThrottling"
+  usesVirtualization: boolean;   // json:"usesVirtualization"
+  usesCodeSplitting: boolean;    // json:"usesCodeSplitting"
+
+  // API Patterns
+  usesRest: boolean;             // json:"usesRest"
+  usesGraphql: boolean;          // json:"usesGraphql"
+  usesWebsocket: boolean;        // json:"usesWebsocket"
+  usesGrpc: boolean;             // json:"usesGrpc"
+
+  // Security Patterns
+  hasInputValidation: boolean;   // json:"hasInputValidation"
+  hasSanitization: boolean;      // json:"hasSanitization"
+  hasRateLimiting: boolean;      // json:"hasRateLimiting"
+  hasAuth: boolean;              // json:"hasAuth"
+  hasOauth: boolean;             // json:"hasOauth"
+  hasJwt: boolean;               // json:"hasJwt"
+
+  // DevOps Patterns
+  hasHealthCheck: boolean;       // json:"hasHealthCheck"
+  hasGracefulShutdown: boolean;  // json:"hasGracefulShutdown"
+  hasMetrics: boolean;           // json:"hasMetrics"
+  hasTracing: boolean;           // json:"hasTracing"
+  hasLogging: boolean;           // json:"hasLogging"
+
+  // Keywords Found
+  advancedKeywords: string[];    // json:"advancedKeywords"
 }
 
 // ============================================
@@ -198,13 +254,29 @@ export interface SkillScore {
   evidence: string[];
 }
 
+// Expanded to match Go engine's SkillCategory values
 export type SkillCategory = 
   | 'LANGUAGE'
   | 'FRAMEWORK'
   | 'DATABASE'
   | 'DEVOPS'
   | 'TOOL'
-  | 'OTHER';
+  | 'OTHER'
+  // Go engine categories (lowercase in JSON)
+  | 'architecture'
+  | 'infrastructure'
+  | 'database'
+  | 'messaging'
+  | 'security'
+  | 'devops'
+  | 'observability'
+  | 'testing'
+  | 'language'
+  | 'framework'
+  | 'ml'
+  | 'data_science'
+  | 'cloud'
+  | 'performance';
 
 export interface FullAnalysis {
   summary?: string;
@@ -252,17 +324,31 @@ export interface SystemArchitecture {
   gateway?: string;
 }
 
+export interface SkillDepth {
+  level: string;           // "surface", "moderate", "deep", "expert"
+  diversityCount: number;  // Number of distinct patterns/APIs used
+  patternsUsed: number;    // Number of distinct code patterns
+  fileSpread: number;      // How many files the tech spans
+}
+
+export interface RichEvidence {
+  summary: string[];                      // Human-readable summaries
+  patterns?: Record<string, any>;         // Detailed pattern data (hooks, routes, etc.)
+  depth?: SkillDepth;                     // Depth assessment
+}
+
 export interface VerifiedSkill {
   name: string;
   category: SkillCategory | string;
   level: string;
   confidence: number;
   evidence: string[];
+  richEvidence?: RichEvidence;   // NEW: Granular pattern-based evidence
   keywords: string[];
   resumeReady: boolean;
   weight?: number;
-  usageVerified?: boolean; // NEW
-  usageStrength?: number;  // NEW
+  usageVerified?: boolean;
+  usageStrength?: number;
 }
 
 // ============================================

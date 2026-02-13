@@ -143,6 +143,17 @@ func (b *Builder) Analyze() *GraphAnalysisResult {
 	// 3. Find technology clusters
 	result.Clusters = b.findClusters()
 
+	// 4. Populate raw graph data
+	result.Nodes = make([]TechNode, 0, len(b.graph.Nodes))
+	for _, node := range b.graph.Nodes {
+		result.Nodes = append(result.Nodes, *node)
+	}
+
+	result.Edges = make([]TechEdge, 0, len(b.graph.Edges))
+	for _, edge := range b.graph.Edges {
+		result.Edges = append(result.Edges, *edge)
+	}
+
 	// 4. Calculate graph metrics
 	b.calculateMetrics(result)
 
@@ -387,7 +398,7 @@ func (b *Builder) inferSkillsFromGraph() []InferredSkill {
 	if hasBackend && hasDatabase && hasAuth {
 		skills = append(skills, InferredSkill{
 			Name:        "RESTful API Development",
-			Category:    "backend",
+			Category:    "architecture",
 			Level:       "intermediate",
 			Confidence:  0.88,
 			Reasoning:   "Backend framework + database + authentication = production API skills",
@@ -479,7 +490,7 @@ func (b *Builder) inferSkillsFromGraph() []InferredSkill {
 	if hasReact && hasStateLib {
 		skills = append(skills, InferredSkill{
 			Name:        "Advanced React State Management",
-			Category:    "frontend",
+			Category:    "framework",
 			Level:       "advanced",
 			Confidence:  0.88,
 			Reasoning:   "React + dedicated state management library = advanced frontend skills",
@@ -494,7 +505,7 @@ func (b *Builder) inferSkillsFromGraph() []InferredSkill {
 	if hasRealtime && hasBackend {
 		skills = append(skills, InferredSkill{
 			Name:        "Real-time Application Development",
-			Category:    "backend",
+			Category:    "architecture",
 			Level:       "advanced",
 			Confidence:  0.85,
 			Reasoning:   "WebSocket/Socket.IO with backend indicates real-time app skills",

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ProjectController } from '../controllers/project.controller.js';
 import { ProjectAnalysisController } from '../controllers/project-analysis.controller.js';
+import { GitDetailsController } from '../controllers/git-details.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 
 const router = Router();
@@ -96,6 +97,20 @@ router.get('/:projectId/dimensional', authenticate, ProjectAnalysisController.ge
  * @access  Private
  */
 router.get('/dimensional/profile', authenticate, ProjectAnalysisController.getUserDimensionalProfile);
+
+/**
+ * @route   POST /api/v1/projects/:projectId/git-details/fetch
+ * @desc    Fetch git details from GitHub APIs
+ * @access  Private
+ */
+router.post('/:projectId/git-details/fetch', authenticate, GitDetailsController.fetchGitDetails);
+
+/**
+ * @route   GET /api/v1/projects/:projectId/git-details
+ * @desc    Get stored git details
+ * @access  Private
+ */
+router.get('/:projectId/git-details', authenticate, GitDetailsController.getGitDetails);
 
 export default router;
 

@@ -1,5 +1,7 @@
 package signals
 
+import "strings"
+
 // AnalyzeRequest - Message received from RabbitMQ
 type AnalyzeRequest struct {
 	ProjectID     string `json:"projectId"`
@@ -350,7 +352,6 @@ type IntelligenceVerdict struct {
 
 	// Recruiter Output
 	SeniorEngineerVerdict string `json:"seniorEngineerVerdict"`
-	HireSignal            string `json:"hireSignal"` // STRONG_HIRE/HIRE/BORDERLINE/NO_HIRE
 
 	// Metadata
 	AnalysisTimeMs   int64    `json:"analysisTimeMs"`
@@ -584,6 +585,38 @@ type TechDependencyGraph struct {
 	GraphDensity   float64 `json:"graphDensity"`
 	AvgNodeWeight  float64 `json:"avgNodeWeight"`
 	MaxConnections int     `json:"maxConnections"`
+}
+
+// FindCluster returns a cluster by exact name, or nil if not found
+func (g *TechDependencyGraph) FindCluster(name string) *TechnologyCluster {
+	for i := range g.Clusters {
+		if g.Clusters[i].Name == name {
+			return &g.Clusters[i]
+		}
+	}
+	return nil
+}
+
+// FindClustersByCategory returns all clusters matching a category
+func (g *TechDependencyGraph) FindClustersByCategory(category string) []TechnologyCluster {
+	var result []TechnologyCluster
+	for _, c := range g.Clusters {
+		if strings.EqualFold(c.Category, category) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// FindNodeByName returns a graph node by display name, or nil if not found
+func (g *TechDependencyGraph) FindNodeByName(name string) *TechGraphNode {
+	lower := strings.ToLower(name)
+	for i := range g.Nodes {
+		if strings.ToLower(g.Nodes[i].Name) == lower {
+			return &g.Nodes[i]
+		}
+	}
+	return nil
 }
 
 // TechGraphNode represents a technology node in the dependency graph

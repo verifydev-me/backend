@@ -3,6 +3,8 @@ package intelligence
 import (
 	"math"
 	"strings"
+
+	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
 // ============================================
@@ -271,7 +273,7 @@ func (c *ConfidenceCalibrator) buildReasoning(size, diversity, intent float64, p
 
 // CalculateSecurityHealthMultiplier computes security-based confidence adjustment
 func (c *ConfidenceCalibrator) CalculateSecurityHealthMultiplier(
-	securityReport *SecurityReport,
+	securityReport *signals.SecurityReport,
 ) float64 {
 	if securityReport == nil {
 		return 1.0 // No penalty if no security report
@@ -301,7 +303,7 @@ func (c *ConfidenceCalibrator) CalibrateSkills(
 	signalCount int,
 	intent ProjectIntent,
 	usageVerdicts map[string]*UsageVerdict,
-	securityReport *SecurityReport,
+	securityReport *signals.SecurityReport,
 ) []CalibratedSkill {
 	result := make([]CalibratedSkill, len(skills))
 

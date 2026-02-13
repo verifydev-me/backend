@@ -60,6 +60,10 @@ type GraphAnalysisResult struct {
 	// Technology clusters (groups of related technologies used together)
 	Clusters []TechCluster `json:"clusters"`
 
+	// Raw graph data for downstream analysis
+	Nodes []TechNode `json:"nodes"`
+	Edges []TechEdge `json:"edges"`
+
 	// Graph metrics
 	TotalNodes     int     `json:"totalNodes"`
 	TotalEdges     int     `json:"totalEdges"`

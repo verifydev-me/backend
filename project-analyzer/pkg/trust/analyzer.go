@@ -1,6 +1,7 @@
 package trust
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -75,10 +76,16 @@ func (ta *TrustAnalyzer) Analyze() *TrustAnalysis {
 func (ta *TrustAnalyzer) analyzeEffort() EffortAnalysis {
 	result := EffortAnalysis{}
 
-	if ta.CommitData == nil || len(ta.CommitData.Commits) == 0 {
+	if ta.CommitData == nil {
 		result.Classification = EffortSuspicious
 		result.EffortScore = 20
 		return result
+	}
+
+	// When we have commit count metadata but no individual commit details
+	// (common for SNAPSHOT analysis), estimate effort from available signals
+	if len(ta.CommitData.Commits) == 0 {
+		return ta.estimateEffortFromMetadata()
 	}
 
 	// Analyze commit pattern
@@ -111,6 +118,82 @@ func (ta *TrustAnalyzer) analyzeEffort() EffortAnalysis {
 		Lower:    maxFloat(0, result.EffortScore-10),
 		Expected: result.EffortScore,
 		Upper:    minFloat(100, result.EffortScore+10),
+	}
+
+	return result
+}
+
+// estimateEffortFromMetadata estimates effort when we have TotalCommits
+// but no individual commit details (SNAPSHOT/metadata-only analysis).
+// Uses commit count, project size, and infrastructure signals as proxies.
+func (ta *TrustAnalyzer) estimateEffortFromMetadata() EffortAnalysis {
+	result := EffortAnalysis{}
+	score := 50.0 // Base score (same as calculateEffortScore)
+
+	// Commit count contribution (up to 20 points)
+	commitCount := ta.CommitData.TotalCommits
+	if commitCount > 0 {
+		commitScore := minFloat(20, float64(commitCount)*2)
+		score += commitScore
+		result.CommitPattern.TotalCommits = commitCount
+	}
+
+	// Development span contribution (up to 15 points) — from date metadata
+	if !ta.CommitData.FirstCommit.IsZero() && !ta.CommitData.LastCommit.IsZero() {
+		span := ta.CommitData.LastCommit.Sub(ta.CommitData.FirstCommit)
+		result.DevelopmentSpan = span
+		days := span.Hours() / 24
+		spanScore := minFloat(15, days*0.5)
+		score += spanScore
+	}
+
+	// Project size contribution (up to 10 points)
+	if ta.Signals != nil {
+		if ta.Signals.TotalFiles > 50 {
+			score += 10
+		} else if ta.Signals.TotalFiles > 20 {
+			score += 7
+		} else if ta.Signals.TotalFiles > 10 {
+			score += 4
+		}
+	}
+
+	// Microservices / multi-service bonus (up to 5 points)
+	if ta.Infra != nil && ta.Infra.ServiceCount > 1 {
+		score += minFloat(5, float64(ta.Infra.ServiceCount))
+	}
+
+	// Infrastructure complexity bonus (up to 5 points)
+	if ta.Infra != nil {
+		infraPoints := 0.0
+		if ta.Infra.HasSignal(signals.SignalDocker) {
+			infraPoints += 1
+		}
+		if ta.Infra.HasSignal(signals.SignalDockerCompose) {
+			infraPoints += 1
+		}
+		if ta.Infra.HasSignal(signals.SignalKubernetes) {
+			infraPoints += 2
+		}
+		if ta.Infra.HasSignal(signals.SignalGitHubActions) || ta.Infra.HasSignal(signals.SignalGitLabCI) {
+			infraPoints += 1
+		}
+		score += minFloat(5, infraPoints)
+	}
+
+	// Single commit penalty
+	if commitCount == 1 {
+		score -= 15
+	}
+
+	score = maxFloat(0, minFloat(100, score))
+
+	result.EffortScore = score
+	result.Classification = classifyEffort(score, &result.CommitPattern)
+	result.EffortBand = ConfidenceBand{
+		Lower:    maxFloat(0, score-15),
+		Expected: score,
+		Upper:    minFloat(100, score+15),
 	}
 
 	return result
@@ -215,6 +298,26 @@ func (ta *TrustAnalyzer) analyzeAuthenticity() AuthenticityAnalysis {
 				Name:       "collaborative_development",
 				Evidence:   "Multiple contributors",
 				Confidence: 0.6,
+			})
+		}
+	} else if ta.CommitData != nil && ta.CommitData.TotalCommits > 0 {
+		// Metadata-only mode: estimate authenticity from commit count
+		// Multiple commits (even without details) suggest iterative development
+		if ta.CommitData.TotalCommits > 5 {
+			result.AuthenticityScore += 10
+			result.Signals = append(result.Signals, AuthenticitySignal{
+				Type:       SignalPositive,
+				Name:       "multiple_commits",
+				Evidence:   fmt.Sprintf("%d commits suggest iterative development", ta.CommitData.TotalCommits),
+				Confidence: 0.6,
+			})
+		} else if ta.CommitData.TotalCommits > 1 {
+			result.AuthenticityScore += 5
+			result.Signals = append(result.Signals, AuthenticitySignal{
+				Type:       SignalPositive,
+				Name:       "some_commits",
+				Evidence:   fmt.Sprintf("%d commits detected", ta.CommitData.TotalCommits),
+				Confidence: 0.4,
 			})
 		}
 	}

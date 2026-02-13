@@ -27,8 +27,9 @@ import (
 	astengine "github.com/verifydev/project-analyzer/internal/ast"
 	confengine "github.com/verifydev/project-analyzer/internal/confidence"
 	"github.com/verifydev/project-analyzer/internal/config"
+	"github.com/verifydev/project-analyzer/internal/debug"
 	"github.com/verifydev/project-analyzer/internal/extractor"
-	"github.com/verifydev/project-analyzer/internal/forensics"
+
 	"github.com/verifydev/project-analyzer/internal/git"
 	"github.com/verifydev/project-analyzer/internal/graph"
 	"github.com/verifydev/project-analyzer/internal/inference"
@@ -52,34 +53,7 @@ func NewAnalyzer(cfg *config.Config, rabbit *rabbitmq.RabbitMQ) *Analyzer {
 	}
 }
 
-// Start begins consuming messages and analyzing projects (legacy single-threaded mode)
-func (a *Analyzer) Start(ctx context.Context) error {
-	msgs, err := a.rabbit.Consume()
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msg("🔍 Analyzer started - waiting for projects...")
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().Msg("Analyzer shutting down...")
-			return nil
-
-		case msg, ok := <-msgs:
-			if !ok {
-				log.Warn().Msg("RabbitMQ channel closed")
-				return nil
-			}
-
-			a.handleMessage(ctx, msg)
-		}
-	}
-}
-
 // StartWithWorkerPool begins consuming messages with concurrent workers
-// This is the recommended method for production use
 func (a *Analyzer) StartWithWorkerPool(ctx context.Context) error {
 	msgs, err := a.rabbit.Consume()
 	if err != nil {
@@ -166,8 +140,11 @@ func (a *Analyzer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
+	// Trim payload — remove internal-only data before RabbitMQ publish
+	slimResult := trimForPublish(result)
+
 	// Publish result to aura processor
-	if err := a.rabbit.Publish(ctx, result); err != nil {
+	if err := a.rabbit.Publish(ctx, slimResult); err != nil {
 		log.Error().Err(err).Msg("Failed to publish result")
 		msg.Nack(false, true)
 		return
@@ -184,6 +161,10 @@ func (a *Analyzer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 
 // analyze performs the actual code analysis
 func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*signals.ProjectSignals, error) {
+	// Wire debug tracer for full request lifecycle tracing
+	tracer := debug.NewTracer(req.ProjectID)
+	defer tracer.TraceSpan("analyze:" + req.ProjectID)()
+
 	// 1. Clone repository
 	// 1. Clone repository
 	repoPath, err := a.gitClient.CloneRepo(ctx, req.RepoURL, req.ProjectID, req.DefaultBranch, req.GitHubToken, req.BasePath)
@@ -346,13 +327,9 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// SEQUENTIAL EXECUTION: Phase 2 (Dependent on Phase 1)
 	// ============================================
 
-	// 6. Git Forensics (Authenticity Engine)
-	// Must run after we have TotalLines for "Largest Commit Ratio" logic
-	log.Info().Msg("🕵️‍♂️ Running Git Forensics...")
-	gitAnalyzer := forensics.NewGitAnalyzer(repoPath)
-	forensics, authVerdict := gitAnalyzer.Analyze(totalLines)
-	result.GitForensics = forensics
-	result.AuthorshipVerdict = authVerdict
+	// NOTE: Git Forensics REMOVED from Go engine.
+	// Authenticity data now fetched via GitHub APIs in user-service.
+	tracer.StartSpan("Phase2:Sequential")
 
 	// Detect Project Type (Depends on Folder + Code Signals)
 	result.ProjectType = fileParser.DetectProjectType(result.FolderStructure, result.CodeSignals)
@@ -415,6 +392,8 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// ============================================
 	// ENTERPRISE ANALYSIS: Phase 3 (Inference & Scoring)
 	// ============================================
+	tracer.EndSpan() // End Phase2:Sequential
+	tracer.StartSpan("Phase3:InferenceScoring")
 
 	// 0. Map AST results to ProjectSignals
 	if astResult != nil {
@@ -448,11 +427,10 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	inferenceEngine := inference.NewInferenceEngine()
 	result.IndustryAnalysis = inferenceEngine.InferSkills(infraSignals)
 
-	// Fix #6: Apply authorship penalty to individual skills, not just overall score
-	// This prevents fake/copied projects from generating resume-ready skills
-	if result.AuthorshipVerdict != nil && result.IndustryAnalysis != nil {
-		applyAuthorshipPenaltyToSkills(result.IndustryAnalysis, result.AuthorshipVerdict)
-	}
+	// NOTE: Authorship penalty is REMOVED here to avoid double penalty.
+	// The Bayesian engine (Phase 3) already applies authorship dampening
+	// via gitWeight = AuthorshipFactor * MaturityFactor in its posterior calculation.
+	// Applying it here AND in Bayesian would crush legitimate skills.
 
 	// 3. Architecture Graph Generation
 	result.ArchitectureGraph = infraExtractor.GenerateArchitectureGraph()
@@ -463,6 +441,8 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// ============================================
 	// AUTONOMOUS INTELLIGENCE ENGINE: Phase 4
 	// ============================================
+	tracer.EndSpan() // End Phase3
+	tracer.StartSpan("Phase4:Intelligence")
 	intelligencePipeline := intelligence.NewPipeline(repoPath, req.Niche, req.UserProjectType)
 
 	// PROD OPTIMIZATION: Inject pre-computed signals to skip redundant scanning
@@ -471,7 +451,7 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	// Compute confidence from the mapped signals
 	confidence := intelligence.ComputeSignalConfidence(fastSignals)
 	intelligencePipeline.SetPrecomputedSignals(fastSignals, confidence)
-	intelligencePipeline.SetGitForensics(result.AuthorshipVerdict)
+	// NOTE: SetGitForensics removed — forensics handled externally
 
 	intelligenceResult, err := intelligencePipeline.Run(ctx)
 	if err != nil {
@@ -488,16 +468,43 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 	}
 
 	// ============================================
+	// SIGNAL FILTERING (BEFORE Bayesian)
+	// Must run BEFORE Bayesian sync so that Phase B
+	// (adding new skills from graph/AST) doesn't get
+	// destroyed by the filter pass.
+	// ============================================
+	filterProjectType := effectiveProjectType
+	if filterProjectType == "" {
+		switch result.ProjectType {
+		case signals.ProjectTypeFrontend:
+			filterProjectType = "frontend"
+		case signals.ProjectTypeBackend, signals.ProjectTypeAPI:
+			filterProjectType = "backend"
+		case signals.ProjectTypeFullstack, signals.ProjectTypeMonorepo:
+			filterProjectType = "fullstack"
+		default:
+			filterProjectType = "fullstack"
+		}
+		log.Info().
+			Str("fallbackFilterType", filterProjectType).
+			Str("autoProjectType", string(result.ProjectType)).
+			Msg("🔄 Using auto-detected ProjectType for signal filtering")
+	}
+	filterSignalsByProjectType(result, filterProjectType)
+
+	// ============================================
 	// BAYESIAN CONFIDENCE ENGINE: Phase 3
 	// Final confidence calibration using all prior data
 	// ============================================
+	tracer.EndSpan() // End Phase4 or filter
+	tracer.StartSpan("Phase5:BayesianConfidence")
 	log.Info().Msg("🔬 Running Bayesian Confidence Engine (Phase 3)...")
 	confEngine := confengine.NewEngine()
 	confEngine.SetAST(astResult)
 	confEngine.SetGraph(graphAnalysis)
 	confEngine.SetInfra(infraSignals)
 	confEngine.SetIndustry(result.IndustryAnalysis)
-	confEngine.SetForensics(result.GitForensics, result.AuthorshipVerdict)
+	// NOTE: SetForensics removed — forensics handled externally
 	confEngine.SetCodeSignals(&result.CodeSignals)
 
 	confReport := confEngine.Run()
@@ -508,6 +515,21 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		Int("resumeReady", confReport.EnsembleVerdict.ResumeReadySkills).
 		Float64("analysisConf", confReport.AnalysisConfidence).
 		Msg("✅ Phase 3: Bayesian Confidence Engine complete")
+
+	// ============================================
+	// BAYESIAN → VERIFIED SKILLS SYNC
+	// Apply Bayesian posteriors to IndustryAnalysis.VerifiedSkills
+	// so aura-processor stores calibrated confidence values
+	// ============================================
+	syncBayesianConfidenceToSkills(result)
+
+	// ============================================
+	// DEEP EVIDENCE ENRICHMENT (Phase 6)
+	// Extract granular, pattern-based evidence from graph clusters
+	// Must run AFTER Bayesian sync (all skills finalized)
+	// ============================================
+	enrichSkillsWithDeepEvidence(result)
+
 	// TotalLines was set in Phase 1 line ~244, TotalFiles was set by language parser.
 	// Only compute here if they haven't been set yet (defensive)
 	if result.TotalLines == 0 || result.TotalFiles == 0 {
@@ -517,28 +539,13 @@ func (a *Analyzer) analyze(ctx context.Context, req signals.AnalyzeRequest) (*si
 		}
 	}
 
-	// Filter signals based on project type for clean response
-	// Use effectiveProjectType (auto-detected when user didn't specify)
-	// Also reconcile with the auto-detected ProjectType from Phase 2
-	filterProjectType := effectiveProjectType
-	if filterProjectType == "" {
-		// Last resort: use auto-detected ProjectType from DetectProjectType()
-		switch result.ProjectType {
-		case signals.ProjectTypeFrontend:
-			filterProjectType = "frontend"
-		case signals.ProjectTypeBackend, signals.ProjectTypeAPI:
-			filterProjectType = "backend"
-		case signals.ProjectTypeFullstack, signals.ProjectTypeMonorepo:
-			filterProjectType = "fullstack"
-		default:
-			filterProjectType = "fullstack" // Safe default: keep everything rather than lose signals
-		}
-		log.Info().
-			Str("fallbackFilterType", filterProjectType).
-			Str("autoProjectType", string(result.ProjectType)).
-			Msg("🔄 Using auto-detected ProjectType for signal filtering")
-	}
-	filterSignalsByProjectType(result, filterProjectType)
+	// NOTE: Signal filtering was already applied BEFORE Bayesian sync
+	// (see above). This ensures Bayesian Phase B skills aren't destroyed.
+
+	tracer.EndSpan() // End Phase5:BayesianConfidence
+
+	// Print trace tree (debug level)
+	tracer.PrintTrace()
 
 	log.Info().
 		Str("projectId", req.ProjectID).

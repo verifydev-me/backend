@@ -143,15 +143,17 @@ func (e *InfraExtractor) validateProjectCompleteness() {
 	}
 
 	// For Node.js projects, verify src/ or pages/ or components/ exist
-	if len(jsFiles) > 0 {
+	// BUT skip for microservices: services/*/src/ is a valid alternative structure
+	if len(jsFiles) > 0 && e.signals.ServiceCount <= 1 {
 		hasSrc := e.findFiles("src/*")
 		hasPages := e.findFiles("pages/*", "app/*")
 		hasComponents := e.findFiles("components/*")
+		hasServicesSrc := e.findFiles("services/*/src/*")
 
-		if len(hasSrc) == 0 && len(hasPages) == 0 && len(hasComponents) == 0 {
+		if len(hasSrc) == 0 && len(hasPages) == 0 && len(hasComponents) == 0 && len(hasServicesSrc) == 0 {
 			// Only has config files, no actual code structure
 			e.signals.AddSignal(signals.SignalIncompleteProject, 0.8,
-				[]string{"No src/, pages/, or components/ directories found"},
+				[]string{"No src/, pages/, components/, or services/*/src/ directories found"},
 				"structure_check")
 		}
 	}

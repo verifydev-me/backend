@@ -3,8 +3,6 @@ package intelligence
 import (
 	"fmt"
 	"strings"
-
-	"github.com/verifydev/project-analyzer/pkg/signals"
 )
 
 // ============================================
@@ -23,14 +21,12 @@ type VerdictEngine struct {
 	archIntent  ArchitectureIntent
 	suggestions []Suggestion
 	skills      []ExtractedSkill
-	authorship  *signals.AuthorshipVerdict
 }
 
 // NewVerdictEngine creates a new verdict engine
-// NewVerdictEngine creates a new verdict engine
 func NewVerdictEngine(signals *FastSignals, confidence *SignalConfidenceVector,
 	intent ProjectIntent, devLevel DeveloperLevel, archIntent ArchitectureIntent,
-	suggestions []Suggestion, skills []ExtractedSkill, authorship *signals.AuthorshipVerdict) *VerdictEngine {
+	suggestions []Suggestion, skills []ExtractedSkill) *VerdictEngine {
 	return &VerdictEngine{
 		signals:     signals,
 		confidence:  confidence,
@@ -39,7 +35,6 @@ func NewVerdictEngine(signals *FastSignals, confidence *SignalConfidenceVector,
 		archIntent:  archIntent,
 		suggestions: suggestions,
 		skills:      skills,
-		authorship:  authorship,
 	}
 }
 
@@ -56,7 +51,6 @@ func (e *VerdictEngine) GenerateVerdict() *Verdict {
 		Suggestions:           e.suggestions,
 		ExtractedSkills:       e.skills,
 		SeniorEngineerVerdict: e.generateEngineerVerdict(),
-		HireSignal:            e.calculateHireSignal(),
 	}
 
 	return v
@@ -199,15 +193,7 @@ func (e *VerdictEngine) calculateOverallScore() float64 {
 		baseScore -= 3 // Reduced from -5
 	}
 
-	// Authenticity Adjustments (Git Forensics)
-	if e.authorship != nil {
-		if e.authorship.Level == "ORGANIC" && e.authorship.Confidence == "HIGH" {
-			baseScore += 10 // Boost for verified organic growth (reduced from +20 to prevent inflation)
-		}
-		if e.authorship.Level == "SNAPSHOT" {
-			baseScore -= 25 // Penalty for dump/fake projects (reduced from -40 for less volatility)
-		}
-	}
+	// NOTE: Authenticity adjustments removed — handled externally via GitHub APIs
 
 	// Cap at 100
 	if baseScore > 100 {
@@ -352,67 +338,15 @@ func (e *VerdictEngine) generateEngineerVerdict() string {
 		verdict.WriteString(fmt.Sprintf("Gaps in %s should be addressed. ", strings.Join(gaps, " and ")))
 	}
 
-	// Role suitability
-	switch e.calculateHireSignal() {
-	case HireStrongHire:
+	// Role suitability based on developer level
+	switch e.devLevel {
+	case LevelExpert, LevelSenior:
 		verdict.WriteString("Suitable for senior technical roles.")
-	case HireHire:
+	case LevelIntermediate:
 		verdict.WriteString("Suitable for mid-to-senior roles with minor growth areas.")
-	case HireBorderline:
-		verdict.WriteString("Suitable for junior-to-mid roles with mentorship.")
 	default:
-		verdict.WriteString("Needs significant improvement before production deployment.")
+		verdict.WriteString("Suitable for junior-to-mid roles with mentorship.")
 	}
 
 	return verdict.String()
-}
-
-// calculateHireSignal determines hiring recommendation
-func (e *VerdictEngine) calculateHireSignal() HireSignal {
-	score := 0
-
-	// Positive signals
-	if e.devLevel == LevelExpert {
-		score += 4
-	} else if e.devLevel == LevelSenior {
-		score += 3
-	} else if e.devLevel == LevelIntermediate {
-		score += 1
-	}
-
-	if e.archIntent == ArchSophisticated {
-		score += 3
-	} else if e.archIntent == ArchIntentional {
-		score += 1
-	}
-
-	if e.confidence.TestConfidence > 0.6 {
-		score += 2
-	}
-	if e.signals.HasCI {
-		score += 1
-	}
-	if e.signals.HasKubernetes || e.signals.HasTerraform {
-		score += 2
-	}
-
-	// Negative signals
-	if !e.signals.HasTests && e.signals.CodeFiles > 10 {
-		score -= 2
-	}
-	if e.confidence.ArchitectureConfidence < 0.3 {
-		score -= 2
-	}
-
-	// Decision
-	switch {
-	case score >= 8:
-		return HireStrongHire
-	case score >= 5:
-		return HireHire
-	case score >= 2:
-		return HireBorderline
-	default:
-		return HireNoHire
-	}
 }

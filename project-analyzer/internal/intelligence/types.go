@@ -313,15 +313,6 @@ func (s *ExtractedSkill) ComputeConfidence() {
 // VERDICT ENGINE (RECRUITER-GRADE OUTPUT)
 // ============================================
 
-type HireSignal string
-
-const (
-	HireStrongHire HireSignal = "STRONG_HIRE"
-	HireHire       HireSignal = "HIRE"
-	HireBorderline HireSignal = "BORDERLINE"
-	HireNoHire     HireSignal = "NO_HIRE"
-)
-
 type Verdict struct {
 	// Summary (1-2 lines)
 	ProjectIntentSummary string `json:"projectIntentSummary"`
@@ -345,8 +336,7 @@ type Verdict struct {
 	ExtractedSkills []ExtractedSkill `json:"extractedSkills"`
 
 	// Recruiter Output
-	SeniorEngineerVerdict string     `json:"seniorEngineerVerdict"`
-	HireSignal            HireSignal `json:"hireSignal"`
+	SeniorEngineerVerdict string `json:"seniorEngineerVerdict"`
 
 	// Metadata
 	AnalysisTimeMs   int64    `json:"analysisTimeMs"`

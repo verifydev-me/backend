@@ -23,8 +23,6 @@ type Engine struct {
 	graphResult  *graph.GraphAnalysisResult
 	infraSignals *signals.InfrastructureSignals
 	industry     *signals.IndustryAnalysis
-	forensics    *signals.GitForensics
-	authorship   *signals.AuthorshipVerdict
 	codeSignals  *signals.CodeSignals
 
 	// Computed intermediates
@@ -57,11 +55,7 @@ func (e *Engine) SetIndustry(industry *signals.IndustryAnalysis) {
 	e.industry = industry
 }
 
-// SetForensics provides git forensics data
-func (e *Engine) SetForensics(f *signals.GitForensics, v *signals.AuthorshipVerdict) {
-	e.forensics = f
-	e.authorship = v
-}
+// NOTE: SetForensics removed — forensics now handled externally via GitHub APIs
 
 // SetCodeSignals provides code-level signals
 func (e *Engine) SetCodeSignals(cs *signals.CodeSignals) {
@@ -289,92 +283,16 @@ func (e *Engine) computeQualityMetrics() QualityMetrics {
 // ============================================
 
 func (e *Engine) computeEvolutionSignals() EvolutionSignals {
-	ev := EvolutionSignals{
-		AuthorshipLevel:  "UNKNOWN",
-		AuthorshipFactor: 0.5, // neutral default
-		MaturityFactor:   0.5,
+	// NOTE: Git forensics removed from Go engine.
+	// Return neutral defaults so Bayesian engine relies purely on code evidence.
+	return EvolutionSignals{
+		AuthorshipLevel:    "UNKNOWN",
+		AuthorshipFactor:   1.0, // neutral: don't penalize or boost
+		MaturityFactor:     1.0, // neutral: don't penalize or boost
+		DevelopmentPattern: "unknown",
+		ProjectAge:         "unknown",
+		CommitConsistency:  0.5, // neutral midpoint
 	}
-
-	if e.forensics == nil {
-		ev.DevelopmentPattern = "unknown"
-		ev.ProjectAge = "unknown"
-		return ev
-	}
-
-	// Authorship
-	if e.authorship != nil {
-		ev.AuthorshipLevel = e.authorship.Level
-
-		switch e.authorship.Level {
-		case "ORGANIC":
-			switch e.authorship.Confidence {
-			case "HIGH":
-				ev.AuthorshipFactor = 1.0
-			case "MEDIUM":
-				ev.AuthorshipFactor = 0.85
-			default:
-				ev.AuthorshipFactor = 0.7
-			}
-		case "SNAPSHOT":
-			switch e.authorship.Confidence {
-			case "HIGH":
-				ev.AuthorshipFactor = 0.3
-			case "MEDIUM":
-				ev.AuthorshipFactor = 0.45
-			default:
-				ev.AuthorshipFactor = 0.55
-			}
-		case "UNCLEAR":
-			ev.AuthorshipFactor = 0.5
-		}
-	}
-
-	// Development Pattern
-	commitCount := e.forensics.CommitCount
-	refactorCount := e.forensics.RefactorCount
-	largestRatio := e.forensics.LargestCommitRatio
-
-	if commitCount > 0 {
-		ev.RefactorRatio = float64(refactorCount) / float64(commitCount)
-	}
-
-	// Estimate iteration count (refactor + fix commits indicate iterations)
-	ev.IterationCount = refactorCount + (commitCount / 5) // rough: 1 iteration per 5 commits
-
-	if largestRatio > 0.8 && commitCount < 5 {
-		ev.DevelopmentPattern = "snapshot"
-	} else if commitCount < 10 && refactorCount == 0 {
-		ev.DevelopmentPattern = "burst"
-	} else {
-		ev.DevelopmentPattern = "incremental"
-	}
-
-	// Project age from dates
-	if e.forensics.FirstCommitDate != "" && e.forensics.LastCommitDate != "" {
-		// Parse the time gap from the commit dates
-		// We use commit count as a proxy for project maturity
-		if commitCount >= 50 {
-			ev.ProjectAge = "months"
-			ev.MaturityFactor = 1.0
-		} else if commitCount >= 20 {
-			ev.ProjectAge = "weeks"
-			ev.MaturityFactor = 0.85
-		} else if commitCount >= 5 {
-			ev.ProjectAge = "days"
-			ev.MaturityFactor = 0.65
-		} else {
-			ev.ProjectAge = "hours"
-			ev.MaturityFactor = 0.4
-		}
-	}
-
-	// Commit consistency: low largest ratio + high commit count = consistent
-	if commitCount > 0 {
-		ev.CommitConsistency = (1.0 - largestRatio) * math.Min(float64(commitCount)/30.0, 1.0)
-		ev.CommitConsistency = math.Round(ev.CommitConsistency*100) / 100
-	}
-
-	return ev
 }
 
 // ============================================
@@ -399,8 +317,38 @@ func (e *Engine) computeBayesianPosteriors() []SkillPosterior {
 	}
 
 	if e.graphResult != nil {
+		// 1. Check inferred skills (high confidence)
 		for _, skill := range e.graphResult.InferredSkills {
 			graphSkillConf[strings.ToLower(skill.Name)] = skill.Confidence
+		}
+
+		// 2. Check individual nodes (direct evidence)
+		for _, node := range e.graphResult.Nodes {
+			// If node exists in graph, we have evidence of usage
+			// Base confidence on node weight, boosted if it has explicit evidence
+			conf := 0.7 + (node.Weight * 0.2)
+			if len(node.Evidence) > 0 {
+				conf += 0.1
+			}
+			conf = math.Min(conf, 0.95)
+
+			// Map by name
+			graphSkillConf[strings.ToLower(node.Name)] = conf
+
+			// Map by category if specific enough (e.g. "postgres" -> "database")
+			// This helps if the skill name is generic "Database" but we found "PostgreSQL"
+		}
+
+		// 3. Check clusters (grouped evidence)
+		for _, cluster := range e.graphResult.Clusters {
+			clusterConf := 0.6 + (cluster.Strength * 0.3)
+			for _, tech := range cluster.Technologies {
+				// Only update if higher than existing
+				key := strings.ToLower(tech)
+				if current, exists := graphSkillConf[key]; !exists || clusterConf > current {
+					graphSkillConf[key] = clusterConf
+				}
+			}
 		}
 	}
 
@@ -469,8 +417,8 @@ func (e *Engine) computeBayesianPosteriors() []SkillPosterior {
 		// Likelihood = weighted combination of evidence sources
 		sourceWeights := map[string]float64{
 			"ast":     0.30,
-			"infra":   0.25,
-			"graph":   0.20,
+			"infra":   0.30, // Increased from 0.25 (Infra is hard evidence)
+			"graph":   0.15, // Reduced from 0.20 (Graph is often sparse)
 			"quality": 0.15,
 			"git":     0.10,
 		}
@@ -492,8 +440,16 @@ func (e *Engine) computeBayesianPosteriors() []SkillPosterior {
 		// Clamp to [0.05, 0.99]
 		rawPosterior = math.Max(0.05, math.Min(0.99, rawPosterior))
 
-		// Apply quality and git dampening
-		posterior.Posterior = rawPosterior * (0.3 + 0.7*qualityWeight) * (0.3 + 0.7*gitWeight)
+		// Apply quality and git dampening (RELAXED v2)
+		// Code evidence (AST/Infra/Graph) should dominate over git history.
+		// If infra confirms Docker+Kafka+Redis+Prisma, git history shouldn't crush confidence.
+		// Quality: floor 0.7 (was 0.6), ceiling 1.0
+		// Git: floor 0.85 (was 0.7), ceiling 1.0
+		// Net minimum dampening: 0.7 * 0.85 = 0.595 (was 0.6 * 0.7 = 0.42)
+		// Net for typical snapshot: ~0.84 * ~0.89 = ~0.75 (was 0.67)
+		qualityDamp := 0.7 + 0.3*qualityWeight
+		gitDamp := 0.85 + 0.15*gitWeight
+		posterior.Posterior = rawPosterior * qualityDamp * gitDamp
 		posterior.Posterior = math.Round(posterior.Posterior*1000) / 1000
 		posterior.Posterior = math.Max(0.05, math.Min(0.99, posterior.Posterior))
 
@@ -526,9 +482,10 @@ func (e *Engine) computeBayesianPosteriors() []SkillPosterior {
 		posterior.LowerBound = math.Max(0.0, math.Round((posterior.Posterior-halfWidth)*100)/100)
 		posterior.UpperBound = math.Min(1.0, math.Round((posterior.Posterior+halfWidth)*100)/100)
 
-		// Resume-ready: posterior >= 0.65 AND (at least 2 evidence sources OR authorship is ORGANIC)
-		posterior.ResumeReady = posterior.Posterior >= 0.65 &&
-			(sourceCount >= 2 || e.evolutionSignals.AuthorshipLevel == "ORGANIC")
+		// Resume-ready: posterior >= 0.60 AND at least 1 strong evidence source
+		// Relaxed from 0.65 + (2 sources OR ORGANIC) — was too restrictive,
+		// blocking skills with strong infra evidence (e.g., Docker+Kafka+Redis)
+		posterior.ResumeReady = posterior.Posterior >= 0.60 && sourceCount >= 1
 
 		// Usage verification from AST
 		posterior.UsageVerified = posterior.ASTEvidence >= 0.5
@@ -568,12 +525,13 @@ func (e *Engine) computeEnsembleVerdict(report *ConfidenceReport) EnsembleVerdic
 		verdict.ASTScore = math.Round(astScore*100) / 100
 	}
 
-	// Graph Score: based on detected stacks and inferred skills
+	// Graph Score: based on detected stacks, inferred skills, and total nodes
 	if e.graphResult != nil {
 		stackScore := float64(len(e.graphResult.DetectedStacks)) * 15
 		skillScore := float64(len(e.graphResult.InferredSkills)) * 10
 		clusterScore := float64(len(e.graphResult.Clusters)) * 5
-		graphScore := math.Min(stackScore+skillScore+clusterScore, 100)
+		nodeScore := float64(len(e.graphResult.Nodes)) * 2 // 2 points per node
+		graphScore := math.Min(stackScore+skillScore+clusterScore+nodeScore, 100)
 		verdict.GraphScore = math.Round(graphScore*100) / 100
 	}
 
@@ -622,9 +580,7 @@ func (e *Engine) computeEnsembleVerdict(report *ConfidenceReport) EnsembleVerdic
 	if e.industry != nil {
 		dataPoints++
 	}
-	if e.forensics != nil {
-		dataPoints++
-	}
+	// NOTE: forensics data removed — skip git data point for confidence calculation
 	verdict.Confidence = math.Min(float64(dataPoints)*0.2, 1.0)
 
 	// Score label
@@ -748,9 +704,7 @@ func (e *Engine) computeAnalysisConfidence() float64 {
 	if e.industry != nil && e.industry.TotalSkills > 0 {
 		conf += 0.15
 	}
-	if e.forensics != nil && e.forensics.CommitCount > 0 {
-		conf += 0.15
-	}
+	// NOTE: forensics data removed — skip git confidence contribution
 	if e.codeSignals != nil {
 		conf += 0.10
 	}

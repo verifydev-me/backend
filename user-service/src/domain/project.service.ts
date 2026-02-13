@@ -2,6 +2,7 @@ import prisma from '../prisma/client.js';
 import { rabbitmqPublisher } from '../rabbitmq/publisher.js';
 import { logger } from '../utils/logger.js';
 import { GitHubService } from './github.service.js';
+import { GitDetailsService } from './git-details.service.js';
 import { AuraService } from './aura.service.js';
 
 export interface AddProjectDto {
@@ -235,6 +236,7 @@ export class ProjectService {
             infraSignals: true,
           },
         },
+        gitDetails: true,
         user: {
           select: {
             githubAccessToken: true,
@@ -245,7 +247,7 @@ export class ProjectService {
 
     if (!project) return null;
 
-    const { analysis, user: projectOwner, ...projectData } = project;
+    const { analysis, gitDetails, user: projectOwner, ...projectData } = project;
 
     // Fetch raw MongoDB doc to get Phase 2/3 fields not in Prisma schema
     let rawAnalysis: any = {};
@@ -322,8 +324,9 @@ export class ProjectService {
           usageVerified: s.usageVerified,
           usageStrength: s.usageStrength,
           evidence: s.evidence || [],
+          richEvidence: (s as any).richEvidence || (s as any).rich_evidence || null,
           resumeReady: s.resumeReady,
-          projectCount: 1, // Specific to this project
+          projectCount: 1,
         }))
       : skills.map(skill => ({
           name: skill.name,
@@ -352,9 +355,9 @@ export class ProjectService {
     }));
 
     // Calculate industry analysis summary
+    // NOTE: skillsByCategory removed — frontend computes it from verifiedSkills
     const computedIndustryAnalysis = {
       verifiedSkills: skillsBreakdown,
-      skillsByCategory: groupSkillsByCategory(skillsBreakdown),
       totalSkills: skillsBreakdown.length,
       highConfidenceSkills: skillsBreakdown.filter(s => s.score >= 70).length,
       resumeReadySkills: skillsBreakdown.filter(s => s.resumeReady).length,
@@ -364,7 +367,7 @@ export class ProjectService {
     };
 
     const mergedIndustryAnalysis = mergeIndustryAnalysis(null, computedIndustryAnalysis);
-    mergedFullAnalysis.industryAnalysis = mergedIndustryAnalysis;
+    // NOTE: removed mergedFullAnalysis.industryAnalysis = ... (was duplicate of top-level industryAnalysis)
 
     return {
       ...projectData,
@@ -375,6 +378,10 @@ export class ProjectService {
       // Include detailed analysis
       fullAnalysis: mergedFullAnalysis,
       industryAnalysis: mergedIndustryAnalysis,
+      // GitHub-sourced git details
+      gitDetails: gitDetails || null,
+      // Complexity from structured analysis (frontend reads project.complexity)
+      complexity: mergedFullAnalysis.complexity || undefined,
       languages: languageSummary.languageMap,
       metrics: {
         codeQuality: project.codeQualityScore,
@@ -494,6 +501,11 @@ export class ProjectService {
       githubToken,
       basePath,
     });
+
+    // Fire-and-forget: fetch git details from GitHub in parallel
+    GitDetailsService.refresh(projectId).catch((err) =>
+      logger.warn({ err, projectId }, 'Git details fetch failed (non-blocking)'),
+    );
   }
 }
 
@@ -553,18 +565,19 @@ function buildStructuredFullAnalysis(analysis: any) {
     },
     infraSignals: {
       signals: (analysis.infraSignals || []).map((s: any) => s.signal),
-      signalDetails: (analysis.infraSignals || []).reduce((acc: any, s: any) => {
-        acc[s.signal] = { signal: s.signal, confidence: s.confidence, evidence: s.evidence };
-        return acc;
-      }, {}),
+      // NOTE: signalDetails removed — was redundant ({signal, 0.8, []}) for every entry
     },
     architecture: {
-      type: analysis.architectureType,
-      serviceCount: analysis.serviceCount,
-      hasAPIGateway: analysis.hasAPIGateway,
+      type: analysis.architectureType || analysis.architecture_type,
+      serviceCount: analysis.serviceCount || analysis.service_count,
+      hasAPIGateway: analysis.hasAPIGateway ?? analysis.has_gateway,
       hasMessageQueue: analysis.hasMessageQueue,
       hasSharedLibraries: analysis.hasSharedLibraries,
-      engineeringLevel: analysis.engineeringLevel,
+      engineeringLevel: analysis.engineeringLevel || analysis.engineering_level,
+      communication: analysis.architecture_communication || [],
+      patterns: analysis.architecture_patterns || [],
+      services: analysis.architecture_service_names || [],
+      gateway: analysis.architecture_gateway || null,
     },
     bestPractices: {
       followed: analysis.bestPracticesFollowed || [],
@@ -602,10 +615,20 @@ function buildStructuredFullAnalysis(analysis: any) {
       confidence: analysis.experienceConfidence,
     },
     verdict: {
-      summary: analysis.verdictSummary,
-      strengths: analysis.verdictStrengths || [],
-      growthAreas: analysis.verdictGrowthAreas || [],
-      justification: analysis.verdictJustification,
+      summary: analysis.verdictSummary || analysis.dimensional_verdict_summary || null,
+      strengths: analysis.verdictStrengths || analysis.dimensional_strengths || [],
+      growthAreas: analysis.verdictGrowthAreas || analysis.dimensional_growth_areas || [],
+      justification: analysis.verdictJustification || analysis.verdict_senior_verdict || null,
+      developerLevel: analysis.verdict_developer_level || null,
+      hireSignal: null, // removed — no longer generated by Go engine
+      keySignals: analysis.verdict_key_signals || [],
+      riskSignals: analysis.verdict_risk_signals || [],
+      strengthSignals: analysis.verdict_strength_signals || [],
+      projectIntent: analysis.verdict_project_intent || null,
+      overallScore: analysis.verdict_overall_score || null,
+      techStack: analysis.verdict_tech_stack || [],
+      modulesExecuted: analysis.verdict_modules_executed || [],
+      modulesSkipped: analysis.verdict_modules_skipped || [],
     },
     trustAnalysis: {
       level: analysis.trustLevel,
@@ -624,6 +647,7 @@ function buildStructuredFullAnalysis(analysis: any) {
       usageVerified: skill.usageVerified,
       usageStrength: skill.usageStrength,
       evidence: skill.evidence,
+      richEvidence: skill.richEvidence || skill.rich_evidence || null,
       linesOfCode: skill.linesOfCode,
     })),
     optimizations: (analysis.optimizationSuggestions || []).map((opt: any) => ({
@@ -651,6 +675,16 @@ function buildStructuredFullAnalysis(analysis: any) {
           suggestions: analysis.reactAnalysis.suggestions,
         }
       : null,
+    // ========== COMPLEXITY ==========
+    complexity: (analysis.complexity_total_score != null) ? {
+      totalScore: analysis.complexity_total_score || 0,
+      architectureScore: analysis.complexity_architecture_score || 0,
+      infrastructureScore: analysis.complexity_infrastructure_score || 0,
+      codeQualityScore: analysis.complexity_code_quality_score || 0,
+      scaleLabel: analysis.complexity_scale_label || 'Unknown',
+    } : undefined,
+    // ========== GIT SIGNALS ==========
+    // gitSignals removed — git data now comes from ProjectGitDetails (GitHub API)
     // ========== PHASE 2: TECH DEPENDENCY GRAPH ==========
     techDependencyGraph: analysis.graph_total_nodes ? {
       totalNodes: analysis.graph_total_nodes || 0,
@@ -747,6 +781,16 @@ function mergeFullAnalysis(structured: any, legacy: any) {
   }
 
   merged.reactAnalysis = structured.reactAnalysis || legacy.reactAnalysis || null;
+
+  // Pass through new sections
+  merged.complexity = structured.complexity || legacy.complexity || undefined;
+  // gitSignals removed — now comes from ProjectGitDetails (GitHub API)
+  merged.dimensionalAnalysis = { ...(legacy.dimensionalAnalysis || {}), ...(structured.dimensionalAnalysis || {}) };
+  merged.experienceAnalysis = { ...(legacy.experienceAnalysis || {}), ...(structured.experienceAnalysis || {}) };
+  merged.verdict = { ...(legacy.verdict || {}), ...(structured.verdict || {}) };
+  merged.trustAnalysis = { ...(legacy.trustAnalysis || {}), ...(structured.trustAnalysis || {}) };
+  merged.confidenceReport = structured.confidenceReport || legacy.confidenceReport || undefined;
+  merged.techDependencyGraph = structured.techDependencyGraph || legacy.techDependencyGraph || undefined;
 
   return merged;
 }
@@ -858,10 +902,7 @@ function mergeIndustryAnalysis(legacy: any, computed: any) {
     ? legacy.verifiedSkills
     : computed.verifiedSkills;
 
-  merged.skillsByCategory = {
-    ...computed.skillsByCategory,
-    ...(legacy.skillsByCategory || {}),
-  };
+  // skillsByCategory removed — frontend computes from verifiedSkills
 
   merged.technologies = (legacy.technologies && legacy.technologies.length > 0)
     ? legacy.technologies
@@ -888,14 +929,9 @@ function getSkillLevel(score: number): string {
 }
 
 // Helper function to group skills by category
-function groupSkillsByCategory(skills: any[]): Record<string, any[]> {
-  return skills.reduce((acc, skill) => {
-    const category = skill.category || 'other';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(skill);
-    return acc;
-  }, {} as Record<string, any[]>);
-}
+// groupSkillsByCategory removed — frontend computes from verifiedSkills
+
+
 
 // Helper function to determine engineering level based on score
 function getEngineeringLevel(score: number): string {

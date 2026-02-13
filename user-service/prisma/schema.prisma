@@ -10,18 +10,18 @@ datasource db {
 // ==================== USER MODEL ====================
 
 model User {
-  id            String  @id @default(auto()) @map("_id") @db.ObjectId
-  githubId      String? @unique @map("github_id")
-  googleId      String? @unique @map("google_id")
-  username      String  @unique
-  email         String? @unique
-  name          String?
-  avatarUrl     String? @map("avatar_url")
-  bio           String?
-  location      String?
-  company       String?
-  website       String?
-  twitterHandle   String? @map("twitter_handle")
+  id               String  @id @default(auto()) @map("_id") @db.ObjectId
+  githubId         String? @unique @map("github_id")
+  googleId         String? @unique @map("google_id")
+  username         String  @unique
+  email            String? @unique
+  name             String?
+  avatarUrl        String? @map("avatar_url")
+  bio              String?
+  location         String?
+  company          String?
+  website          String?
+  twitterHandle    String? @map("twitter_handle")
   leetcodeUsername String? @map("leetcode_username")
 
   // ========== STUDENT INFO ==========
@@ -335,8 +335,9 @@ model Project {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // ========== RELATIONS ==========
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  analysis ProjectAnalysis? // Detailed analysis in separate collection
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis   ProjectAnalysis? // Detailed analysis in separate collection
+  gitDetails ProjectGitDetails? // GitHub-sourced git data
 
   @@unique([userId, githubRepoUrl])
   @@index([userId])
@@ -352,6 +353,47 @@ enum AnalysisStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ==================== PROJECT GIT DETAILS (from GitHub APIs) ====================
+// Replaces the Go engine's local git forensics with real GitHub data
+
+model ProjectGitDetails {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String @unique @map("project_id") @db.ObjectId
+
+  // ========== COMMIT HISTORY ==========
+  totalCommits    Int       @default(0) @map("total_commits")
+  firstCommitDate DateTime? @map("first_commit_date")
+  lastCommitDate  DateTime? @map("last_commit_date")
+  commitFrequency Json?     @map("commit_frequency") // Weekly commit counts [{week, total}]
+
+  // ========== CONTRIBUTORS ==========
+  totalContributors Int   @default(0) @map("total_contributors")
+  contributors      Json? // [{login, avatar, commits, additions, deletions}]
+  primaryAuthorPct  Float @default(0) @map("primary_author_pct")
+
+  // ========== REPO STATS ==========
+  stars      Int @default(0)
+  forks      Int @default(0)
+  watchers   Int @default(0)
+  openIssues Int @default(0) @map("open_issues")
+  repoSize   Int @default(0) @map("repo_size") // KB
+
+  // ========== LANGUAGE BREAKDOWN (from GitHub) ==========
+  languageBreakdown Json? @map("language_breakdown") // {TypeScript: 50000, Go: 30000}
+
+  // ========== ACTIVITY ==========
+  isActive         Boolean   @default(true) @map("is_active")
+  lastActivityDate DateTime? @map("last_activity_date")
+
+  // ========== METADATA ==========
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_git_details")
 }
 
 // ==================== PROJECT ANALYSIS MODEL (STRUCTURED) ====================
@@ -564,9 +606,10 @@ model AnalysisVerifiedSkill {
   confidence    Float // 0.0 to 1.0
   auraPoints    Int           @default(0) @map("aura_points")
   resumeReady   Boolean       @default(false) @map("resume_ready")
-  usageVerified Boolean       @default(false) @map("usage_verified") // NEW
-  usageStrength Float         @default(0.0) @map("usage_strength") // NEW
+  usageVerified Boolean       @default(false) @map("usage_verified")
+  usageStrength Float         @default(0.0) @map("usage_strength")
   evidence      String[]      @default([])
+  richEvidence  Json?         @map("rich_evidence") // Phase 6: Granular pattern-based evidence
   linesOfCode   Int?          @map("lines_of_code")
 
   analysis ProjectAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)

@@ -1509,6 +1509,67 @@ func (e *InferenceEngine) loadRules() {
 			Keywords:        []string{"fastapi", "async python", "pydantic"},
 			Evidence:        []string{"FastAPI framework detected"},
 		},
+		// === BACKEND FRAMEWORK RULES ===
+		{
+			SkillName:       "Express.js",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalExpress},
+			OptionalSignals: []signals.InfraSignal{signals.SignalNode, signals.SignalJavaScript, signals.SignalTypeScript},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"express", "expressjs", "middleware", "node http"},
+			Evidence:        []string{"Express.js framework detected"},
+		},
+		{
+			SkillName:       "NestJS",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelAdvanced,
+			RequiredSignals: []signals.InfraSignal{signals.SignalNestJS},
+			OptionalSignals: []signals.InfraSignal{signals.SignalNode, signals.SignalTypeScript},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          9,
+			Keywords:        []string{"nestjs", "decorator", "module", "injectable"},
+			Evidence:        []string{"NestJS framework detected"},
+		},
+		{
+			SkillName:       "Gin",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalGin},
+			OptionalSignals: []signals.InfraSignal{signals.SignalGo},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"gin", "gin-gonic", "go http"},
+			Evidence:        []string{"Gin web framework detected"},
+		},
+		{
+			SkillName:       "Fiber",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalFiber},
+			OptionalSignals: []signals.InfraSignal{signals.SignalGo},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"fiber", "gofiber", "fasthttp"},
+			Evidence:        []string{"Fiber web framework detected"},
+		},
+		{
+			SkillName:       "Echo",
+			Category:        signals.CategoryFramework,
+			Level:           signals.LevelIntermediate,
+			RequiredSignals: []signals.InfraSignal{signals.SignalEcho},
+			OptionalSignals: []signals.InfraSignal{signals.SignalGo},
+			MinSignalCount:  0,
+			BaseConfidence:  0.90,
+			Weight:          8,
+			Keywords:        []string{"echo", "labstack", "go http"},
+			Evidence:        []string{"Echo web framework detected"},
+		},
 		// === NEW LANGUAGE RULES ===
 		{
 			SkillName:       "Java",
@@ -1813,8 +1874,8 @@ func (e *InferenceEngine) InferSkills(infraSignals *signals.InfrastructureSignal
 			for i := range skills {
 				// Only add warning evidence, don't heavily penalize confidence
 				skills[i].Evidence = append(skills[i].Evidence, "⚠️ Project structure incomplete")
-				// Slightly reduce resumeReady threshold for incomplete projects
-				skills[i].ResumeReady = skills[i].Confidence >= 0.80
+				// Use same threshold as normal — Bayesian will calibrate final confidence
+				skills[i].ResumeReady = skills[i].Confidence >= 0.65
 			}
 			analysis.SkillsByCategory[cat] = skills
 		}

@@ -36,19 +36,36 @@ const (
 	LevelExpert       SkillLevel = "expert"
 )
 
+// SkillDepth represents how deeply a technology is used
+type SkillDepth struct {
+	Level          string `json:"level"`          // "surface", "moderate", "deep", "expert"
+	DiversityCount int    `json:"diversityCount"` // Number of distinct patterns/APIs used
+	PatternsUsed   int    `json:"patternsUsed"`   // Number of distinct code patterns
+	FileSpread     int    `json:"fileSpread"`     // How many files the tech spans
+}
+
+// RichEvidence provides granular, pattern-based evidence for a skill
+// This is the "Developer Magnet" — shows we ACTUALLY read their code
+type RichEvidence struct {
+	Summary  []string               `json:"summary"`            // Human-readable summaries (e.g., "React Hooks: useState (23 uses), useEffect (18 uses)")
+	Patterns map[string]interface{} `json:"patterns,omitempty"` // Detailed pattern data (e.g., hooks, routes, queries)
+	Depth    *SkillDepth            `json:"depth,omitempty"`    // Depth assessment
+}
+
 // VerifiedSkill - A skill proven by code evidence
 type VerifiedSkill struct {
 	Name          string        `json:"name"`
 	Category      SkillCategory `json:"category"`
 	Level         SkillLevel    `json:"level"`
-	Confidence    float64       `json:"confidence"`    // 0.0 - 1.0
-	Evidence      []string      `json:"evidence"`      // Human-readable proof
-	Signals       []InfraSignal `json:"signals"`       // Underlying signals
-	Keywords      []string      `json:"keywords"`      // Related keywords for search
-	ResumeReady   bool          `json:"resumeReady"`   // Safe to put on resume
-	Weight        int           `json:"weight"`        // Importance (1-10) for scoring
-	UsageVerified bool          `json:"usageVerified"` // NEW
-	UsageStrength float64       `json:"usageStrength"` // NEW
+	Confidence    float64       `json:"confidence"`             // 0.0 - 1.0
+	Evidence      []string      `json:"evidence"`               // Human-readable proof (backward compat)
+	RichEvidence  *RichEvidence `json:"richEvidence,omitempty"` // NEW: Granular pattern-based evidence
+	Signals       []InfraSignal `json:"signals"`                // Underlying signals
+	Keywords      []string      `json:"keywords"`               // Related keywords for search
+	ResumeReady   bool          `json:"resumeReady"`            // Safe to put on resume
+	Weight        int           `json:"weight"`                 // Importance (1-10) for scoring
+	UsageVerified bool          `json:"usageVerified"`          // Usage verified by AST/intelligence
+	UsageStrength float64       `json:"usageStrength"`          // Usage strength score
 }
 
 // ArchitectureType - System architecture classification

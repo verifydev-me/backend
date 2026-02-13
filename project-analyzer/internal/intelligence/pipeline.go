@@ -25,11 +25,10 @@ type Pipeline struct {
 	// Pre-computed signals to bypass Stage 1 scan
 	preComputedSignals    *FastSignals
 	preComputedConfidence *SignalConfidenceVector
-	gitForensicsVerdict   *signals.AuthorshipVerdict
 
 	// NEW: Context
-	astReport      *ASTReport
-	securityReport *SecurityReport
+	astReport      *signals.ASTReport
+	securityReport *signals.SecurityReport
 }
 
 // PipelineResult contains complete analysis output
@@ -70,11 +69,6 @@ func NewPipeline(repoPath, niche, userProjectType string) *Pipeline {
 func (p *Pipeline) SetPrecomputedSignals(signals *FastSignals, confidence *SignalConfidenceVector) {
 	p.preComputedSignals = signals
 	p.preComputedConfidence = confidence
-}
-
-// SetGitForensics injects authenticity verification results
-func (p *Pipeline) SetGitForensics(verdict *signals.AuthorshipVerdict) {
-	p.gitForensicsVerdict = verdict
 }
 
 // Run executes the full intelligence pipeline
@@ -156,13 +150,34 @@ func (p *Pipeline) Run(ctx context.Context) (*PipelineResult, error) {
 		result.EarlyTermination = true
 		result.ExitReason = string(exitDecision.Reason)
 
-		// Still generate minimal verdict
+		// Even on early exit, run suggestion + skill extraction with evidence
+		// extractBasicSkills already calls VerifyAllUsage so skills get verified
 		suggGen := NewSuggestionGenerator(signals, confidence, intent, devLevel)
 		suggestions := suggGen.GenerateSuggestions()
 
 		skills := p.extractBasicSkills(signals)
 
-		verdictEngine := NewVerdictEngine(signals, confidence, intent, devLevel, archIntent, suggestions, skills, p.gitForensicsVerdict)
+		// Enrich basic skills with architecture context from what we have
+		for i := range skills {
+			if archIntent == ArchSophisticated {
+				skills[i].Evidence = append(skills[i].Evidence, "Sophisticated architecture detected")
+				if skills[i].Confidence < 85 {
+					skills[i].Confidence = 85
+				}
+			}
+			// Add more context evidence for early exit skills
+			if signals.HasTests {
+				skills[i].Evidence = append(skills[i].Evidence, "Test coverage present")
+			}
+			if signals.HasCI {
+				skills[i].Evidence = append(skills[i].Evidence, "CI/CD pipeline configured")
+			}
+			if signals.HasDockerfile {
+				skills[i].Evidence = append(skills[i].Evidence, "Containerized deployment")
+			}
+		}
+
+		verdictEngine := NewVerdictEngine(signals, confidence, intent, devLevel, archIntent, suggestions, skills)
 		result.Verdict = verdictEngine.GenerateVerdict()
 		result.Verdict.EarlyTermination = true
 		result.Verdict.ExitReason = string(exitDecision.Reason)
@@ -220,7 +235,7 @@ func (p *Pipeline) Run(ctx context.Context) (*PipelineResult, error) {
 	// ============================================
 	log.Debug().Msg("Stage 8: Verdict generation")
 
-	verdictEngine := NewVerdictEngine(signals, confidence, intent, devLevel, archIntent, suggestions, skills, p.gitForensicsVerdict)
+	verdictEngine := NewVerdictEngine(signals, confidence, intent, devLevel, archIntent, suggestions, skills)
 	result.Verdict = verdictEngine.GenerateVerdict()
 	result.Verdict.ModulesExecuted = result.ModulesExecuted
 	result.Verdict.ModulesSkipped = result.ModulesSkipped
@@ -682,7 +697,7 @@ func getIntent(projectType string) ProjectIntent {
 	return IntentProduction
 }
 
-func applyASTSecurityBoosts(skills []ExtractedSkill, astReport *ASTReport, secReport *SecurityReport) {
+func applyASTSecurityBoosts(skills []ExtractedSkill, astReport *signals.ASTReport, secReport *signals.SecurityReport) {
 	if astReport == nil {
 		return
 	}

@@ -186,6 +186,10 @@ enum SkillCategory {
   ARCHITECTURE        @map("architecture")
   ARCHITECTURE_LEGACY @map("ARCHITECTURE")
 
+  // Engineering
+  ENGINEERING        @map("engineering")
+  ENGINEERING_LEGACY @map("ENGINEERING")
+
   // Machine Learning & AI
   ML        @map("ml")
   ML_LEGACY @map("ML")
