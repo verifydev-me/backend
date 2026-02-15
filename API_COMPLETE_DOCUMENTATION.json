@@ -1,0 +1,2424 @@
+{
+  "documentation": {
+    "title": "Verify Stack - Complete API Documentation",
+    "version": "1.0.0",
+    "baseUrl": "https://api.verifydev.com",
+    "description": "Comprehensive API documentation for all backend services"
+  },
+  
+  "services": {
+    
+    "AUTH_SERVICE": {
+      "baseUrl": "/api/v1/auth",
+      "description": "Authentication and authorization service",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/github",
+          "description": "Initiate GitHub OAuth flow",
+          "auth": "Public",
+          "queryParams": {
+            "state": "string (optional) - 'mobile' for mobile app",
+            "mobile_redirect_uri": "string (optional) - Deep link URI for mobile"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "authUrl": "string - GitHub OAuth URL"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/github/callback",
+          "description": "Handle GitHub OAuth callback",
+          "auth": "Public",
+          "queryParams": {
+            "code": "string - OAuth code",
+            "state": "string - CSRF state token"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "user": {
+                "id": "string",
+                "name": "string",
+                "email": "string",
+                "username": "string",
+                "avatarUrl": "string",
+                "auraScore": "number",
+                "coreCount": "number",
+                "isVerified": "boolean"
+              },
+              "tokens": {
+                "accessToken": "string",
+                "refreshToken": "string"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/google",
+          "description": "Initiate Google OAuth flow",
+          "auth": "Public",
+          "response": {
+            "success": true,
+            "data": {
+              "authUrl": "string"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/google/callback",
+          "description": "Handle Google OAuth callback",
+          "auth": "Public",
+          "queryParams": {
+            "code": "string",
+            "state": "string"
+          },
+          "response": "Same as GitHub callback"
+        },
+        {
+          "method": "POST",
+          "path": "/refresh",
+          "description": "Refresh access token",
+          "auth": "Public (with refresh token)",
+          "requestBody": {
+            "refreshToken": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "accessToken": "string",
+              "refreshToken": "string"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/logout",
+          "description": "Logout current session",
+          "auth": "Private (Bearer token)",
+          "response": {
+            "success": true,
+            "message": "Logged out successfully"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/logout-all",
+          "description": "Logout from all devices",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Logged out from all devices"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me",
+          "description": "Get current authenticated user",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "user": {
+                "id": "string",
+                "email": "string",
+                "name": "string",
+                "username": "string",
+                "avatarUrl": "string",
+                "bio": "string",
+                "location": "string",
+                "websiteUrl": "string",
+                "auraScore": "number",
+                "coreCount": "number",
+                "isVerified": "boolean",
+                "createdAt": "ISO8601 string",
+                "updatedAt": "ISO8601 string"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "OTP_SERVICE": {
+      "baseUrl": "/api/v1/auth/otp",
+      "description": "OTP-based authentication for email and phone",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/request-email",
+          "description": "Request OTP for email",
+          "auth": "Public",
+          "requestBody": {
+            "email": "string (required) - User email",
+            "type": "string (optional) - 'login' | 'signup' (default: 'login')"
+          },
+          "response": {
+            "message": "OTP sent to your email",
+            "email": "string - Masked email (ke***@gmail.com)"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/request-phone",
+          "description": "Request OTP for phone",
+          "auth": "Public",
+          "requestBody": {
+            "phone": "string (required) - Phone number with country code",
+            "type": "string (optional) - 'mobile_verify' (default)"
+          },
+          "response": {
+            "message": "OTP sent to your phone",
+            "phone": "string - Masked phone"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/verify",
+          "description": "Verify OTP and login/signup",
+          "auth": "Public",
+          "requestBody": {
+            "email": "string (required if phone not provided)",
+            "phone": "string (required if email not provided)",
+            "otp": "string (required) - 6-digit OTP",
+            "type": "string (optional) - 'login' | 'signup'"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "user": {
+                "id": "string",
+                "email": "string",
+                "name": "string",
+                "avatarUrl": "string"
+              },
+              "tokens": {
+                "accessToken": "string",
+                "refreshToken": "string"
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/resend",
+          "description": "Resend OTP",
+          "auth": "Public",
+          "requestBody": {
+            "email": "string (or)",
+            "phone": "string (or)",
+            "type": "string - 'login' | 'signup'"
+          },
+          "response": {
+            "message": "OTP resent successfully"
+          }
+        }
+      ]
+    },
+
+    "USER_SERVICE": {
+      "baseUrl": "/api/v1/users",
+      "description": "User profile and data management",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/me",
+          "description": "Get current user's full profile",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "profile": {
+                "id": "string",
+                "email": "string",
+                "name": "string",
+                "username": "string",
+                "avatarUrl": "string",
+                "bio": "string",
+                "location": "string",
+                "websiteUrl": "string",
+                "githubUsername": "string",
+                "linkedinUrl": "string",
+                "twitterUrl": "string",
+                "auraScore": "number",
+                "coreCount": "number",
+                "isVerified": "boolean",
+                "visibility": "object",
+                "jobPreferences": "object",
+                "createdAt": "ISO8601",
+                "updatedAt": "ISO8601"
+              }
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/me",
+          "description": "Update current user's profile",
+          "auth": "Private",
+          "requestBody": {
+            "name": "string (optional)",
+            "bio": "string (optional)",
+            "location": "string (optional)",
+            "websiteUrl": "string (optional)",
+            "linkedinUrl": "string (optional)",
+            "twitterUrl": "string (optional)",
+            "currentRole": "string (optional)",
+            "yearsOfExperience": "number (optional)",
+            "expectedSalary": "number (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Profile updated successfully",
+            "data": {
+              "profile": "object - Updated profile"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me/repos",
+          "description": "Get user's GitHub repos available for analysis",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "repos": [
+                {
+                  "id": "number",
+                  "name": "string",
+                  "fullName": "string",
+                  "description": "string",
+                  "isPrivate": "boolean",
+                  "htmlUrl": "string",
+                  "language": "string",
+                  "stargazersCount": "number",
+                  "forksCount": "number",
+                  "updatedAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me/projects",
+          "description": "Get user's analyzed projects",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "projects": [
+                {
+                  "id": "string",
+                  "name": "string",
+                  "description": "string",
+                  "repoUrl": "string",
+                  "analysisStatus": "PENDING | PROCESSING | COMPLETED | FAILED",
+                  "isPinned": "boolean",
+                  "complexity": "number",
+                  "linesOfCode": "number",
+                  "technologies": ["string"],
+                  "createdAt": "ISO8601",
+                  "updatedAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/me/projects/analyze",
+          "description": "Analyze a GitHub project",
+          "auth": "Private",
+          "requestBody": {
+            "repoUrl": "string (required) - GitHub repo URL",
+            "branch": "string (optional) - Branch name (default: main)"
+          },
+          "response": {
+            "success": true,
+            "message": "Project analysis started",
+            "data": {
+              "project": {
+                "id": "string",
+                "analysisStatus": "PROCESSING"
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/me/sync-github",
+          "description": "Sync GitHub profile data",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "GitHub data synced successfully"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me/github",
+          "description": "Get GitHub stats",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "stats": {
+                "totalStars": "number",
+                "totalRepos": "number",
+                "followers": "number",
+                "following": "number",
+                "publicRepos": "number"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me/skills",
+          "description": "Get user's skills",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "skills": [
+                {
+                  "id": "string",
+                  "name": "string",
+                  "category": "LANGUAGE | FRAMEWORK | TOOL | DATABASE | OTHER",
+                  "proficiency": "number (0-100)",
+                  "isVerified": "boolean",
+                  "source": "PROJECT_ANALYSIS | MANUAL",
+                  "yearsOfExperience": "number"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/settings",
+          "description": "Get user settings",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "settings": {
+                "visibility": {
+                  "isProfilePublic": "boolean",
+                  "showGithubStats": "boolean",
+                  "showProjects": "boolean",
+                  "showSkills": "boolean"
+                },
+                "notifications": {
+                  "email": "boolean",
+                  "push": "boolean",
+                  "jobMatches": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/settings",
+          "description": "Update user settings",
+          "auth": "Private",
+          "requestBody": {
+            "visibility": "object (optional)",
+            "notifications": "object (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Settings updated successfully"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/me/aura",
+          "description": "Get current user's aura summary",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "auraScore": "number",
+              "coreCount": "number",
+              "level": "string",
+              "breakdown": {
+                "projectComplexity": "number",
+                "codeQuality": "number",
+                "consistency": "number",
+                "innovation": "number"
+              }
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/me/leetcode",
+          "description": "Connect LeetCode account",
+          "auth": "Private",
+          "requestBody": {
+            "leetcodeUsername": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "message": "LeetCode account connected"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/me/leetcode",
+          "description": "Disconnect LeetCode account",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "LeetCode account disconnected"
+          }
+        }
+      ]
+    },
+
+    "PROJECT_SERVICE": {
+      "baseUrl": "/api/v1/projects",
+      "description": "Project management and analysis",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/available",
+          "description": "Get available GitHub repos to add",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "repos": ["array of GitHub repos"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/repo/branches",
+          "description": "Get branches for a specific repo",
+          "auth": "Private",
+          "queryParams": {
+            "repoUrl": "string - GitHub repo URL"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "branches": ["string array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/repo/contents",
+          "description": "Get repo contents",
+          "auth": "Private",
+          "queryParams": {
+            "repoUrl": "string",
+            "path": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "contents": ["array"]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Add a new project for analysis",
+          "auth": "Private",
+          "requestBody": {
+            "repoUrl": "string (required)",
+            "branch": "string (optional)",
+            "name": "string (optional)",
+            "description": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Project added for analysis",
+            "data": {
+              "project": {
+                "id": "string",
+                "analysisStatus": "PROCESSING"
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/batch",
+          "description": "Add multiple projects for analysis (max 3)",
+          "auth": "Private",
+          "requestBody": {
+            "projects": [
+              {
+                "repoUrl": "string",
+                "branch": "string (optional)"
+              }
+            ]
+          },
+          "response": {
+            "success": true,
+            "message": "Batch analysis started",
+            "data": {
+              "projects": ["array of project objects"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "Get user's projects",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "projects": ["array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:projectId",
+          "description": "Get single project details",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "project": "object"
+            }
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:projectId",
+          "description": "Delete a project",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Project deleted"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:projectId/analyze",
+          "description": "Re-trigger project analysis",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Analysis restarted"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:projectId/pin",
+          "description": "Toggle pin status",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "isPinned": "boolean"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:projectId/analysis",
+          "description": "Get detailed project analysis",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "analysis": {
+                "complexity": "number",
+                "linesOfCode": "number",
+                "technologies": ["array"],
+                "architecture": "object",
+                "codeQuality": "object",
+                "dimensional": "object"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:projectId/dimensional",
+          "description": "Get 6-dimensional analysis",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "dimensions": {
+                "architecture": "number (0-100)",
+                "codeQuality": "number",
+                "testing": "number",
+                "documentation": "number",
+                "security": "number",
+                "performance": "number"
+              },
+              "verdicts": "object",
+              "trustScore": "number"
+            }
+          }
+        }
+      ]
+    },
+
+    "SKILL_SERVICE": {
+      "baseUrl": "/api/v1/skills",
+      "description": "Skill management",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "Get all skills for current user",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "skills": [
+                {
+                  "id": "string",
+                  "name": "string",
+                  "category": "LANGUAGE | FRAMEWORK | TOOL | DATABASE",
+                  "proficiency": "number",
+                  "isVerified": "boolean",
+                  "source": "PROJECT_ANALYSIS | MANUAL",
+                  "evidence": ["array"]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/category/:category",
+          "description": "Get skills by category",
+          "auth": "Private",
+          "pathParams": {
+            "category": "LANGUAGE | FRAMEWORK | TOOL | DATABASE"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "skills": ["array"]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/manual",
+          "description": "Add a manual (unverified) skill",
+          "auth": "Private",
+          "requestBody": {
+            "name": "string (required)",
+            "category": "string (required)",
+            "proficiency": "number (0-100, optional)",
+            "yearsOfExperience": "number (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Skill added",
+            "data": {
+              "skill": "object"
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/:id",
+          "description": "Update a skill (only MANUAL skills)",
+          "auth": "Private",
+          "requestBody": {
+            "name": "string (optional)",
+            "proficiency": "number (optional)",
+            "yearsOfExperience": "number (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Skill updated"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id",
+          "description": "Delete a skill (only MANUAL skills)",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Skill deleted"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:id/evidence",
+          "description": "Get skill with evidence details",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "skill": "object",
+              "evidence": [
+                {
+                  "projectId": "string",
+                  "projectName": "string",
+                  "usage": "string",
+                  "linesOfCode": "number"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    "EXPERIENCE_SERVICE": {
+      "baseUrl": "/api/v1/experiences",
+      "description": "Work, education, certifications, volunteer experiences",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "Get all experiences (grouped by type)",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "experiences": {
+                "work": ["array"],
+                "education": ["array"],
+                "certifications": ["array"],
+                "volunteer": ["array"]
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Create a new experience",
+          "auth": "Private",
+          "requestBody": {
+            "type": "WORK | EDUCATION | CERTIFICATION | VOLUNTEER (required)",
+            "title": "string (required)",
+            "company": "string (for WORK)",
+            "institution": "string (for EDUCATION)",
+            "organization": "string (for VOLUNTEER)",
+            "location": "string (optional)",
+            "startDate": "ISO8601 (required)",
+            "endDate": "ISO8601 (optional, null for current)",
+            "isCurrent": "boolean",
+            "description": "string (optional)",
+            "skills": ["string array (optional)"]
+          },
+          "response": {
+            "success": true,
+            "message": "Experience added",
+            "data": {
+              "experience": "object"
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/:id",
+          "description": "Update an experience",
+          "auth": "Private",
+          "requestBody": "Same as POST (all fields optional)",
+          "response": {
+            "success": true,
+            "message": "Experience updated"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id",
+          "description": "Delete an experience",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Experience deleted"
+          }
+        }
+      ]
+    },
+
+    "ONBOARDING_SERVICE": {
+      "baseUrl": "/api/v1/users/me/onboarding",
+      "description": "User onboarding flow",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/status",
+          "description": "Get onboarding status",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "isComplete": "boolean",
+              "currentStep": "number (1-3)",
+              "completedSteps": ["number array"]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/step/1",
+          "description": "Update step 1 (basic info)",
+          "auth": "Private",
+          "requestBody": {
+            "name": "string (required)",
+            "bio": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Step 1 completed"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/step/2",
+          "description": "Update step 2 (student info)",
+          "auth": "Private",
+          "requestBody": {
+            "isStudent": "boolean",
+            "university": "string (if isStudent)",
+            "graduationYear": "number (if isStudent)"
+          },
+          "response": {
+            "success": true,
+            "message": "Step 2 completed"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/step/2/skip",
+          "description": "Skip step 2",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Step 2 skipped"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/complete",
+          "description": "Complete onboarding",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Onboarding completed"
+          }
+        }
+      ]
+    },
+
+    "VISIBILITY_SERVICE": {
+      "baseUrl": "/api/v1/visibility-settings",
+      "description": "Profile visibility and privacy settings",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "Get all visibility settings",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "visibility": {
+                "isProfilePublic": "boolean",
+                "showGithubStats": "boolean",
+                "showProjects": "boolean",
+                "showSkills": "boolean",
+                "showExperience": "boolean"
+              },
+              "jobPreferences": "object",
+              "highlightedSkills": ["array"]
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/",
+          "description": "Update profile visibility",
+          "auth": "Private",
+          "requestBody": {
+            "isProfilePublic": "boolean (optional)",
+            "showGithubStats": "boolean (optional)",
+            "showProjects": "boolean (optional)",
+            "showSkills": "boolean (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Visibility updated"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/job-preferences",
+          "description": "Update job preferences",
+          "auth": "Private",
+          "requestBody": {
+            "isOpenToWork": "boolean",
+            "preferredRoles": ["string array"],
+            "preferredLocations": ["string array"],
+            "isRemoteOnly": "boolean",
+            "expectedSalary": "number"
+          },
+          "response": {
+            "success": true,
+            "message": "Job preferences updated"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/highlighted-skills",
+          "description": "Bulk update highlighted skills",
+          "auth": "Private",
+          "requestBody": {
+            "skillIds": ["string array - max 5"]
+          },
+          "response": {
+            "success": true,
+            "message": "Highlighted skills updated"
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/projects/:projectId",
+          "description": "Update single project visibility",
+          "auth": "Private",
+          "requestBody": {
+            "isVisible": "boolean"
+          },
+          "response": {
+            "success": true,
+            "message": "Project visibility updated"
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/skills/:skillId",
+          "description": "Update single skill visibility",
+          "auth": "Private",
+          "requestBody": {
+            "isVisible": "boolean"
+          },
+          "response": {
+            "success": true,
+            "message": "Skill visibility updated"
+          }
+        }
+      ]
+    },
+
+    "RESUME_SERVICE": {
+      "baseUrl": "/api/v1/resume",
+      "description": "Resume generation service",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/generate",
+          "description": "Generate a resume PDF",
+          "auth": "Private",
+          "requestBody": {
+            "template": "string (optional) - 'modern' | 'classic' | 'minimal'",
+            "includeProjects": "boolean (optional)",
+            "includeSkills": "boolean (optional)",
+            "includeExperience": "boolean (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "resumeUrl": "string - URL to download PDF",
+              "expiresAt": "ISO8601"
+            }
+          }
+        }
+      ]
+    },
+
+    "JOB_SERVICE": {
+      "baseUrl": "/api/v1/jobs",
+      "description": "Job posting and search",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Create a new job posting (recruiter only)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "title": "string (required)",
+            "description": "string (required)",
+            "requirements": ["string array (required)"],
+            "responsibilities": ["string array (optional)"],
+            "benefits": ["string array (optional)"],
+            "skills": ["string array (required)"],
+            "experienceLevel": "ENTRY | JUNIOR | MID | SENIOR | LEAD (required)",
+            "type": "FULL_TIME | PART_TIME | CONTRACT | INTERNSHIP (required)",
+            "location": "string (optional)",
+            "isRemote": "boolean (required)",
+            "salaryMin": "number (optional)",
+            "salaryMax": "number (optional)",
+            "currency": "string (optional) - default: USD",
+            "expiresAt": "ISO8601 (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Job posted successfully! 🎉",
+            "data": {
+              "job": {
+                "id": "string",
+                "title": "string",
+                "status": "OPEN",
+                "createdAt": "ISO8601"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "List jobs with filters",
+          "auth": "Public",
+          "queryParams": {
+            "page": "number (default: 1)",
+            "limit": "number (default: 20)",
+            "type": "FULL_TIME | PART_TIME | CONTRACT | INTERNSHIP",
+            "level": "ENTRY | JUNIOR | MID | SENIOR | LEAD",
+            "isRemote": "boolean",
+            "location": "string"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "jobs": [
+                {
+                  "id": "string",
+                  "title": "string",
+                  "company": "string",
+                  "location": "string",
+                  "isRemote": "boolean",
+                  "type": "string",
+                  "experienceLevel": "string",
+                  "salaryMin": "number",
+                  "salaryMax": "number",
+                  "skills": ["array"],
+                  "postedAt": "ISO8601"
+                }
+              ]
+            },
+            "meta": {
+              "page": "number",
+              "limit": "number",
+              "total": "number"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/search",
+          "description": "Advanced job search",
+          "auth": "Public",
+          "queryParams": {
+            "q": "string - Search query",
+            "skills": "string - Comma-separated skills",
+            "type": "string - Comma-separated types",
+            "level": "string - Comma-separated levels",
+            "isRemote": "boolean",
+            "salaryMin": "number",
+            "salaryMax": "number",
+            "location": "string",
+            "sortBy": "relevance | date | salary (default: date)",
+            "page": "number",
+            "limit": "number"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "jobs": ["array"]
+            },
+            "meta": {
+              "page": "number",
+              "limit": "number",
+              "total": "number",
+              "totalPages": "number"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/matched",
+          "description": "Get jobs matched to user's skills",
+          "auth": "Private",
+          "queryParams": {
+            "page": "number",
+            "limit": "number"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "jobs": [
+                {
+                  "...job": "object",
+                  "matchScore": "number (0-100)",
+                  "matchedSkills": ["array"],
+                  "missingSkills": ["array"]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:jobId",
+          "description": "Get job details",
+          "auth": "Public",
+          "response": {
+            "success": true,
+            "data": {
+              "job": {
+                "id": "string",
+                "title": "string",
+                "description": "string",
+                "requirements": ["array"],
+                "responsibilities": ["array"],
+                "benefits": ["array"],
+                "skills": ["array"],
+                "experienceLevel": "string",
+                "type": "string",
+                "location": "string",
+                "isRemote": "boolean",
+                "salary": "object",
+                "recruiter": "object",
+                "applicationsCount": "number"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:jobId/details",
+          "description": "Get job with match score (authenticated)",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "job": "object",
+              "matchScore": "number",
+              "matchedSkills": ["array"],
+              "missingSkills": ["array"]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:jobId/apply",
+          "description": "Apply to a job",
+          "auth": "Private",
+          "requestBody": {
+            "coverLetter": "string (optional)",
+            "resumeUrl": "string (optional)",
+            "expectedSalary": "number (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Application submitted successfully",
+            "data": {
+              "application": {
+                "id": "string",
+                "status": "PENDING",
+                "appliedAt": "ISO8601"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:jobId/can-apply",
+          "description": "Check if user can apply to job",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "canApply": "boolean",
+              "reason": "string (if canApply is false)"
+            }
+          }
+        }
+      ]
+    },
+
+    "APPLICATION_SERVICE": {
+      "baseUrl": "/api/v1/applications",
+      "description": "Job application management",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Apply to a job",
+          "auth": "Private",
+          "requestBody": {
+            "jobId": "string (required)",
+            "coverLetter": "string (optional)",
+            "resumeUrl": "string (optional)",
+            "expectedSalary": "number (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "application": "object"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/my-applications",
+          "description": "Get user's applications",
+          "auth": "Private",
+          "queryParams": {
+            "status": "PENDING | SHORTLISTED | REJECTED | ACCEPTED | WITHDRAWN"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "applications": [
+                {
+                  "id": "string",
+                  "jobId": "string",
+                  "jobTitle": "string",
+                  "companyName": "string",
+                  "status": "string",
+                  "appliedAt": "ISO8601",
+                  "updatedAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:id",
+          "description": "Get single application",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "application": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/withdraw",
+          "description": "Withdraw application",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "withdrawn": "boolean"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/job/:jobId",
+          "description": "Get applications for a job (recruiter)",
+          "auth": "Private (Recruiter)",
+          "queryParams": {
+            "status": "string"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "applications": ["array"]
+            }
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id/status",
+          "description": "Update application status (recruiter)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "status": "PENDING | SHORTLISTED | REJECTED | ACCEPTED (required)",
+            "notes": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "application": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/notes",
+          "description": "Add recruiter notes",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "notes": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "application": "object"
+            }
+          }
+        }
+      ]
+    },
+
+    "INTERVIEW_SERVICE": {
+      "baseUrl": "/api/v1/interviews",
+      "description": "Interview scheduling and management",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Schedule interview (recruiter)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "applicationId": "string (required)",
+            "userId": "string (required)",
+            "scheduledAt": "ISO8601 (required)",
+            "duration": "number (minutes, required)",
+            "type": "PHONE | VIDEO | ONSITE (required)",
+            "meetingUrl": "string (optional for VIDEO)",
+            "location": "string (optional for ONSITE)",
+            "notes": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "interview": {
+                "id": "string",
+                "status": "SCHEDULED",
+                "scheduledAt": "ISO8601"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:id",
+          "description": "Get interview details",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "interview": "object"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/my-interviews",
+          "description": "Get user's interviews",
+          "auth": "Private",
+          "queryParams": {
+            "status": "SCHEDULED | CONFIRMED | COMPLETED | CANCELLED"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "interviews": ["array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/upcoming",
+          "description": "Get upcoming interviews",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "interviews": ["array"]
+            }
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id",
+          "description": "Update interview (recruiter)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "scheduledAt": "ISO8601 (optional)",
+            "duration": "number (optional)",
+            "meetingUrl": "string (optional)",
+            "notes": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "interview": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/confirm",
+          "description": "Confirm interview (candidate)",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "interview": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/reschedule",
+          "description": "Reschedule interview (recruiter)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "newScheduledAt": "ISO8601 (required)",
+            "reason": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "interview": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/cancel",
+          "description": "Cancel interview",
+          "auth": "Private",
+          "requestBody": {
+            "reason": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Interview cancelled"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/complete",
+          "description": "Mark interview as completed (recruiter)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "feedback": "string (optional)",
+            "rating": "number (1-5, optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "interview": "object"
+            }
+          }
+        }
+      ]
+    },
+
+    "MESSAGE_SERVICE": {
+      "baseUrl": "/api/v1/messages",
+      "description": "Direct messaging between users and recruiters",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Send a message",
+          "auth": "Private",
+          "requestBody": {
+            "receiverId": "string (required)",
+            "content": "string (required)",
+            "subject": "string (optional)",
+            "jobId": "string (optional)",
+            "applicationId": "string (optional)",
+            "attachments": ["array (optional)"]
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "message": {
+                "id": "string",
+                "senderId": "string",
+                "receiverId": "string",
+                "content": "string",
+                "sentAt": "ISO8601"
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/bulk",
+          "description": "Send bulk messages (recruiter only)",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "receiverIds": ["string array (required)"],
+            "subject": "string (optional)",
+            "content": "string (required)",
+            "jobId": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "sentCount": "number",
+              "messages": ["array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/inbox",
+          "description": "Get inbox messages",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "messages": [
+                {
+                  "id": "string",
+                  "senderId": "string",
+                  "senderName": "string",
+                  "content": "string",
+                  "isRead": "boolean",
+                  "sentAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/sent",
+          "description": "Get sent messages",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "messages": ["array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/thread/:userId",
+          "description": "Get message thread with a user",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "messages": ["array ordered by time"]
+            }
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id/read",
+          "description": "Mark message as read",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Message marked as read"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id",
+          "description": "Delete a message",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Message deleted"
+          }
+        }
+      ]
+    },
+
+    "RECRUITER_SERVICE": {
+      "baseUrl": "/api/v1/recruiter",
+      "description": "Recruiter-specific functionality",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/auth/register",
+          "description": "Register a new recruiter",
+          "auth": "Public",
+          "requestBody": {
+            "email": "string (required)",
+            "password": "string (required, min 8 chars)",
+            "name": "string (required)",
+            "companyName": "string (required)",
+            "companyWebsite": "string (optional)",
+            "phone": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "recruiter": "object",
+              "tokens": {
+                "accessToken": "string",
+                "refreshToken": "string"
+              }
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/login",
+          "description": "Login a recruiter",
+          "auth": "Public",
+          "requestBody": {
+            "email": "string (required)",
+            "password": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "recruiter": "object",
+              "tokens": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/refresh",
+          "description": "Refresh access token",
+          "auth": "Public",
+          "requestBody": {
+            "refreshToken": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "accessToken": "string"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/auth/me",
+          "description": "Get current recruiter info",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "recruiter": "object"
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/auth/profile",
+          "description": "Update recruiter profile",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "name": "string (optional)",
+            "companyName": "string (optional)",
+            "companyWebsite": "string (optional)",
+            "bio": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Profile updated"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/dashboard",
+          "description": "Get recruiter dashboard stats",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "stats": {
+                "activeJobs": "number",
+                "totalApplications": "number",
+                "pendingApplications": "number",
+                "shortlistedCandidates": "number",
+                "scheduledInterviews": "number"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/candidates/search",
+          "description": "Search for candidates",
+          "auth": "Private (Recruiter)",
+          "queryParams": {
+            "skills": "string - Comma-separated",
+            "experience": "number - Minimum years",
+            "location": "string",
+            "isOpenToWork": "boolean",
+            "page": "number",
+            "limit": "number"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "candidates": [
+                {
+                  "id": "string",
+                  "name": "string",
+                  "username": "string",
+                  "avatarUrl": "string",
+                  "bio": "string",
+                  "skills": ["array"],
+                  "auraScore": "number",
+                  "isOpenToWork": "boolean"
+                }
+              ]
+            },
+            "meta": "pagination"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/candidates/:userId",
+          "description": "Get basic candidate profile",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "candidate": "object"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/candidates/:userId/full",
+          "description": "Get FULL candidate profile",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "candidate": {
+                "profile": "object",
+                "projects": ["array"],
+                "skills": ["array"],
+                "experiences": ["array"],
+                "aura": "object",
+                "dimensional": "object"
+              }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/candidates/:userId/resume",
+          "description": "Get candidate's resume data",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "resume": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/candidates/:userId/shortlist",
+          "description": "Shortlist a candidate",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "jobId": "string (optional)",
+            "notes": "string (optional)"
+          },
+          "response": {
+            "success": true,
+            "message": "Candidate shortlisted"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/shortlist",
+          "description": "Get shortlisted candidates",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "shortlist": ["array"]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/jobs/:jobId/applications",
+          "description": "Get applications for a job",
+          "auth": "Private (Recruiter)",
+          "response": {
+            "success": true,
+            "data": {
+              "applications": ["array"]
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/applications/:applicationId/status",
+          "description": "Update application status",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "status": "PENDING | SHORTLISTED | REJECTED | ACCEPTED (required)"
+          },
+          "response": {
+            "success": true,
+            "message": "Application status updated"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/applications/:applicationId/note",
+          "description": "Add recruiter note",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "note": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "message": "Note added"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/jobs/:jobId/suggested-candidates",
+          "description": "Get AI-matched candidates for a job",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "limit": "number (optional, default: 20)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "candidates": [
+                {
+                  "...candidate": "object",
+                  "matchScore": "number (0-100)",
+                  "matchedSkills": ["array"],
+                  "missingSkills": ["array"],
+                  "reasoning": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/candidates/:userId/match-score",
+          "description": "Calculate match score for a candidate",
+          "auth": "Private (Recruiter)",
+          "requestBody": {
+            "jobId": "string (required)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "matchScore": "number",
+              "breakdown": "object"
+            }
+          }
+        }
+      ]
+    },
+
+    "CHAT_SERVICE": {
+      "baseUrl": "/api/v1/chat",
+      "description": "Real-time chat service (WebSocket + REST)",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/rooms",
+          "description": "Get user's chat rooms",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "rooms": [
+                {
+                  "id": "string",
+                  "type": "DIRECT | GROUP",
+                  "participants": ["array"],
+                  "lastMessage": "object",
+                  "unreadCount": "number",
+                  "createdAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/rooms/:roomId",
+          "description": "Get room details",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "data": {
+              "room": "object"
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/rooms",
+          "description": "Create or get existing room",
+          "auth": "Private",
+          "requestBody": {
+            "participantId": "string (required for DIRECT)",
+            "type": "DIRECT | GROUP (default: DIRECT)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "room": "object"
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/:roomId/messages",
+          "description": "Get messages in a room",
+          "auth": "Private",
+          "queryParams": {
+            "limit": "number (default: 50)",
+            "before": "string - Message ID for pagination"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "messages": [
+                {
+                  "id": "string",
+                  "roomId": "string",
+                  "senderId": "string",
+                  "content": "string",
+                  "type": "TEXT | IMAGE | FILE",
+                  "createdAt": "ISO8601"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:roomId/messages",
+          "description": "Send message (REST fallback, prefer WebSocket)",
+          "auth": "Private",
+          "requestBody": {
+            "content": "string (required)",
+            "type": "TEXT | IMAGE | FILE (default: TEXT)"
+          },
+          "response": {
+            "success": true,
+            "data": {
+              "message": "object"
+            }
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/:roomId/read",
+          "description": "Mark room messages as read",
+          "auth": "Private",
+          "response": {
+            "success": true,
+            "message": "Messages marked as read"
+          }
+        }
+      ],
+      "websocket": {
+        "url": "wss://api.verifydev.com/ws",
+        "description": "Real-time chat WebSocket connection",
+        "events": {
+          "client_to_server": [
+            {
+              "event": "join_room",
+              "payload": {
+                "roomId": "string"
+              }
+            },
+            {
+              "event": "send_message",
+              "payload": {
+                "roomId": "string",
+                "content": "string",
+                "type": "TEXT | IMAGE | FILE"
+              }
+            },
+            {
+              "event": "typing_start",
+              "payload": {
+                "roomId": "string"
+              }
+            },
+            {
+              "event": "typing_stop",
+              "payload": {
+                "roomId": "string"
+              }
+            }
+          ],
+          "server_to_client": [
+            {
+              "event": "message",
+              "payload": {
+                "id": "string",
+                "roomId": "string",
+                "senderId": "string",
+                "content": "string",
+                "createdAt": "ISO8601"
+              }
+            },
+            {
+              "event": "user_typing",
+              "payload": {
+                "roomId": "string",
+                "userId": "string"
+              }
+            },
+            {
+              "event": "message_read",
+              "payload": {
+                "roomId": "string",
+                "messageIds": ["array"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+
+  "MISSING_APIS_FOR_COMPLETE_FRONTEND": {
+    "description": "APIs that should be added for a complete and production-ready frontend experience",
+    
+    "CRITICAL_MISSING": [
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "GET /api/v1/users/:username",
+        "description": "Get public user profile by username (for profile sharing)",
+        "priority": "HIGH",
+        "requestBody": null,
+        "response": {
+          "profile": "Public profile data"
+        }
+      },
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "POST /api/v1/users/me/avatar",
+        "description": "Upload profile avatar/picture",
+        "priority": "HIGH",
+        "requestBody": {
+          "file": "multipart/form-data - Image file"
+        },
+        "response": {
+          "avatarUrl": "string"
+        }
+      },
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "GET /api/v1/users/me/stats",
+        "description": "Get user dashboard stats (total projects, skills, aura trend)",
+        "priority": "HIGH",
+        "response": {
+          "stats": {
+            "totalProjects": "number",
+            "verifiedSkills": "number",
+            "auraScore": "number",
+            "auraTrend": "number (change %)",
+            "profileViews": "number",
+            "jobMatches": "number"
+          }
+        }
+      },
+      {
+        "service": "AUTH_SERVICE",
+        "endpoint": "POST /api/v1/auth/password/reset-request",
+        "description": "Request password reset email",
+        "priority": "HIGH",
+        "requestBody": {
+          "email": "string"
+        }
+      },
+      {
+        "service": "AUTH_SERVICE",
+        "endpoint": "POST /api/v1/auth/password/reset",
+        "description": "Reset password with token",
+        "priority": "HIGH",
+        "requestBody": {
+          "token": "string",
+          "newPassword": "string"
+        }
+      },
+      {
+        "service": "AUTH_SERVICE",
+        "endpoint": "PUT /api/v1/auth/password/change",
+        "description": "Change password (authenticated user)",
+        "priority": "HIGH",
+        "requestBody": {
+          "currentPassword": "string",
+          "newPassword": "string"
+        }
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "PUT /api/v1/jobs/:jobId",
+        "description": "Update job posting (recruiter)",
+        "priority": "HIGH",
+        "requestBody": "Same as create job"
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "DELETE /api/v1/jobs/:jobId",
+        "description": "Delete/close job posting (recruiter)",
+        "priority": "HIGH"
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "GET /api/v1/jobs/my-jobs",
+        "description": "Get recruiter's posted jobs",
+        "priority": "HIGH",
+        "auth": "Recruiter"
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "POST /api/v1/jobs/:jobId/save",
+        "description": "Save/bookmark a job",
+        "priority": "MEDIUM",
+        "auth": "Private"
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "GET /api/v1/jobs/saved",
+        "description": "Get saved/bookmarked jobs",
+        "priority": "MEDIUM",
+        "auth": "Private"
+      },
+      {
+        "service": "NOTIFICATION_SERVICE",
+        "endpoint": "GET /api/v1/notifications",
+        "description": "Get user notifications",
+        "priority": "HIGH",
+        "response": {
+          "notifications": [
+            {
+              "id": "string",
+              "type": "JOB_MATCH | APPLICATION_UPDATE | MESSAGE | INTERVIEW",
+              "title": "string",
+              "message": "string",
+              "isRead": "boolean",
+              "createdAt": "ISO8601"
+            }
+          ]
+        }
+      },
+      {
+        "service": "NOTIFICATION_SERVICE",
+        "endpoint": "PATCH /api/v1/notifications/:id/read",
+        "description": "Mark notification as read",
+        "priority": "HIGH"
+      },
+      {
+        "service": "NOTIFICATION_SERVICE",
+        "endpoint": "POST /api/v1/notifications/read-all",
+        "description": "Mark all notifications as read",
+        "priority": "MEDIUM"
+      },
+      {
+        "service": "ANALYTICS_SERVICE",
+        "endpoint": "GET /api/v1/analytics/profile-views",
+        "description": "Get profile view analytics",
+        "priority": "MEDIUM",
+        "response": {
+          "totalViews": "number",
+          "viewsThisWeek": "number",
+          "viewsThisMonth": "number",
+          "topViewers": ["array"]
+        }
+      },
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "POST /api/v1/users/me/delete-account",
+        "description": "Request account deletion",
+        "priority": "MEDIUM"
+      },
+      {
+        "service": "PROJECT_SERVICE",
+        "endpoint": "GET /api/v1/projects/:projectId/timeline",
+        "description": "Get project development timeline/commits",
+        "priority": "LOW",
+        "response": {
+          "timeline": [
+            {
+              "date": "ISO8601",
+              "commits": "number",
+              "linesAdded": "number",
+              "linesRemoved": "number"
+            }
+          ]
+        }
+      }
+    ],
+
+    "NICE_TO_HAVE": [
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "GET /api/v1/users/search",
+        "description": "Search for users (public profiles)",
+        "priority": "LOW"
+      },
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "POST /api/v1/users/:userId/follow",
+        "description": "Follow a user",
+        "priority": "LOW"
+      },
+      {
+        "service": "USER_SERVICE",
+        "endpoint": "GET /api/v1/users/me/followers",
+        "description": "Get user's followers",
+        "priority": "LOW"
+      },
+      {
+        "service": "PROJECT_SERVICE",
+        "endpoint": "POST /api/v1/projects/:projectId/share",
+        "description": "Generate shareable link for project",
+        "priority": "LOW"
+      },
+      {
+        "service": "SKILL_SERVICE",
+        "endpoint": "GET /api/v1/skills/trending",
+        "description": "Get trending skills in the platform",
+        "priority": "LOW"
+      },
+      {
+        "service": "ANALYTICS_SERVICE",
+        "endpoint": "GET /api/v1/analytics/aura-history",
+        "description": "Get aura score history/trend over time",
+        "priority": "LOW"
+      },
+      {
+        "service": "JOB_SERVICE",
+        "endpoint": "GET /api/v1/jobs/recommendations",
+        "description": "Get AI-powered job recommendations",
+        "priority": "MEDIUM"
+      },
+      {
+        "service": "FEEDBACK_SERVICE",
+        "endpoint": "POST /api/v1/feedback",
+        "description": "Submit user feedback/bug report",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "AUTHENTICATION": {
+    "description": "Authentication methods used across all services",
+    "methods": {
+      "Bearer_Token": {
+        "header": "Authorization: Bearer <accessToken>",
+        "description": "JWT token obtained from login/OAuth"
+      },
+      "Refresh_Token": {
+        "header": "Authorization: Bearer <refreshToken>",
+        "endpoint": "POST /api/v1/auth/refresh",
+        "description": "Used to obtain new access token"
+      }
+    },
+    "token_expiry": {
+      "accessToken": "15 minutes",
+      "refreshToken": "7 days"
+    }
+  },
+
+  "ERROR_RESPONSES": {
+    "format": {
+      "success": false,
+      "message": "string - Human readable error message",
+      "error": {
+        "code": "string - Error code (e.g., UNAUTHORIZED, VALIDATION_ERROR)",
+        "details": "object (optional) - Additional error details"
+      }
+    },
+    "common_errors": {
+      "401": {
+        "code": "UNAUTHORIZED",
+        "message": "Authentication required"
+      },
+      "403": {
+        "code": "FORBIDDEN",
+        "message": "Insufficient permissions"
+      },
+      "404": {
+        "code": "NOT_FOUND",
+        "message": "Resource not found"
+      },
+      "422": {
+        "code": "VALIDATION_ERROR",
+        "message": "Validation failed",
+        "details": "Zod validation errors"
+      },
+      "500": {
+        "code": "INTERNAL_ERROR",
+        "message": "Internal server error"
+      }
+    }
+  },
+
+  "PAGINATION": {
+    "description": "Standard pagination format for list endpoints",
+    "queryParams": {
+      "page": "number (default: 1)",
+      "limit": "number (default: 20, max: 100)"
+    },
+    "response": {
+      "data": "array of items",
+      "meta": {
+        "page": "number - Current page",
+        "limit": "number - Items per page",
+        "total": "number - Total items count",
+        "totalPages": "number (optional)"
+      }
+    }
+  },
+
+  "NOTES": {
+    "service_ports": {
+      "gateway": "80/443",
+      "auth-service": "3001",
+      "user-service": "3002",
+      "job-service": "3003",
+      "recruiter-service": "3004",
+      "chat-service": "3005",
+      "resume-service": "3006 (Go)",
+      "project-analyzer": "3007 (Go)"
+    },
+    "gateway_routes": {
+      "/api/v1/auth/*": "auth-service",
+      "/api/v1/users/*": "user-service",
+      "/api/v1/projects/*": "user-service",
+      "/api/v1/skills/*": "user-service",
+      "/api/v1/experiences/*": "user-service",
+      "/api/v1/jobs/*": "job-service",
+      "/api/v1/applications/*": "job-service",
+      "/api/v1/interviews/*": "job-service",
+      "/api/v1/messages/*": "job-service",
+      "/api/v1/recruiter/*": "recruiter-service",
+      "/api/v1/chat/*": "chat-service",
+      "/api/v1/resume/*": "resume-service"
+    },
+    "websocket": {
+      "chat": "wss://api.verifydev.com/ws - Real-time chat",
+      "notifications": "wss://api.verifydev.com/notifications - Real-time notifications (if implemented)"
+    }
+  }
+}

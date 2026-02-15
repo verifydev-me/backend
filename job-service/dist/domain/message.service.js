@@ -5,7 +5,7 @@ const client_js_1 = require("../prisma/client.js");
 class MessageService {
     // Send message
     async sendMessage(data) {
-        return await client_js_1.prisma.message.create({
+        return await client_js_1.prisma.legacyMessage.create({
             data: {
                 ...data,
                 isRead: false,
@@ -15,7 +15,7 @@ class MessageService {
     // Get inbox messages
     async getInbox(userId, isRecruiter = false) {
         const receiverType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
-        return await client_js_1.prisma.message.findMany({
+        return await client_js_1.prisma.legacyMessage.findMany({
             where: {
                 receiverId: userId,
                 receiverType,
@@ -26,7 +26,7 @@ class MessageService {
     // Get sent messages
     async getSentMessages(userId, isRecruiter = false) {
         const senderType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
-        return await client_js_1.prisma.message.findMany({
+        return await client_js_1.prisma.legacyMessage.findMany({
             where: {
                 senderId: userId,
                 senderType,
@@ -45,20 +45,20 @@ class MessageService {
         if (jobId) {
             where.jobId = jobId;
         }
-        return await client_js_1.prisma.message.findMany({
+        return await client_js_1.prisma.legacyMessage.findMany({
             where,
             orderBy: { sentAt: 'asc' },
         });
     }
     // Mark message as read
     async markAsRead(messageId, userId) {
-        const message = await client_js_1.prisma.message.findUnique({
+        const message = await client_js_1.prisma.legacyMessage.findUnique({
             where: { id: messageId },
         });
         if (!message || message.receiverId !== userId) {
             throw new Error('Message not found or unauthorized');
         }
-        return await client_js_1.prisma.message.update({
+        return await client_js_1.prisma.legacyMessage.update({
             where: { id: messageId },
             data: {
                 isRead: true,
@@ -69,7 +69,7 @@ class MessageService {
     // Mark all as read
     async markAllAsRead(userId, isRecruiter = false) {
         const receiverType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
-        const result = await client_js_1.prisma.message.updateMany({
+        const result = await client_js_1.prisma.legacyMessage.updateMany({
             where: {
                 receiverId: userId,
                 receiverType,
@@ -85,7 +85,7 @@ class MessageService {
     // Get unread count
     async getUnreadCount(userId, isRecruiter = false) {
         const receiverType = isRecruiter ? 'RECRUITER' : 'CANDIDATE';
-        return await client_js_1.prisma.message.count({
+        return await client_js_1.prisma.legacyMessage.count({
             where: {
                 receiverId: userId,
                 receiverType,
@@ -95,13 +95,13 @@ class MessageService {
     }
     // Delete message
     async deleteMessage(messageId, userId) {
-        const message = await client_js_1.prisma.message.findUnique({
+        const message = await client_js_1.prisma.legacyMessage.findUnique({
             where: { id: messageId },
         });
         if (!message || (message.senderId !== userId && message.receiverId !== userId)) {
             throw new Error('Message not found or unauthorized');
         }
-        await client_js_1.prisma.message.delete({
+        await client_js_1.prisma.legacyMessage.delete({
             where: { id: messageId },
         });
     }
@@ -114,7 +114,7 @@ class MessageService {
         if (!job) {
             throw new Error('Job not found or unauthorized');
         }
-        return await client_js_1.prisma.message.findMany({
+        return await client_js_1.prisma.legacyMessage.findMany({
             where: { jobId },
             orderBy: { sentAt: 'desc' },
         });
@@ -132,7 +132,7 @@ class MessageService {
         if (application.userId !== userId && application.job.recruiterId !== userId) {
             throw new Error('Unauthorized');
         }
-        return await client_js_1.prisma.message.findMany({
+        return await client_js_1.prisma.legacyMessage.findMany({
             where: { applicationId },
             orderBy: { sentAt: 'asc' },
         });

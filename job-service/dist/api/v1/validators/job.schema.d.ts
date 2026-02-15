@@ -2,20 +2,21 @@ import { z } from 'zod';
 export declare const createJobSchema: z.ZodObject<{
     title: z.ZodString;
     description: z.ZodString;
-    requirements: z.ZodDefault<z.ZodString>;
-    responsibilities: z.ZodDefault<z.ZodString>;
-    type: z.ZodEnum<["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "FREELANCE"]>;
-    level: z.ZodEnum<["ENTRY", "JUNIOR", "MID", "SENIOR", "LEAD", "PRINCIPAL"]>;
-    location: z.ZodString;
-    isRemote: z.ZodDefault<z.ZodBoolean>;
-    salaryMin: z.ZodOptional<z.ZodNumber>;
-    salaryMax: z.ZodOptional<z.ZodNumber>;
-    salaryCurrency: z.ZodDefault<z.ZodString>;
-    requiredSkills: z.ZodArray<z.ZodString, "many">;
+    requirements: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    responsibilities: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    type: z.ZodDefault<z.ZodEnum<["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "FREELANCE"]>>;
+    level: z.ZodDefault<z.ZodEnum<["ENTRY", "JUNIOR", "MID", "SENIOR", "LEAD", "PRINCIPAL"]>>;
+    category: z.ZodDefault<z.ZodOptional<z.ZodEnum<["FRONTEND", "BACKEND", "FULLSTACK", "MOBILE", "DEVOPS", "DATA_ENGINEERING", "MACHINE_LEARNING", "SECURITY", "DESIGN", "QA", "GENERAL"]>>>;
+    location: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    isRemote: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+    salaryMin: z.ZodNullable<z.ZodOptional<z.ZodNumber>>;
+    salaryMax: z.ZodNullable<z.ZodOptional<z.ZodNumber>>;
+    salaryCurrency: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    requiredSkills: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
     preferredSkills: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
-    minAuraScore: z.ZodDefault<z.ZodNumber>;
-    minCoreCount: z.ZodDefault<z.ZodNumber>;
-    expiresAt: z.ZodOptional<z.ZodString>;
+    minAuraScore: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    minCoreCount: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+    expiresAt: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     type: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE";
     level: "ENTRY" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "PRINCIPAL";
@@ -23,6 +24,7 @@ export declare const createJobSchema: z.ZodObject<{
     description: string;
     requirements: string;
     responsibilities: string;
+    category: "FRONTEND" | "BACKEND" | "FULLSTACK" | "MOBILE" | "DEVOPS" | "DATA_ENGINEERING" | "MACHINE_LEARNING" | "SECURITY" | "DESIGN" | "QA" | "GENERAL";
     location: string;
     isRemote: boolean;
     salaryCurrency: string;
@@ -30,30 +32,32 @@ export declare const createJobSchema: z.ZodObject<{
     preferredSkills: string[];
     minAuraScore: number;
     minCoreCount: number;
-    salaryMin?: number | undefined;
-    salaryMax?: number | undefined;
-    expiresAt?: string | undefined;
+    salaryMin?: number | null | undefined;
+    salaryMax?: number | null | undefined;
+    expiresAt?: string | null | undefined;
 }, {
-    type: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE";
-    level: "ENTRY" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "PRINCIPAL";
     title: string;
     description: string;
-    location: string;
-    requiredSkills: string[];
+    type?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE" | undefined;
+    level?: "ENTRY" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "PRINCIPAL" | undefined;
     requirements?: string | undefined;
     responsibilities?: string | undefined;
+    category?: "FRONTEND" | "BACKEND" | "FULLSTACK" | "MOBILE" | "DEVOPS" | "DATA_ENGINEERING" | "MACHINE_LEARNING" | "SECURITY" | "DESIGN" | "QA" | "GENERAL" | undefined;
+    location?: string | undefined;
     isRemote?: boolean | undefined;
-    salaryMin?: number | undefined;
-    salaryMax?: number | undefined;
+    salaryMin?: number | null | undefined;
+    salaryMax?: number | null | undefined;
     salaryCurrency?: string | undefined;
+    requiredSkills?: string[] | undefined;
     preferredSkills?: string[] | undefined;
     minAuraScore?: number | undefined;
     minCoreCount?: number | undefined;
-    expiresAt?: string | undefined;
+    expiresAt?: string | null | undefined;
 }>;
 export declare const jobFiltersSchema: z.ZodObject<{
     type: z.ZodOptional<z.ZodEnum<["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "FREELANCE"]>>;
     level: z.ZodOptional<z.ZodEnum<["ENTRY", "JUNIOR", "MID", "SENIOR", "LEAD", "PRINCIPAL"]>>;
+    category: z.ZodOptional<z.ZodEnum<["FRONTEND", "BACKEND", "FULLSTACK", "MOBILE", "DEVOPS", "DATA_ENGINEERING", "MACHINE_LEARNING", "SECURITY", "DESIGN", "QA", "GENERAL"]>>;
     isRemote: z.ZodOptional<z.ZodBoolean>;
     skills: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     minSalary: z.ZodOptional<z.ZodNumber>;
@@ -66,6 +70,7 @@ export declare const jobFiltersSchema: z.ZodObject<{
     limit: number;
     type?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE" | undefined;
     level?: "ENTRY" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "PRINCIPAL" | undefined;
+    category?: "FRONTEND" | "BACKEND" | "FULLSTACK" | "MOBILE" | "DEVOPS" | "DATA_ENGINEERING" | "MACHINE_LEARNING" | "SECURITY" | "DESIGN" | "QA" | "GENERAL" | undefined;
     location?: string | undefined;
     isRemote?: boolean | undefined;
     skills?: string[] | undefined;
@@ -74,6 +79,7 @@ export declare const jobFiltersSchema: z.ZodObject<{
 }, {
     type?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE" | undefined;
     level?: "ENTRY" | "JUNIOR" | "MID" | "SENIOR" | "LEAD" | "PRINCIPAL" | undefined;
+    category?: "FRONTEND" | "BACKEND" | "FULLSTACK" | "MOBILE" | "DEVOPS" | "DATA_ENGINEERING" | "MACHINE_LEARNING" | "SECURITY" | "DESIGN" | "QA" | "GENERAL" | undefined;
     location?: string | undefined;
     isRemote?: boolean | undefined;
     page?: number | undefined;
@@ -85,12 +91,36 @@ export declare const jobFiltersSchema: z.ZodObject<{
 export declare const applyJobSchema: z.ZodObject<{
     coverLetter: z.ZodOptional<z.ZodString>;
     resumeUrl: z.ZodOptional<z.ZodString>;
+    candidateName: z.ZodOptional<z.ZodString>;
+    candidateEmail: z.ZodOptional<z.ZodString>;
+    candidateAura: z.ZodOptional<z.ZodNumber>;
+    candidateCores: z.ZodOptional<z.ZodNumber>;
+    candidateSkills: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    candidateProjects: z.ZodOptional<z.ZodArray<z.ZodAny, "many">>;
+    candidateExperience: z.ZodOptional<z.ZodArray<z.ZodAny, "many">>;
+    candidateCertifications: z.ZodOptional<z.ZodArray<z.ZodAny, "many">>;
 }, "strip", z.ZodTypeAny, {
     coverLetter?: string | undefined;
     resumeUrl?: string | undefined;
+    candidateName?: string | undefined;
+    candidateEmail?: string | undefined;
+    candidateAura?: number | undefined;
+    candidateCores?: number | undefined;
+    candidateSkills?: string[] | undefined;
+    candidateProjects?: any[] | undefined;
+    candidateExperience?: any[] | undefined;
+    candidateCertifications?: any[] | undefined;
 }, {
     coverLetter?: string | undefined;
     resumeUrl?: string | undefined;
+    candidateName?: string | undefined;
+    candidateEmail?: string | undefined;
+    candidateAura?: number | undefined;
+    candidateCores?: number | undefined;
+    candidateSkills?: string[] | undefined;
+    candidateProjects?: any[] | undefined;
+    candidateExperience?: any[] | undefined;
+    candidateCertifications?: any[] | undefined;
 }>;
 export type CreateJobInput = z.infer<typeof createJobSchema>;
 export type JobFiltersInput = z.infer<typeof jobFiltersSchema>;

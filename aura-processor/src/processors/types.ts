@@ -54,6 +54,79 @@ export interface ProjectSignals {
   totalLines: number;
   analyzedAt: string;
   analysisVersion: string;
+
+  // Compact AI Payload
+  compactOutput?: CompactOutput;
+}
+
+// ============================================
+// COMPACT AI TYPES (Mirror of Go pkg/signals/compact_types.go)
+// ============================================
+
+export interface CompactOutput {
+  pid: string;
+  uid: string;
+  p: CompactProject;
+  s?: CompactSkill[];
+  a?: CompactArch;
+  sc?: CompactScores;
+  st?: CompactStack;
+  sg?: CompactSignals;
+}
+
+export interface CompactProject {
+  t: string;    // type
+  f: number;    // files
+  l: number;    // lines
+  pl: string;   // primary language
+  lg: CompactLang[];
+  sc: string;   // scale
+}
+
+export interface CompactLang {
+  n: string; // name
+  l: number; // lines
+  p: number; // percentage
+}
+
+export interface CompactSkill {
+  n: string;     // name
+  c: string;     // category
+  cf: number;    // confidence
+  d: string;     // depth
+  r: boolean;    // resume-ready
+  v: boolean;    // verified
+  e: string[];   // evidence
+  f?: number;    // file spread
+  p?: number;    // patterns used
+}
+
+export interface CompactArch {
+  t: string;     // type
+  p: string[];   // patterns
+  s: number;     // services
+}
+
+export interface CompactScores {
+  o?: number;               // overall
+  d?: Record<string, number>; // dimensions
+  t?: { s: number; l: string }; // trust
+  b?: number;               // bayesian
+  q?: string;               // quality tier
+  l?: string;               // level
+}
+
+export interface CompactStack {
+  d?: string[];    // detected
+  fw?: string[];   // frameworks
+  db?: string[];   // databases
+  do?: string[];   // devops
+}
+
+export interface CompactSignals {
+  str?: string[];  // strengths
+  rsk?: string[];  // risks
+  int?: string;    // intent
 }
 
 export interface LanguageStats {

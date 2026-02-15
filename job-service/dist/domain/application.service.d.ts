@@ -8,16 +8,22 @@ interface ApplicationWithMatch extends Application {
         verified: boolean;
         status: 'met' | 'partial' | 'missing';
     }[];
+    candidateSkills?: string[];
+    candidateExperience?: any[];
+    candidateProjects?: any[];
+    candidateAura?: number;
+    candidateName?: string;
 }
 export declare class ApplicationService {
     /**
      * Apply to a job
+     * Uses gRPC for user data fetching with HTTP fallback
      */
     apply(userId: string, jobId: string, data: ApplyJobDto): Promise<ApplicationWithMatch>;
     /**
      * Get user's applications
      */
-    getUserApplications(userId: string): Promise<ApplicationWithMatch[]>;
+    getUserApplications(userId: string, status?: ApplicationStatus): Promise<ApplicationWithMatch[]>;
     /**
      * Get applications for a job (recruiter view)
      */
@@ -30,6 +36,10 @@ export declare class ApplicationService {
      * Update application status (recruiter action)
      */
     updateStatus(applicationId: string, status: ApplicationStatus, notes?: string): Promise<ApplicationWithMatch | null>;
+    /**
+     * Add recruiter note
+     */
+    addNote(applicationId: string, note: string): Promise<ApplicationWithMatch | null>;
     /**
      * Withdraw application (user action)
      */

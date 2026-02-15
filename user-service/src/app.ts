@@ -1,5 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
+import cors from 'cors';
 
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
@@ -11,6 +12,8 @@ import onboardingRoutes from './api/v1/routes/onboarding.routes.js';
 import skillRoutes from './api/v1/routes/skill.routes.js';
 import internalRoutes from './api/v1/routes/internal.routes.js';
 import visibilityRoutes from './api/v1/routes/visibility.routes.js';
+import notificationRoutes from './api/v1/routes/notification.routes.js';
+import dashboardRoutes from './api/v1/routes/dashboard.routes.js';
 import { rabbitmqPublisher } from './rabbitmq/publisher.js';
 import type { ApiResponse } from './types/index.js';
 
@@ -22,11 +25,16 @@ rabbitmqPublisher.connect().catch((err) => {
 export function createApp(): Express {
   const app = express();
 
+  // CORS configuration
+  app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  }));
+
   // Security
   app.use(helmet());
-
-  // CORS removed - Gateway handles it
-  // Rate limiting removed - Gateway handles it
 
   // Body parsing
   app.use(express.json({ limit: '10kb' }));
@@ -52,6 +60,7 @@ export function createApp(): Express {
   });
 
   // Routes
+  app.use('/api/v1/dashboard', dashboardRoutes); // Comprehensive dashboard analytics
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/users/me/onboarding', onboardingRoutes); // Step 1.1: Onboarding routes
   app.use('/api/v1/skills', skillRoutes); // Step 1.2: Skill routes with protection
@@ -59,6 +68,7 @@ export function createApp(): Express {
   app.use('/api/v1/resume', resumeRoutes);
   app.use('/api/v1/experiences', experienceRoutes);
   app.use('/api/v1/visibility-settings', visibilityRoutes); // Phase 2: Visibility settings
+  app.use('/api/v1/notifications', notificationRoutes); // Notifications
   app.use('/api/internal', internalRoutes); // Internal API for inter-service communication
   // Public routes use the same router but different paths
   app.use('/api/v1', userRoutes);

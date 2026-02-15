@@ -613,6 +613,158 @@ export class JobController {
       res.status(500).json({ success: false, message: 'Failed to get applicants', error: { code: 'INTERNAL_ERROR' } });
     }
   }
+
+  /**
+   * PUT /jobs/:jobId
+   * Update a job (recruiter only)
+   */
+  static async updateJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+    try {
+      if (!req.user || !req.user.userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { jobId } = req.params;
+      const jobService = new JobService();
+      
+      const job = await jobService.getJobById(jobId);
+      if (!job) {
+        res.status(404).json({ success: false, message: 'Job not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      if (job.recruiterId !== req.user.userId) {
+        res.status(403).json({ success: false, message: 'Forbidden', error: { code: 'FORBIDDEN' } });
+        return;
+      }
+
+      const updatedJob = await jobService.updateJob(jobId, req.body);
+
+      res.json({
+        success: true,
+        message: 'Job updated successfully',
+        data: { job: updatedJob },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to update job');
+      res.status(500).json({ success: false, message: 'Failed to update job', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * DELETE /jobs/:jobId
+   * Delete/close a job (recruiter only)
+   */
+  static async deleteJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+    try {
+      if (!req.user || !req.user.userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { jobId } = req.params;
+      const jobService = new JobService();
+      
+      const job = await jobService.getJobById(jobId);
+      if (!job) {
+        res.status(404).json({ success: false, message: 'Job not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      if (job.recruiterId !== req.user.userId) {
+        res.status(403).json({ success: false, message: 'Forbidden', error: { code: 'FORBIDDEN' } });
+        return;
+      }
+
+      await jobService.deleteJob(jobId);
+
+      res.json({
+        success: true,
+        message: 'Job deleted successfully',
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to delete job');
+      res.status(500).json({ success: false, message: 'Failed to delete job', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /jobs/my-jobs
+   * Get recruiter's posted jobs
+   */
+  static async getMyJobs(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+    try {
+      if (!req.user || !req.user.userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const jobService = new JobService();
+      const jobs = await jobService.getRecruiterJobs(req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Jobs retrieved',
+        data: { jobs },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get my jobs');
+      res.status(500).json({ success: false, message: 'Failed to get jobs', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * POST /jobs/:jobId/save
+   * Toggle save/bookmark a job
+   */
+  static async toggleSaveJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+    try {
+      if (!req.user || !req.user.userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const { jobId } = req.params;
+      const jobService = new JobService();
+      
+      const result = await jobService.toggleSaveJob(req.user.userId, jobId);
+
+      res.json({
+        success: true,
+        message: result.saved ? 'Job saved' : 'Job unsaved',
+        data: { saved: result.saved },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to toggle save job');
+      res.status(500).json({ success: false, message: 'Failed to save job', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
+
+  /**
+   * GET /jobs/saved
+   * Get saved/bookmarked jobs
+   */
+  static async getSavedJobs(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+    try {
+      if (!req.user || !req.user.userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      const jobService = new JobService();
+      const jobs = await jobService.getSavedJobs(req.user.userId);
+
+      res.json({
+        success: true,
+        message: 'Saved jobs retrieved',
+        data: { jobs },
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get saved jobs');
+      res.status(500).json({ success: false, message: 'Failed to get saved jobs', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
 }
 
 export default JobController;

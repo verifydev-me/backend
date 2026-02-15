@@ -14,7 +14,7 @@ export class GitHubService {
   static getAuthorizationUrl(state: string): string {
     const params = new URLSearchParams({
       client_id: env.GITHUB_CLIENT_ID,
-      redirect_uri: env.GITHUB_CALLBACK_URL,
+      // redirect_uri: env.GITHUB_CALLBACK_URL, // Use default from GitHub App settings
       scope: 'read:user user:email',
       state,
       allow_signup: 'true',
@@ -34,7 +34,7 @@ export class GitHubService {
           client_id: env.GITHUB_CLIENT_ID,
           client_secret: env.GITHUB_CLIENT_SECRET,
           code,
-          redirect_uri: env.GITHUB_CALLBACK_URL,
+          // redirect_uri: env.GITHUB_CALLBACK_URL,
         },
         {
           headers: {

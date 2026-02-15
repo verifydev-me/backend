@@ -81,5 +81,30 @@ export declare class JobController {
      * Get all applicants for a specific job
      */
     static getJobApplicants(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
+    /**
+     * PUT /jobs/:jobId
+     * Update a job (recruiter only)
+     */
+    static updateJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
+    /**
+     * DELETE /jobs/:jobId
+     * Delete/close a job (recruiter only)
+     */
+    static deleteJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
+    /**
+     * GET /jobs/my-jobs
+     * Get recruiter's posted jobs
+     */
+    static getMyJobs(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
+    /**
+     * POST /jobs/:jobId/save
+     * Toggle save/bookmark a job
+     */
+    static toggleSaveJob(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
+    /**
+     * GET /jobs/saved
+     * Get saved/bookmarked jobs
+     */
+    static getSavedJobs(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void>;
 }
 export default JobController;

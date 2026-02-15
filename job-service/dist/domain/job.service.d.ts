@@ -43,16 +43,22 @@ export declare class JobService {
     /**
      * Get matched jobs for a user based on their skills
      */
-    getMatchedJobs(userId: string, userSkills: UserSkill[], auraScore: number): Promise<(Job & {
-        matchResult: MatchResult;
-    })[]>;
+    getMatchedJobs(userId: string, userSkills: UserSkill[], auraScore: number, page?: number, limit?: number): Promise<{
+        jobs: (Job & {
+            matchResult: MatchResult;
+        })[];
+        total: number;
+    }>;
     /**
      * Get recommended jobs based on user profile
-     * Fetches user data from user-service
+     * OPTIMIZED: Faster with caching and parallel processing
      */
-    getRecommendedJobs(userId: string): Promise<(Job & {
-        matchResult: MatchResult;
-    })[]>;
+    getRecommendedJobs(userId: string, page?: number, limit?: number): Promise<{
+        jobs: (Job & {
+            matchResult: MatchResult;
+        })[];
+        total: number;
+    }>;
     /**
      * Calculate skill match between user and job
      */
@@ -69,10 +75,6 @@ export declare class JobService {
      * Update job status
      */
     updateJobStatus(jobId: string, status: 'ACTIVE' | 'PAUSED' | 'CLOSED'): Promise<Job | null>;
-    /**
-     * Delete job
-     */
-    deleteJob(jobId: string): Promise<boolean>;
     /**
      * Search jobs with advanced filters
      */
@@ -98,5 +100,27 @@ export declare class JobService {
      * Seed demo jobs for development
      */
     seedDemoJobs(): Promise<void>;
+    /**
+     * Update a job
+     */
+    updateJob(jobId: string, updateData: Partial<CreateJobDto>): Promise<Job>;
+    /**
+     * Delete a job (soft delete by setting status to CLOSED)
+     */
+    deleteJob(jobId: string): Promise<void>;
+    /**
+     * Get recruiter's posted jobs
+     */
+    getRecruiterJobs(recruiterId: string): Promise<Job[]>;
+    /**
+     * Toggle save/bookmark a job
+     */
+    toggleSaveJob(userId: string, jobId: string): Promise<{
+        saved: boolean;
+    }>;
+    /**
+     * Get user's saved jobs
+     */
+    getSavedJobs(userId: string): Promise<Job[]>;
 }
 export default JobService;

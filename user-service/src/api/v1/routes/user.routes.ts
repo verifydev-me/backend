@@ -87,6 +87,13 @@ router.put('/settings', authenticate, UserController.updateSettings);
 router.get('/me/aura', authenticate, UserController.getMyAura);
 
 /**
+ * @route   GET /api/v1/users/me/stats
+ * @desc    Get dashboard stats for current user
+ * @access  Private
+ */
+router.get('/me/stats', authenticate, UserController.getMyStats);
+
+/**
  * @route   PUT /api/v1/users/me/leetcode
  * @desc    Connect LeetCode account
  * @access  Private

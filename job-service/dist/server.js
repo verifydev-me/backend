@@ -5,18 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const express_1 = __importDefault(require("express"));
-const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const env_js_1 = require("./config/env.js");
 const logger_js_1 = require("./utils/logger.js");
 const client_js_1 = require("./prisma/client.js");
 const index_js_1 = __importDefault(require("./api/v1/index.js"));
 const app = (0, express_1.default)();
 // Security
+app.set('trust proxy', 1); // Trust the Nginx gateway
 app.use((0, helmet_1.default)());
-app.use((0, cors_1.default)({ origin: env_js_1.env.ALLOWED_ORIGINS, credentials: true }));
-app.use((0, express_rate_limit_1.default)({ windowMs: 15 * 60 * 1000, max: 200 }));
+// app.use(cors({ origin: env.ALLOWED_ORIGINS, credentials: true })); // Gateway handles CORS
+// Rate limiting removed - Gateway handles it
 app.use(express_1.default.json());
 // Health check
 app.get('/health', (_req, res) => {

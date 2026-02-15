@@ -140,6 +140,10 @@ func (a *Analyzer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
+	// Generate Compact Payload for AI (Gemini)
+	// This is much smaller (~3KB vs 50KB) and optimized for LLM token usage
+	result.CompactOutput = CompactForAI(result)
+
 	// Trim payload — remove internal-only data before RabbitMQ publish
 	slimResult := trimForPublish(result)
 

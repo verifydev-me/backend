@@ -84,16 +84,18 @@ model User {
   githubAccessToken String?   @map("github_access_token")
 
   // ========== RELATIONS ==========
-  sessions     Session[]
-  skills       Skill[]
-  technologies Technology[]
-  projects     Project[]
-  experiences  Experience[]
-  socialLinks  SocialLink[]
-  activities   Activity[]
-  applications Application[]
-  savedJobs    SavedJob[]
-  jobAlerts    JobAlert[]
+  sessions      Session[]
+  skills        Skill[]
+  technologies  Technology[]
+  projects      Project[]
+  experiences   Experience[]
+  socialLinks   SocialLink[]
+  activities    Activity[]
+  applications  Application[]
+  savedJobs     SavedJob[]
+  jobAlerts     JobAlert[]
+  notifications Notification[]
+  auraScoreData AuraScore? // One-to-one relationship
 
   @@index([auraScore])
   @@index([isOpenToWork])
@@ -497,14 +499,16 @@ model ProjectAnalysis {
   infraDevOpsScore              Int?   @map("infra_devops_score")
   infraDevOpsConfidence         Float? @map("infra_devops_confidence")
 
-  // Verdict (from Go: pkg/verdict)
-  verdictSummary       String?          @map("dimensional_verdict_summary")
-  experienceLevel      ExperienceLevel? @map("experience_level")
-  experienceYearRange  String?          @map("experience_year_range")
-  experienceConfidence Float?           @map("experience_confidence")
-  verdictStrengths     String[]         @default([]) @map("dimensional_strengths")
-  verdictGrowthAreas   String[]         @default([]) @map("dimensional_growth_areas")
-  verdictJustification String?          @map("verdict_justification")
+  // ========== AI VERDICT (Gemini) ==========
+  aiVerdictTitle       String?  @map("ai_verdict_title")
+  aiVerdictSummary     String?  @map("ai_verdict_summary")
+  aiVerdictStrengths   String[] @default([]) @map("ai_verdict_strengths")
+  aiVerdictWeaknesses  String[] @default([]) @map("ai_verdict_weaknesses")
+  aiHireRecommendation String?  @map("ai_hire_recommendation") // STRONG_HIRE, HIRE, MAYBE, NO
+  aiRiskScore          Int?     @map("ai_risk_score")
+  aiRiskAnalysis       String?  @map("ai_risk_analysis")
+  aiSkillsNarrative    String?  @map("ai_skills_narrative")
+  aiInterviewQuestions String[] @default([]) @map("ai_interview_questions")
 
   // Trust Analysis (from Go: pkg/trust)
   trustLevel        TrustLevel?  @map("trust_level")
@@ -529,7 +533,6 @@ model ProjectAnalysis {
   @@index([architectureType])
   @@index([engineeringLevel])
   @@index([analyzedAt])
-  @@index([experienceLevel])
   @@index([trustLevel])
   @@map("project_analyses")
 }
@@ -673,20 +676,17 @@ model JobMatchResult {
   confidence Float       @default(0) // 0-1
 
   // Dimension Match Breakdown
-  dimFundamentalsFit Float    @default(0) @map("dim_fundamentals_fit")
-  dimEngineeringFit  Float    @default(0) @map("dim_engineering_fit")
-  dimProductionFit   Float    @default(0) @map("dim_production_fit")
-  dimTestingFit      Float    @default(0) @map("dim_testing_fit")
-  dimArchitectureFit Float    @default(0) @map("dim_architecture_fit")
-  dimInfraFit        Float    @default(0) @map("dim_infra_fit")
-  missingRequired    String[] @default([]) @map("missing_required")
-
-  // Skill Match
-  mustHaveMatched Int      @default(0) @map("must_have_matched")
-  mustHaveTotal   Int      @default(0) @map("must_have_total")
-  mustHaveScore   Float    @default(0) @map("must_have_score")
-  missingMustHave String[] @default([]) @map("missing_must_have")
-  bonusSkills     String[] @default([]) @map("bonus_skills")
+  dimFundamentalsFit   Float    @default(0) @map("dim_fundamentals_fit")
+  dimEngineeringFit    Float // ========== AI VERDICT (Gemini) ==========
+  aiVerdictTitle       String?  @map("ai_verdict_title")
+  aiVerdictSummary     String?  @map("ai_verdict_summary")
+  aiVerdictStrengths   String[] @default([]) @map("ai_verdict_strengths")
+  aiVerdictWeaknesses  String[] @default([]) @map("ai_verdict_weaknesses")
+  aiHireRecommendation String?  @map("ai_hire_recommendation") // STRONG_HIRE, HIRE, MAYBE, NO
+  aiRiskScore          Int?     @map("ai_risk_score")
+  aiRiskAnalysis       String?  @map("ai_risk_analysis")
+  aiSkillsNarrative    String?  @map("ai_skills_narrative")
+  aiInterviewQuestions String[] @default([]) @map("ai_interview_questions")
 
   // Level Match
   candidateLevel String? @map("candidate_level")
@@ -958,6 +958,10 @@ model Application {
   userId String @map("user_id") @db.ObjectId
   jobId  String @map("job_id")
 
+  // Job Information (denormalized for easier dashboard queries)
+  companyName String @map("company_name")
+  role        String
+
   // Application Details
   coverLetter String? @map("cover_letter")
   resumeUrl   String? @map("resume_url")
@@ -998,8 +1002,10 @@ enum ApplicationStatus {
   PENDING
   REVIEWING
   SHORTLISTED
+  INTERVIEW // Changed from INTERVIEW_SCHEDULED for consistency
   INTERVIEW_SCHEDULED
   INTERVIEW_COMPLETED
+  OFFER // Added for offers
   OFFER_EXTENDED
   OFFER_ACCEPTED
   REJECTED
@@ -1057,4 +1063,94 @@ model JobAlert {
   @@index([userId])
   @@index([isActive])
   @@map("job_alerts")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @map("user_id") @db.ObjectId
+
+  // Notification Content
+  type    NotificationType
+  title   String
+  message String
+  link    String? // Optional link to relevant resource
+
+  // Metadata
+  metadata Json? // Additional data (jobId, applicationId, etc.)
+
+  // Status
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  JOB_MATCH
+  APPLICATION_UPDATE
+  INTERVIEW_SCHEDULED
+  MESSAGE_RECEIVED
+  PROFILE_VIEW
+  PROJECT_ANALYZED
+  AURA_UPDATE
+  SYSTEM
+}
+
+// ==================== AURA SCORE TRACKING ====================
+
+model AuraScore {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @map("user_id") @db.ObjectId
+
+  // Total score
+  totalScore Int @default(0) @map("total_score")
+
+  // Breakdown by category
+  profileScore   Int @default(0) @map("profile_score")
+  projectScore   Int @default(0) @map("project_score")
+  skillScore     Int @default(0) @map("skill_score")
+  activityScore  Int @default(0) @map("activity_score")
+  githubScore    Int @default(0) @map("github_score")
+  communityScore Int @default(0) @map("community_score")
+
+  // Trend tracking
+  monthlyChange Int @default(0) @map("monthly_change") // +/- change in last 30 days
+  loginStreak   Int @default(0) @map("login_streak") // Consecutive days
+
+  // Timestamps
+  lastCalculated DateTime @default(now()) @map("last_calculated")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gainHistory AuraGainHistory[]
+
+  @@index([totalScore])
+  @@map("aura_scores")
+}
+
+model AuraGainHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  auraScoreId String   @map("aura_score_id") @db.ObjectId
+  type        String // 'PROJECT_ANALYZED' | 'SKILL_VERIFIED' | 'GITHUB_ACTIVITY' | 'LOGIN' | 'PROFILE_UPDATE'
+  points      Int
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  auraScore AuraScore @relation(fields: [auraScoreId], references: [id], onDelete: Cascade)
+
+  @@index([auraScoreId])
+  @@index([createdAt])
+  @@map("aura_gain_history")
 }

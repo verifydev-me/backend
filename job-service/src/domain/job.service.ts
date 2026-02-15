@@ -237,10 +237,7 @@ export class JobService {
    * Get recommended jobs based on user profile
    * OPTIMIZED: Faster with caching and parallel processing
    */
-  /**
-   * Get recommended jobs based on user profile
-   * OPTIMIZED: Faster with caching and parallel processing
-   */
+
   async getRecommendedJobs(
     userId: string, 
     page: number = 1, 
@@ -415,19 +412,7 @@ export class JobService {
     return transformJob(job);
   }
 
-  /**
-   * Delete job
-   */
-  async deleteJob(jobId: string): Promise<boolean> {
-    logger.info({ jobId }, 'Deleting job');
-    
-    try {
-      await prisma.job.delete({ where: { id: jobId } });
-      return true;
-    } catch {
-      return false;
-    }
-  }
+
 
   /**
    * Search jobs with advanced filters
@@ -636,6 +621,98 @@ export class JobService {
     }
 
     logger.info(`Seeded ${demoJobs.length} demo jobs`);
+  }
+
+  /**
+   * Update a job
+   */
+  async updateJob(jobId: string, updateData: Partial<CreateJobDto>): Promise<Job> {
+    const updatedJob = await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
+    });
+
+    return transformJob(updatedJob);
+  }
+
+  /**
+   * Delete a job (soft delete by setting status to CLOSED)
+   */
+  async deleteJob(jobId: string): Promise<void> {
+    await prisma.job.update({
+      where: { id: jobId },
+      data: { 
+        status: 'CLOSED',
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Get recruiter's posted jobs
+   */
+  async getRecruiterJobs(recruiterId: string): Promise<Job[]> {
+    const jobs = await prisma.job.findMany({
+      where: { recruiterId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return jobs.map(transformJob);
+  }
+
+  /**
+   * Toggle save/bookmark a job
+   */
+  async toggleSaveJob(userId: string, jobId: string): Promise<{ saved: boolean }> {
+    // Check if already saved
+    const existing = await prisma.savedJob.findUnique({
+      where: {
+        userId_jobId: {
+          userId,
+          jobId,
+        },
+      },
+    });
+
+    if (existing) {
+      // Unsave
+      await prisma.savedJob.delete({
+        where: {
+          userId_jobId: {
+            userId,
+            jobId,
+          },
+        },
+      });
+      return { saved: false };
+    } else {
+      // Save
+      await prisma.savedJob.create({
+        data: {
+          userId,
+          jobId,
+        },
+      });
+      return { saved: true };
+    }
+  }
+
+  /**
+   * Get user's saved jobs
+   */
+  async getSavedJobs(userId: string): Promise<Job[]> {
+    const savedJobs = await prisma.savedJob.findMany({
+      where: { userId },
+      include: {
+        job: true,
+      },
+      orderBy: { savedAt: 'desc' },
+    });
+
+    return savedJobs.map(saved => transformJob(saved.job));
   }
 }
 

@@ -29,11 +29,15 @@ class JobController {
             }
             // Create job with recruiter ID from authenticated user
             const jobService = new job_service_js_1.JobService();
-            const job = await jobService.createJob({
+            const jobData = {
                 ...validation.data,
                 recruiterId: req.user.userId,
                 expiresAt: validation.data.expiresAt ? new Date(validation.data.expiresAt) : undefined,
-            });
+                // Convert null to undefined for optional number fields
+                salaryMin: validation.data.salaryMin ?? undefined,
+                salaryMax: validation.data.salaryMax ?? undefined,
+            };
+            const job = await jobService.createJob(jobData);
             res.status(201).json({
                 success: true,
                 message: 'Job posted successfully! 🎉',
@@ -57,7 +61,13 @@ class JobController {
      */
     static async listJobs(req, res) {
         try {
-            const result = job_schema_js_1.jobFiltersSchema.safeParse(req.query);
+            // Parse query parameters (URL query params are always strings)
+            const queryParams = {
+                ...req.query,
+                page: req.query.page ? parseInt(req.query.page, 10) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
+            };
+            const result = job_schema_js_1.jobFiltersSchema.safeParse(queryParams);
             if (!result.success) {
                 res.status(400).json({
                     success: false,
@@ -194,14 +204,17 @@ class JobController {
                 return;
             }
             // Fetch user's matched jobs directly (service handles user data fetching)
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 20;
             const jobService = new job_service_js_1.JobService();
-            const jobs = await jobService.getRecommendedJobs(req.user.userId);
+            const result = await jobService.getRecommendedJobs(req.user.userId, page, limit);
             res.json({
                 success: true,
                 message: 'Matched jobs retrieved',
                 data: {
-                    jobs,
-                    totalMatched: jobs.length,
+                    jobs: result.jobs,
+                    totalMatched: result.total,
+                    meta: { page, limit, total: result.total }
                 },
             });
         }
@@ -530,6 +543,141 @@ class JobController {
         catch (error) {
             logger_js_1.logger.error({ error }, 'Failed to get applicants');
             res.status(500).json({ success: false, message: 'Failed to get applicants', error: { code: 'INTERNAL_ERROR' } });
+        }
+    }
+    /**
+     * PUT /jobs/:jobId
+     * Update a job (recruiter only)
+     */
+    static async updateJob(req, res) {
+        try {
+            if (!req.user || !req.user.userId) {
+                res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+                return;
+            }
+            const { jobId } = req.params;
+            const jobService = new job_service_js_1.JobService();
+            const job = await jobService.getJobById(jobId);
+            if (!job) {
+                res.status(404).json({ success: false, message: 'Job not found', error: { code: 'NOT_FOUND' } });
+                return;
+            }
+            if (job.recruiterId !== req.user.userId) {
+                res.status(403).json({ success: false, message: 'Forbidden', error: { code: 'FORBIDDEN' } });
+                return;
+            }
+            const updatedJob = await jobService.updateJob(jobId, req.body);
+            res.json({
+                success: true,
+                message: 'Job updated successfully',
+                data: { job: updatedJob },
+            });
+        }
+        catch (error) {
+            logger_js_1.logger.error({ error }, 'Failed to update job');
+            res.status(500).json({ success: false, message: 'Failed to update job', error: { code: 'INTERNAL_ERROR' } });
+        }
+    }
+    /**
+     * DELETE /jobs/:jobId
+     * Delete/close a job (recruiter only)
+     */
+    static async deleteJob(req, res) {
+        try {
+            if (!req.user || !req.user.userId) {
+                res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+                return;
+            }
+            const { jobId } = req.params;
+            const jobService = new job_service_js_1.JobService();
+            const job = await jobService.getJobById(jobId);
+            if (!job) {
+                res.status(404).json({ success: false, message: 'Job not found', error: { code: 'NOT_FOUND' } });
+                return;
+            }
+            if (job.recruiterId !== req.user.userId) {
+                res.status(403).json({ success: false, message: 'Forbidden', error: { code: 'FORBIDDEN' } });
+                return;
+            }
+            await jobService.deleteJob(jobId);
+            res.json({
+                success: true,
+                message: 'Job deleted successfully',
+            });
+        }
+        catch (error) {
+            logger_js_1.logger.error({ error }, 'Failed to delete job');
+            res.status(500).json({ success: false, message: 'Failed to delete job', error: { code: 'INTERNAL_ERROR' } });
+        }
+    }
+    /**
+     * GET /jobs/my-jobs
+     * Get recruiter's posted jobs
+     */
+    static async getMyJobs(req, res) {
+        try {
+            if (!req.user || !req.user.userId) {
+                res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+                return;
+            }
+            const jobService = new job_service_js_1.JobService();
+            const jobs = await jobService.getRecruiterJobs(req.user.userId);
+            res.json({
+                success: true,
+                message: 'Jobs retrieved',
+                data: { jobs },
+            });
+        }
+        catch (error) {
+            logger_js_1.logger.error({ error }, 'Failed to get my jobs');
+            res.status(500).json({ success: false, message: 'Failed to get jobs', error: { code: 'INTERNAL_ERROR' } });
+        }
+    }
+    /**
+     * POST /jobs/:jobId/save
+     * Toggle save/bookmark a job
+     */
+    static async toggleSaveJob(req, res) {
+        try {
+            if (!req.user || !req.user.userId) {
+                res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+                return;
+            }
+            const { jobId } = req.params;
+            const jobService = new job_service_js_1.JobService();
+            const result = await jobService.toggleSaveJob(req.user.userId, jobId);
+            res.json({
+                success: true,
+                message: result.saved ? 'Job saved' : 'Job unsaved',
+                data: { saved: result.saved },
+            });
+        }
+        catch (error) {
+            logger_js_1.logger.error({ error }, 'Failed to toggle save job');
+            res.status(500).json({ success: false, message: 'Failed to save job', error: { code: 'INTERNAL_ERROR' } });
+        }
+    }
+    /**
+     * GET /jobs/saved
+     * Get saved/bookmarked jobs
+     */
+    static async getSavedJobs(req, res) {
+        try {
+            if (!req.user || !req.user.userId) {
+                res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+                return;
+            }
+            const jobService = new job_service_js_1.JobService();
+            const jobs = await jobService.getSavedJobs(req.user.userId);
+            res.json({
+                success: true,
+                message: 'Saved jobs retrieved',
+                data: { jobs },
+            });
+        }
+        catch (error) {
+            logger_js_1.logger.error({ error }, 'Failed to get saved jobs');
+            res.status(500).json({ success: false, message: 'Failed to get saved jobs', error: { code: 'INTERNAL_ERROR' } });
         }
     }
 }

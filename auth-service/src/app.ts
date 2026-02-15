@@ -1,6 +1,8 @@
 import express, { Express } from 'express';
 import helmet from 'helmet';
+import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { generalRateLimiter } from './middlewares/rateLimit.js';
@@ -12,9 +14,16 @@ import otpRoutes from './api/v1/routes/otp.routes.js';
 export function createApp(): Express {
   const app = express();
 
+  // CORS configuration
+  app.use(cors({
+    origin: env.ALLOWED_ORIGINS,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  }));
+
   // Security middleware
   app.use(helmet());
-
   // General rate limiting (100 req/min per IP)
   app.use(generalRateLimiter);
 

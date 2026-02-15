@@ -5,18 +5,74 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const message_service_js_1 = require("../../domain/message.service.js");
+const authenticate_js_1 = require("../../middlewares/authenticate.js");
 const messageService = new message_service_js_1.MessageService();
 const router = express_1.default.Router();
+// Apply authentication to all message routes
+router.use(authenticate_js_1.authenticate);
 // Send message
 router.post('/', async (req, res, next) => {
     try {
         const isRecruiter = req.user.role === 'recruiter';
+        // Determine receiver ID and Type
+        // Support both generic receiverId and specific candidateId/recruiterId
+        const receiverId = req.body.receiverId || (isRecruiter ? req.body.candidateId : req.body.recruiterId);
+        if (!receiverId) {
+            return res.status(400).json({ success: false, message: 'Receiver ID is required' });
+        }
+        const receiverType = isRecruiter ? 'CANDIDATE' : 'RECRUITER';
+        // Map content from body if needed (legacy frontend support)
+        const content = req.body.content || req.body.body;
+        if (!content) {
+            return res.status(400).json({ success: false, message: 'Message content is required' });
+        }
         const message = await messageService.sendMessage({
-            ...req.body,
             senderId: req.user.userId,
             senderType: isRecruiter ? 'RECRUITER' : 'CANDIDATE',
+            senderName: req.body.senderName,
+            receiverId,
+            receiverType,
+            receiverName: req.body.receiverName || req.body.candidateName,
+            content,
+            subject: req.body.subject,
+            jobId: req.body.jobId,
+            applicationId: req.body.applicationId,
+            attachments: req.body.attachments,
         });
         res.status(201).json({ success: true, data: message });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Send bulk message to multiple receivers
+router.post('/bulk', async (req, res, next) => {
+    try {
+        const isRecruiter = req.user.role === 'recruiter';
+        if (!isRecruiter) {
+            return res.status(403).json({ success: false, message: 'Only recruiters can send bulk messages' });
+        }
+        const { receiverIds, subject, content } = req.body;
+        if (!Array.isArray(receiverIds) || receiverIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'receiverIds array is required' });
+        }
+        if (!content) {
+            return res.status(400).json({ success: false, message: 'Message content is required' });
+        }
+        const results = await Promise.all(receiverIds.map(receiverId => messageService.sendMessage({
+            senderId: req.user.userId,
+            senderType: 'RECRUITER',
+            senderName: req.body.senderName,
+            receiverId,
+            receiverType: 'CANDIDATE',
+            content,
+            subject,
+            jobId: req.body.jobId,
+        })));
+        res.status(201).json({
+            success: true,
+            data: { sentCount: results.length, messages: results }
+        });
     }
     catch (error) {
         next(error);

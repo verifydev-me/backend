@@ -38,6 +38,9 @@ func trimForPublish(full *signals.ProjectSignals) *signals.ProjectSignals {
 	slim.GitForensics = nil
 	slim.AuthorshipVerdict = nil
 
+	// Preserve CompactOutput (it's already there via shallow copy, but let's be explicit)
+	// slim.CompactOutput = full.CompactOutput
+
 	// 1. Drop ASTDeepAnalysis — internal engine data, aura-processor never reads it
 	slim.ASTDeepAnalysis = nil
 

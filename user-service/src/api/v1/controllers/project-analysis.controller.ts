@@ -415,15 +415,15 @@ export class ProjectAnalysisController {
 
       // Build verdict from stored data
       const verdict = {
-        summary: analysis.verdictSummary ?? '',
+        summary: analysis.aiVerdictSummary || (analysis as any).verdictSummary || '',
         experience: {
-          level: analysis.experienceLevel ?? 'JUNIOR',
-          yearRange: analysis.experienceYearRange ?? '0-1 years',
-          confidence: analysis.experienceConfidence ?? 0.5,
+          level: (analysis as any).experienceLevel || 'UNKNOWN',
+          yearRange: (analysis as any).experienceYearRange || 'Unknown',
+          confidence: (analysis as any).experienceConfidence || 0.5,
         },
-        strengths: analysis.verdictStrengths ?? [],
-        growthAreas: analysis.verdictGrowthAreas ?? [],
-        justification: analysis.verdictJustification ?? '',
+        strengths: analysis.aiVerdictStrengths || (analysis as any).verdictStrengths || [],
+        growthAreas: analysis.aiVerdictWeaknesses || (analysis as any).verdictGrowthAreas || [],
+        justification: analysis.aiRiskAnalysis || (analysis as any).verdictJustification || '',
       };
 
       // Build trust analysis from stored data
@@ -447,7 +447,7 @@ export class ProjectAnalysisController {
       const quickStats = {
         overallScore: project.overallScore ?? 0,
         topDimension: getTopDimension(dimensionMatrix),
-        experienceLevel: analysis.experienceLevel ?? 'JUNIOR',
+        experienceLevel: (analysis as any).experienceLevel || 'UNKNOWN',
         trustLevel: analysis.trustLevel ?? 'MEDIUM',
         skillCount: analysis.verifiedSkills.length,
       };
@@ -510,7 +510,6 @@ export class ProjectAnalysisController {
               architectureConfidence: true,
               infraDevOpsScore: true,
               infraDevOpsConfidence: true,
-              experienceLevel: true,
               trustLevel: true,
               trustScore: true,
             },
@@ -541,11 +540,10 @@ export class ProjectAnalysisController {
         infraDevOps: weightedAverage(analyzedProjects, 'infraDevOpsScore', 'infraDevOpsConfidence'),
       };
 
-      // Determine overall experience level (majority voting)
-      const experienceLevels = analyzedProjects
-        .map(p => p.analysis?.experienceLevel)
-        .filter(Boolean);
-      const overallExperience = mostCommon(experienceLevels as string[]) ?? 'JUNIOR';
+      // Determine overall experience level (majority voting) - DEPRECATED (using default)
+      // const experienceLevels = analyzedProjects.map(p => (p.analysis as any).experienceLevel).filter(Boolean);
+      // const overallExperience = mostCommon(experienceLevels as string[]) ?? 'UNKNOWN';
+      const overallExperience = 'UNKNOWN';
 
       // Calculate overall trust
       const trustScores = analyzedProjects
@@ -632,18 +630,4 @@ function weightedAverage(
   return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
 }
 
-function mostCommon(arr: string[]): string | undefined {
-  const counts = new Map<string, number>();
-  for (const item of arr) {
-    counts.set(item, (counts.get(item) ?? 0) + 1);
-  }
-  let maxCount = 0;
-  let result: string | undefined;
-  for (const [item, count] of counts) {
-    if (count > maxCount) {
-      maxCount = count;
-      result = item;
-    }
-  }
-  return result;
-}
+

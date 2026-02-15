@@ -652,6 +652,77 @@ export class UserController {
       res.status(500).json({ success: false, message: 'Failed to get GitHub stats', error: { code: 'INTERNAL_ERROR' } });
     }
   }
+
+  /**
+   * GET /users/me/stats
+   * Get dashboard stats for current user
+   */
+  static async getMyStats(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: { code: 'UNAUTHORIZED' } });
+        return;
+      }
+
+      // Fetch user data with counts
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        include: {
+          _count: {
+            select: {
+              projects: true,
+              skills: { where: { source: 'ANALYSIS' } },
+              experiences: true,
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found', error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      // Get aura history for trend calculation (last 2 records)
+      // TODO: Implement AuraHistory model or use Activity to calculate trend
+      /*
+      const auraHistory = await prisma.auraHistory.findMany({
+        where: { userId: req.user.userId },
+        orderBy: { createdAt: 'desc' },
+        take: 2,
+        select: { score: true, createdAt: true }
+      });
+
+      const auraTrend = auraHistory.length === 2 
+        ? ((auraHistory[0].score - auraHistory[1].score) / auraHistory[1].score) * 100 
+        : 0;
+      */
+      const auraTrend = 0;
+
+      res.json({
+        success: true,
+        message: 'Stats retrieved',
+        data: {
+          stats: {
+            totalProjects: user._count.projects,
+            verifiedSkills: user._count.skills,
+            totalExperiences: user._count.experiences,
+            auraScore: user.auraScore,
+            coreCount: user.coreCount,
+            auraTrend: Math.round(auraTrend * 10) / 10, // Round to 1 decimal
+            profileViews: 0, // TODO: Implement profile views tracking
+            jobMatches: 0, // TODO: Fetch from job service
+          }
+        }
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get user stats');
+      res.status(500).json({ success: false, message: 'Failed to get stats', error: { code: 'INTERNAL_ERROR' } });
+    }
+  }
 }
 
 

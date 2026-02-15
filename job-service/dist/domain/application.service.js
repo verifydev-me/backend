@@ -8,6 +8,7 @@ const logger_js_1 = require("../utils/logger.js");
 const client_js_1 = require("../prisma/client.js");
 const axios_1 = __importDefault(require("axios"));
 const job_service_js_1 = require("./job.service.js");
+const user_client_js_1 = require("../grpc/user-client.js");
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -21,6 +22,7 @@ function transformPrismaJobToJob(prismaJob) {
         responsibilities: prismaJob.responsibilities,
         type: prismaJob.type,
         level: prismaJob.level,
+        category: prismaJob.category,
         location: prismaJob.location,
         isRemote: prismaJob.isRemote,
         salaryMin: prismaJob.salaryMin || undefined,
@@ -48,9 +50,14 @@ function transformApplication(app, prismaJob) {
         resumeUrl: app.resumeUrl || undefined,
         status: app.status,
         matchScore: app.matchScore ?? 0,
-        matchBreakdown: [], // Would be calculated from skillMatchScore and auraMatchScore
+        matchBreakdown: app.matchBreakdown ? app.matchBreakdown : [],
         appliedAt: app.appliedAt,
         reviewedAt: app.reviewedAt || undefined,
+        candidateSkills: app.candidateSkills,
+        candidateExperience: app.candidateExperience,
+        candidateProjects: app.candidateProjects,
+        candidateAura: app.candidateAura,
+        candidateName: app.candidateName,
     };
 }
 // ============================================
@@ -59,6 +66,7 @@ function transformApplication(app, prismaJob) {
 class ApplicationService {
     /**
      * Apply to a job
+     * Uses gRPC for user data fetching with HTTP fallback
      */
     async apply(userId, jobId, data) {
         logger_js_1.logger.info({ userId, jobId }, 'User applying to job');
@@ -84,23 +92,64 @@ class ApplicationService {
         // Get user skills and calculate match
         let matchScore = 50;
         let matchBreakdown = [];
+        let userSkills = [];
+        let userAura = 0;
+        // Try gRPC first for user data
         try {
-            const userDataResponse = await axios_1.default.get(`http://user-service:3002/api/v1/users/${userId}/skills-summary`, { timeout: 5000 });
-            const userData = userDataResponse.data.data;
-            const userSkills = userData?.skills || [];
-            const userAura = userData?.auraScore || 0;
-            // Simple match calculation
-            const skillMatches = (job.requiredSkills || []).filter(reqSkill => userSkills.some(us => us.name.toLowerCase() === reqSkill.toLowerCase()));
+            const grpcUser = await (0, user_client_js_1.getUserProfile)(userId, {
+                includeSkills: true,
+                includeProjects: true,
+            });
+            if (grpcUser) {
+                userSkills = (grpcUser.skills || []).map((s) => ({
+                    name: s.name,
+                    score: s.confidence_score || 0.8,
+                    isVerified: s.verified || false,
+                }));
+                userAura = grpcUser.aura_score || 0;
+                logger_js_1.logger.debug({ userId, skillCount: userSkills.length }, 'Fetched user skills via gRPC');
+            }
+        }
+        catch (grpcError) {
+            logger_js_1.logger.warn({ error: grpcError, userId }, 'gRPC failed, falling back to HTTP');
+            // Fallback to HTTP
+            try {
+                const userDataResponse = await axios_1.default.get(`http://user-service:3002/api/v1/users/${userId}/skills-summary`, { timeout: 5000 });
+                const userData = userDataResponse.data.data;
+                userSkills = userData?.skills || [];
+                userAura = userData?.auraScore || 0;
+            }
+            catch (httpError) {
+                logger_js_1.logger.warn({ error: httpError, userId }, 'HTTP fallback also failed');
+            }
+        }
+        // Calculate skill matches and scores
+        if (userSkills.length > 0) {
+            const skillMatches = userSkills.filter(us => (job.requiredSkills || []).some(reqSkill => us.name.toLowerCase() === reqSkill.toLowerCase()));
             const skillScore = job.requiredSkills.length > 0
                 ? (skillMatches.length / job.requiredSkills.length) * 100
                 : 50;
             const auraScore = job.minAuraScore > 0
                 ? Math.min(100, (userAura / job.minAuraScore) * 100)
                 : 100;
+            const matchResult = {
+                skills: {
+                    score: skillScore,
+                    weight: 70,
+                    matched: skillMatches.map(s => s.name),
+                    missing: (job.requiredSkills || []).filter(req => !userSkills.some(us => us.name.toLowerCase() === req.toLowerCase()))
+                },
+                aura: {
+                    score: auraScore,
+                    weight: 30,
+                    candidateScore: userAura,
+                    requiredScore: job.minAuraScore
+                },
+                experience: { score: 0, weight: 0, candidateYears: 0, requiredYears: 0 },
+                location: { score: 0, weight: 0, isMatch: false }
+            };
             matchScore = Math.round(skillScore * 0.7 + auraScore * 0.3);
-        }
-        catch (error) {
-            logger_js_1.logger.warn({ error, userId }, 'Could not fetch user skills for match calculation');
+            matchBreakdown = matchResult;
         }
         // Get resume URL
         let resumeUrl = data.resumeUrl;
@@ -125,11 +174,14 @@ class ApplicationService {
                 candidateAura: data.candidateAura || 0,
                 candidateCores: data.candidateCores || 1,
                 candidateSkills: data.candidateSkills || [],
+                candidateProjects: data.candidateProjects, // Cast to any for Json type
+                candidateExperience: data.candidateExperience,
+                candidateCertifications: data.candidateCertifications,
                 status: 'PENDING',
                 matchScore,
+                matchBreakdown: matchBreakdown, // Save to DB
             },
         });
-        // Increment job application count
         await client_js_1.prisma.job.update({
             where: { id: jobId },
             data: { applicationsCount: { increment: 1 } }
@@ -140,10 +192,14 @@ class ApplicationService {
     /**
      * Get user's applications
      */
-    async getUserApplications(userId) {
-        logger_js_1.logger.debug({ userId }, 'Fetching user applications');
+    async getUserApplications(userId, status) {
+        logger_js_1.logger.debug({ userId, status }, 'Fetching user applications');
+        const where = { userId };
+        if (status) {
+            where.status = status;
+        }
         const applications = await client_js_1.prisma.application.findMany({
-            where: { userId },
+            where,
             orderBy: { appliedAt: 'desc' },
         });
         // Enrich with job data
@@ -199,6 +255,22 @@ class ApplicationService {
             });
             const job = await client_js_1.prisma.job.findUnique({ where: { id: application.jobId } });
             // TODO: Send notification to user about status change
+            return transformApplication(application, job);
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
+     * Add recruiter note
+     */
+    async addNote(applicationId, note) {
+        try {
+            const application = await client_js_1.prisma.application.update({
+                where: { id: applicationId },
+                data: { recruiterNotes: note }
+            });
+            const job = await client_js_1.prisma.job.findUnique({ where: { id: application.jobId } });
             return transformApplication(application, job);
         }
         catch {

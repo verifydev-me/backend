@@ -102,6 +102,11 @@ type ProjectSignals struct {
 	// ============================================
 	ConfidenceReport *ConfidenceAnalysis `json:"confidenceReport,omitempty"`
 
+	// ============================================
+	// COMPACT AI PAYLOAD (New for Gemini)
+	// ============================================
+	CompactOutput *CompactOutput `json:"compactOutput,omitempty"`
+
 	// Metadata
 	TotalFiles      int    `json:"totalFiles"`
 	TotalLines      int    `json:"totalLines"`

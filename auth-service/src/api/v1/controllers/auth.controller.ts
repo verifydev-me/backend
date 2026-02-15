@@ -156,6 +156,7 @@ export class AuthController {
 
         const redirectUrl = new URL(`${env.FRONTEND_URL}/auth/callback`);
         redirectUrl.searchParams.set('accessToken', tokens.accessToken);
+        redirectUrl.searchParams.set('refreshToken', tokens.refreshToken);
         redirectUrl.searchParams.set('userId', user.id);
 
         res.redirect(redirectUrl.toString());
@@ -288,6 +289,7 @@ export class AuthController {
 
         const redirectUrl = new URL(`${env.FRONTEND_URL}/auth/callback`);
         redirectUrl.searchParams.set('accessToken', tokens.accessToken);
+        redirectUrl.searchParams.set('refreshToken', tokens.refreshToken);
         redirectUrl.searchParams.set('userId', user.id);
 
         res.redirect(redirectUrl.toString());

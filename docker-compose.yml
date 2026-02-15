@@ -308,6 +308,7 @@ services:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-verifydev}:${RABBITMQ_PASS}@rabbitmq:5672
       - CONSUME_QUEUE=project.analyzed
       - EXCHANGE_NAME=project.events
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       rabbitmq:
         condition: service_healthy

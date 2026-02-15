@@ -45,7 +45,7 @@ export declare class MatchingService {
         requirements: string;
         responsibilities: string;
         benefits: string | null;
-        category: string | null;
+        category: import(".prisma/job-client").$Enums.JobCategory;
         location: string;
         isRemote: boolean;
         remoteType: import(".prisma/job-client").$Enums.RemoteType | null;

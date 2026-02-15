@@ -1,9 +1,11 @@
-import type { Message, SenderType } from '../../node_modules/.prisma/job-client/index.js';
+import type { LegacyMessage as Message, SenderType } from '../../node_modules/.prisma/job-client/index.js';
 export interface CreateMessageDTO {
     senderId: string;
     senderType: SenderType;
+    senderName?: string;
     receiverId: string;
     receiverType: SenderType;
+    receiverName?: string;
     jobId?: string;
     applicationId?: string;
     subject?: string;
@@ -23,6 +25,8 @@ export declare class MessageService {
         subject: string | null;
         content: string;
         attachments: string[];
+        senderName: string | null;
+        receiverName: string | null;
         isRead: boolean;
         readAt: Date | null;
         sentAt: Date;
@@ -38,6 +42,8 @@ export declare class MessageService {
         subject: string | null;
         content: string;
         attachments: string[];
+        senderName: string | null;
+        receiverName: string | null;
         isRead: boolean;
         readAt: Date | null;
         sentAt: Date;
@@ -53,6 +59,8 @@ export declare class MessageService {
         subject: string | null;
         content: string;
         attachments: string[];
+        senderName: string | null;
+        receiverName: string | null;
         isRead: boolean;
         readAt: Date | null;
         sentAt: Date;
@@ -72,6 +80,8 @@ export declare class MessageService {
         subject: string | null;
         content: string;
         attachments: string[];
+        senderName: string | null;
+        receiverName: string | null;
         isRead: boolean;
         readAt: Date | null;
         sentAt: Date;
@@ -87,6 +97,8 @@ export declare class MessageService {
         subject: string | null;
         content: string;
         attachments: string[];
+        senderName: string | null;
+        receiverName: string | null;
         isRead: boolean;
         readAt: Date | null;
         sentAt: Date;

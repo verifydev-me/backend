@@ -30,6 +30,7 @@ export interface Job {
     responsibilities: string;
     type: JobType;
     level: ExperienceLevel;
+    category: JobCategory;
     location: string;
     isRemote: boolean;
     salaryMin?: number;
@@ -74,6 +75,7 @@ export interface Application {
 }
 export type JobType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERNSHIP' | 'FREELANCE';
 export type ExperienceLevel = 'ENTRY' | 'JUNIOR' | 'MID' | 'SENIOR' | 'LEAD' | 'PRINCIPAL';
+export type JobCategory = 'FRONTEND' | 'BACKEND' | 'FULLSTACK' | 'MOBILE' | 'DEVOPS' | 'DATA_ENGINEERING' | 'MACHINE_LEARNING' | 'SECURITY' | 'DESIGN' | 'QA' | 'GENERAL';
 export type JobStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED' | 'EXPIRED';
 export type ApplicationStatus = 'PENDING' | 'REVIEWING' | 'SHORTLISTED' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'WITHDRAWN';
 export type CompanySize = 'STARTUP' | 'SMALL' | 'MEDIUM' | 'LARGE' | 'ENTERPRISE';
@@ -84,6 +86,7 @@ export interface CreateJobDto {
     responsibilities: string;
     type: JobType;
     level: ExperienceLevel;
+    category?: JobCategory;
     location: string;
     isRemote: boolean;
     salaryMin?: number;
@@ -98,6 +101,7 @@ export interface CreateJobDto {
 export interface JobFilters {
     type?: JobType;
     level?: ExperienceLevel;
+    category?: JobCategory;
     isRemote?: boolean;
     skills?: string[];
     minSalary?: number;
@@ -112,4 +116,7 @@ export interface ApplyJobDto {
     candidateAura?: number;
     candidateCores?: number;
     candidateSkills?: string[];
+    candidateProjects?: any[];
+    candidateExperience?: any[];
+    candidateCertifications?: any[];
 }

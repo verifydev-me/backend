@@ -4,4 +4,7 @@ export const config = {
   consumeQueue: process.env.CONSUME_QUEUE || 'project.analyzed',
   exchangeName: process.env.EXCHANGE_NAME || 'project.events',
   nodeEnv: process.env.NODE_ENV || 'development',
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+  },
 };

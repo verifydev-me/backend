@@ -40,8 +40,12 @@ export declare class InterviewService {
             candidateAura: number;
             candidateCores: number;
             candidateSkills: string[];
+            candidateProjects: import(".prisma/job-client/runtime/library").JsonValue | null;
+            candidateExperience: import(".prisma/job-client/runtime/library").JsonValue | null;
+            candidateCertifications: import(".prisma/job-client/runtime/library").JsonValue | null;
             stage: string | null;
             matchScore: number | null;
+            matchBreakdown: import(".prisma/job-client/runtime/library").JsonValue | null;
             skillMatchScore: number | null;
             auraMatchScore: number | null;
             recruiterNotes: string | null;
@@ -137,8 +141,12 @@ export declare class InterviewService {
             candidateAura: number;
             candidateCores: number;
             candidateSkills: string[];
+            candidateProjects: import(".prisma/job-client/runtime/library").JsonValue | null;
+            candidateExperience: import(".prisma/job-client/runtime/library").JsonValue | null;
+            candidateCertifications: import(".prisma/job-client/runtime/library").JsonValue | null;
             stage: string | null;
             matchScore: number | null;
+            matchBreakdown: import(".prisma/job-client/runtime/library").JsonValue | null;
             skillMatchScore: number | null;
             auraMatchScore: number | null;
             recruiterNotes: string | null;

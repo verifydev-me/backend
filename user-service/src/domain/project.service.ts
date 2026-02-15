@@ -354,13 +354,36 @@ export class ProjectService {
       resumeReady: tech.confidence >= 60,
     }));
 
+    // Merge bayesian confidence data INTO each skill (dedup: removes need for separate skillConfidences array)
+    const bayesianSkills = rawAnalysis.bayesian_skill_confidences || [];
+    const bayesianMap = new Map<string, any>();
+    for (const bs of bayesianSkills) {
+      if (bs.name || bs.skill) bayesianMap.set((bs.name || bs.skill).toLowerCase(), bs);
+    }
+
+    const enrichedSkills = skillsBreakdown.map((skill: any) => {
+      const bayesian = bayesianMap.get(skill.name.toLowerCase());
+      if (bayesian) {
+        return {
+          ...skill,
+          bayesian: {
+            prior: bayesian.prior ?? bayesian.priorConfidence,
+            posterior: bayesian.posterior ?? bayesian.posteriorConfidence,
+            graphBoost: bayesian.graphBoost ?? bayesian.graph_boost ?? 0,
+            evidenceCount: bayesian.evidenceCount ?? bayesian.evidence_count ?? 0,
+          },
+        };
+      }
+      return skill;
+    });
+
     // Calculate industry analysis summary
     // NOTE: skillsByCategory removed — frontend computes it from verifiedSkills
     const computedIndustryAnalysis = {
-      verifiedSkills: skillsBreakdown,
-      totalSkills: skillsBreakdown.length,
-      highConfidenceSkills: skillsBreakdown.filter(s => s.score >= 70).length,
-      resumeReadySkills: skillsBreakdown.filter(s => s.resumeReady).length,
+      verifiedSkills: enrichedSkills,
+      totalSkills: enrichedSkills.length,
+      highConfidenceSkills: enrichedSkills.filter((s: any) => s.score >= 70).length,
+      resumeReadySkills: enrichedSkills.filter((s: any) => s.resumeReady).length,
       overallScore: project.overallScore || project.auraContribution || 0,
       engineeringLevel: getEngineeringLevel(project.overallScore),
       technologies: techBreakdown,
@@ -369,7 +392,7 @@ export class ProjectService {
     const mergedIndustryAnalysis = mergeIndustryAnalysis(null, computedIndustryAnalysis);
     // NOTE: removed mergedFullAnalysis.industryAnalysis = ... (was duplicate of top-level industryAnalysis)
 
-    return {
+    return stripNulls({
       ...projectData,
       analysisId: analysis?.id ?? null,
       // Add computed fields for frontend
@@ -378,6 +401,38 @@ export class ProjectService {
       // Include detailed analysis
       fullAnalysis: mergedFullAnalysis,
       industryAnalysis: mergedIndustryAnalysis,
+      intelligenceVerdict: analysis ? {
+        title: analysis.aiVerdictTitle || "Analysis Pending",
+        summary: analysis.aiVerdictSummary || "AI analysis is currently processing...",
+        strengths: analysis.aiVerdictStrengths || [],
+        weaknesses: analysis.aiVerdictWeaknesses || [],
+        hireRecommendation: (analysis.aiHireRecommendation as any) || 'NO',
+        riskScore: analysis.aiRiskScore || 0,
+        riskAnalysis: analysis.aiRiskAnalysis || "No risk analysis available.",
+        skillsNarrative: analysis.aiSkillsNarrative || "",
+        interviewQuestions: analysis.aiInterviewQuestions || [],
+      } : undefined,
+      // Enhanced AI Project Insight (from raw MongoDB — new dual-purpose format)
+      aiInsight: rawAnalysis.ai_insight_title ? {
+        projectTitle: rawAnalysis.ai_insight_title,
+        projectSummary: rawAnalysis.ai_insight_summary || '',
+        whatYouBuilt: rawAnalysis.ai_insight_what_you_built || '',
+        techHighlights: rawAnalysis.ai_insight_tech_highlights || [],
+        impressivePatterns: rawAnalysis.ai_insight_impressive_patterns || [],
+        growthAreas: rawAnalysis.ai_insight_growth_areas || [],
+        learningPath: rawAnalysis.ai_insight_learning_path || [],
+        projectMaturity: rawAnalysis.ai_insight_project_maturity || '',
+        recruiterVerdict: {
+          headline: rawAnalysis.ai_recruiter_headline || '',
+          recommendation: rawAnalysis.ai_recruiter_recommendation || 'LEAN_HIRE',
+          confidenceLevel: rawAnalysis.ai_recruiter_confidence || '',
+          oneLineSummary: rawAnalysis.ai_recruiter_summary || '',
+          topStrengths: rawAnalysis.ai_recruiter_strengths || [],
+          topConcerns: rawAnalysis.ai_recruiter_concerns || [],
+          estimatedLevel: rawAnalysis.ai_recruiter_level || '',
+          interviewFocus: rawAnalysis.ai_recruiter_interview_focus || [],
+        },
+      } : undefined,
       // GitHub-sourced git details
       gitDetails: gitDetails || null,
       // Complexity from structured analysis (frontend reads project.complexity)
@@ -391,7 +446,7 @@ export class ProjectService {
         complexity: mergedFullAnalysis.folderStructure?.maxDepth ? Math.min(mergedFullAnalysis.folderStructure.maxDepth * 10, 100) : 30,
         activityScore: project.overallScore,
       },
-    };
+    });
   }
 
   /**
@@ -638,18 +693,7 @@ function buildStructuredFullAnalysis(analysis: any) {
       authenticityFlags: analysis.authenticityFlags || [],
       hasOriginalWork: analysis.hasOriginalWork,
     },
-    verifiedSkills: (analysis.verifiedSkills || []).map((skill: any) => ({
-      name: skill.name,
-      category: skill.category,
-      confidence: skill.confidence,
-      auraPoints: skill.auraPoints,
-      resumeReady: skill.resumeReady,
-      usageVerified: skill.usageVerified,
-      usageStrength: skill.usageStrength,
-      evidence: skill.evidence,
-      richEvidence: skill.richEvidence || skill.rich_evidence || null,
-      linesOfCode: skill.linesOfCode,
-    })),
+    // verifiedSkills REMOVED from fullAnalysis — now lives only in industryAnalysis (dedup)
     optimizations: (analysis.optimizationSuggestions || []).map((opt: any) => ({
       category: opt.category,
       priority: opt.priority,
@@ -692,7 +736,7 @@ function buildStructuredFullAnalysis(analysis: any) {
       graphDensity: analysis.graph_density || 0,
       detectedStacks: analysis.graph_detected_stacks || [],
       inferredSkills: analysis.graph_inferred_skills || [],
-      clusters: analysis.graph_clusters || [],
+      clusters: cleanGraphClusters(analysis.graph_clusters || []),
     } : undefined,
     // ========== PHASE 3: BAYESIAN CONFIDENCE REPORT ==========
     confidenceReport: analysis.confidence_analysis_confidence ? {
@@ -735,7 +779,7 @@ function buildStructuredFullAnalysis(analysis: any) {
         topFactors: analysis.ensemble_top_factors || [],
         riskFactors: analysis.ensemble_risk_factors || [],
       },
-      skillConfidences: analysis.bayesian_skill_confidences || [],
+      // skillConfidences REMOVED — merged into industryAnalysis.verifiedSkills as .bayesian (dedup)
     } : undefined,
   };
 
@@ -768,11 +812,7 @@ function mergeFullAnalysis(structured: any, legacy: any) {
   merged.bestPractices = { ...(legacy.bestPractices || {}), ...(structured.bestPractices || {}) };
   merged.scores = { ...(legacy.scores || {}), ...(structured.scores || {}) };
 
-  if (structured.verifiedSkills?.length) {
-    merged.verifiedSkills = structured.verifiedSkills;
-  } else {
-    merged.verifiedSkills = legacy.verifiedSkills || [];
-  }
+  // verifiedSkills removed from fullAnalysis — now only in industryAnalysis
 
   if (structured.optimizations?.length) {
     merged.optimizations = structured.optimizations;
@@ -939,6 +979,57 @@ function getEngineeringLevel(score: number): string {
   if (score >= 60) return 'Mid-Level Engineer';
   if (score >= 40) return 'Junior Engineer';
   return 'Beginner';
+}
+
+/**
+ * Clean graph clusters — filter out function-name noise.
+ * Keeps only clusters with technology-level names (not individual function names).
+ */
+function cleanGraphClusters(clusters: any[]): any[] {
+  if (!Array.isArray(clusters)) return [];
+  return clusters.map((cluster: any) => {
+    if (!cluster) return cluster;
+    // Filter nodes: keep entries that look like tech names, not function names
+    // Function names typically: contain dots (pkg.func), are camelCase with parens, or are very long
+    if (Array.isArray(cluster.nodes)) {
+      cluster.nodes = cluster.nodes.filter((node: string) => {
+        if (!node || typeof node !== 'string') return false;
+        // Skip if looks like a function call (contains dots like "pkg.FuncName" or parens)
+        if (/^[a-z]+\.[A-Z]/.test(node)) return false;
+        if (node.includes('(') || node.includes(')')) return false;
+        // Skip very long names (likely function signatures)
+        if (node.length > 50) return false;
+        return true;
+      });
+    }
+    // Only keep clusters that still have nodes after filtering
+    return cluster.nodes?.length > 0 ? cluster : null;
+  }).filter(Boolean);
+}
+
+/**
+ * Recursively strip null, undefined, and empty values from an object.
+ * Removes: null, undefined, empty strings, empty arrays, empty objects.
+ */
+function stripNulls(obj: any): any {
+  if (obj === null || obj === undefined) return undefined;
+  if (Array.isArray(obj)) {
+    const filtered = obj.map(stripNulls).filter(v => v !== undefined);
+    return filtered.length > 0 ? filtered : undefined;
+  }
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const cleaned = stripNulls(value);
+      if (cleaned !== undefined) {
+        result[key] = cleaned;
+      }
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  // Keep numbers (including 0), booleans, non-empty strings
+  if (typeof obj === 'string' && obj === '') return undefined;
+  return obj;
 }
 
 export default ProjectService;

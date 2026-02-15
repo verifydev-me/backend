@@ -36,6 +36,7 @@ async function authenticate(req, res, next) {
                 req.user = {
                     userId: decoded.recruiterId,
                     sessionId: decoded.organizationId, // Use organizationId as sessionId
+                    role: 'recruiter',
                 };
             }
             else {
@@ -43,6 +44,7 @@ async function authenticate(req, res, next) {
                 req.user = {
                     userId: decoded.userId,
                     sessionId: decoded.sessionId,
+                    role: 'user',
                 };
             }
             next();
