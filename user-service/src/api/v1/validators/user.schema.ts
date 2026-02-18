@@ -6,7 +6,7 @@ export const updateProfileSchema = z.object({
   bio: z.string().max(500).optional(),
   location: z.string().max(100).optional(),
   company: z.string().max(100).optional(),
-  website: z.string().url().max(200).optional().or(z.literal('')),
+  website: z.string().max(200).optional(),
   twitterHandle: z.string().max(50).optional(),
   linkedinUrl: z.string().url().max(200).optional().or(z.literal('')),
 });
