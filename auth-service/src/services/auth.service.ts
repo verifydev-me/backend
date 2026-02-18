@@ -125,10 +125,15 @@ export class AuthService {
     };
 
     if (existingUser) {
-      // Update existing user — link Google account
+      // Update existing user — link Google account, preserve user-edited fields
       return prisma.user.update({
         where: { id: existingUser.id },
-        data: userData,
+        data: {
+          email: googleUser.email || existingUser.email,
+          name: existingUser.name || googleUser.name,
+          avatarUrl: googleUser.picture || existingUser.avatarUrl,
+          googleId: googleUser.sub,
+        },
       });
     }
 
@@ -191,11 +196,25 @@ export class AuthService {
     };
 
     if (existingUser) {
-      // Update existing user
+      // Update existing user — only update system fields, NOT user-edited profile fields
+      // User-edited fields (name, bio, location, company, website) should be preserved
       return prisma.user.update({
         where: { id: existingUser.id },
         data: {
-          ...userData,
+          // Always update system/GitHub fields
+          username: githubUser.login,
+          email: email || githubUser.email || existingUser.email,
+          avatarUrl: githubUser.avatar_url,
+          twitterHandle: githubUser.twitter_username || existingUser.twitterHandle,
+          githubFollowers: githubUser.followers,
+          githubRepos: githubUser.public_repos,
+          githubAccessToken,
+          // Only fill in user-editable fields if they are currently empty
+          name: existingUser.name || githubUser.name,
+          bio: existingUser.bio || githubUser.bio,
+          location: existingUser.location || githubUser.location,
+          company: existingUser.company || githubUser.company,
+          website: existingUser.website || githubUser.blog,
           // Don't overwrite core count and aura if already set
           coreCount: existingUser.coreCount || coreCount,
         },
