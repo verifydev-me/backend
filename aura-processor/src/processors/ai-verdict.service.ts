@@ -238,17 +238,27 @@ export class AIVerdictService {
   }
 
   // ════════════════════════════════════════════
-  // STRUCTURED PROMPT — Human-readable, token-efficient
+  // STRUCTURED PROMPT — ChatGPT-quality, human-readable output
   // ════════════════════════════════════════════
 
   private buildStructuredPrompt(ctx: SignalContext): string {
     const lines: string[] = [];
 
-    lines.push('You are a world-class Staff Engineer reviewing a developer\'s project.');
-    lines.push('Your job: give the developer USEFUL insight about their project AND give a recruiter a clear verdict.');
+    // ── ROLE & GOAL ──
+    lines.push('You are a brilliant senior engineering mentor — think of yourself as the best tech lead someone could have.');
+    lines.push('You are reviewing a developer\'s GitHub project. Your job is two-fold:');
+    lines.push('  1. Talk to the developer like a kind, honest mentor. Be SPECIFIC, WARM, and ACTIONABLE. Like a ChatGPT conversation.');
+    lines.push('  2. Give recruiters a clear, data-driven hiring signal. No fluff, just facts.');
     lines.push('');
-    lines.push('═══ PROJECT CONTEXT ═══');
-    lines.push(`TYPE: ${ctx.projectType} | ${ctx.primaryLanguage} | ${ctx.totalFiles} files | ${ctx.totalLines?.toLocaleString()} lines`);
+    lines.push('CRITICAL STYLE RULES:');
+    lines.push('  - Write like you\'re explaining to a friend, not writing a corporate report.');
+    lines.push('  - Be SPECIFIC. Never say "good practices" — say WHAT practice and WHY it matters.');
+    lines.push('  - Use short punchy sentences. Active voice. Real numbers when you have them.');
+    lines.push('  - For the developer: be encouraging but brutally honest about gaps.');
+    lines.push('  - Every point must be USEFUL — if it doesn\'t help them grow, cut it.');
+    lines.push('');
+    lines.push('═══ PROJECT DATA ═══');
+    lines.push(`Language: ${ctx.primaryLanguage} | Files: ${ctx.totalFiles} | Lines: ${ctx.totalLines?.toLocaleString()} | Scale: ${ctx.scaleLabel || 'unknown'}`);
 
     if (ctx.scaleLabel) lines.push(`SCALE: ${ctx.scaleLabel}`);
 
@@ -323,47 +333,143 @@ export class AIVerdictService {
     if (ctx.riskSignals?.length) lines.push(`ENGINE RISKS: ${ctx.riskSignals.slice(0, 5).join(', ')}`);
 
     lines.push('');
-    lines.push('═══ YOUR TASK ═══');
-    lines.push('Generate a JSON response with TWO sections:');
-    lines.push('1. Developer-facing insights (they will see this on their project page)');
-    lines.push('2. Recruiter verdict (recruiters will see this when evaluating candidates)');
+    lines.push('═══ WHAT TO WRITE ═══');
     lines.push('');
-    lines.push('RULES:');
-    lines.push('- Be SPECIFIC to THIS project. Reference actual tech, patterns, and numbers.');
-    lines.push('- For "whatYouBuilt": Write like you\'re explaining this project to the developer in plain English. Be warm and insightful.');
-    lines.push('- For "techHighlights": Focus on what makes this project technically interesting.');
-    lines.push('- For "impressivePatterns": Call out specific good engineering decisions you see.');
-    lines.push('- For "growthAreas": Be constructive. Give actionable suggestions with impact.');
-    lines.push('- For "learningPath": Suggest 3-5 concrete next steps to level up this project.');
-    lines.push('- For "recruiterVerdict": Be honest and data-driven. Base recommendation strictly on evidence.');
-    lines.push('- Do NOT be generic. Do NOT pad with filler.');
+    lines.push('── projectTitle ──');
+    lines.push('  5-7 words max. Make it sound like a real product, not a school project.');
+    lines.push('  Pattern: "[What it does] + [core tech]" or "[Tech] + [what you accomplished]"');
+    lines.push('  BAD:  "React/Next.js Prototype with Zustand and Tailwind"');
+    lines.push('  GOOD: "Next.js Developer Portfolio Verification Platform" or "Full-Stack Dev Hiring Intelligence App"');
     lines.push('');
-    lines.push('OUTPUT FORMAT (JSON ONLY, no markdown):');
+    lines.push('── projectSummary ──');
+    lines.push('  2-3 sentences. Start with what the app DOES, then what\'s technically interesting about it.');
+    lines.push('  Mention the engineering achievement, not just the tech list.');
+    lines.push('  BAD:  "Uses TypeScript, React, Next.js, Tailwind, and Zustand."');
+    lines.push('  GOOD: "A developer verification platform that analyzes GitHub repos and surfaces hiring signals. Built with Next.js App Router, it handles real-time data, complex state, and a rich UI — all in TypeScript."');
+    lines.push('');
+    lines.push('── whatYouBuilt ──');
+    lines.push('  THIS IS THE MOST IMPORTANT FIELD. Write like a brilliant mentor talking to their student.');
+    lines.push('  4-5 sentences. Be warm, specific, and inspiring. Address the developer directly ("You built...").');
+    lines.push('  Paragraph 1: What is this app and what problem does it solve?');
+    lines.push('  Paragraph 2: What tech choices stand out and why they show skill?');
+    lines.push('  Paragraph 3: What does this project say about you as an engineer?');
+    lines.push('  BAD:  "This project is a solid start! You used React/Next.js with Tailwind."');
+    lines.push('  GOOD: "You built a full-stack developer intelligence platform — something genuinely complex and valuable. The fact that you reached for Zustand instead of prop-drilling, and React Query instead of raw fetch calls, shows you already think about scalability and maintainability. Your 37 custom hooks and 168 components tell me you understand component architecture deeply. The gap between this and \'production-ready\' is testing and deployment infrastructure — not skills."');
+    lines.push('');
+    lines.push('── techHighlights ──');
+    lines.push('  Max 5 items. Each one = one specific decision + why it matters. Like bullet points in a code review.');
+    lines.push('  BAD:  "TypeScript usage with a high confidence score."');
+    lines.push('  GOOD: "TypeScript at 97% codebase coverage — near-complete type safety with no JavaScript leakage"');
+    lines.push('  GOOD: "37 custom React hooks showing deep component abstraction skills"');
+    lines.push('  GOOD: "Zustand for global state instead of Context API — a deliberate scalability choice"');
+    lines.push('');
+    lines.push('── impressivePatterns ──');
+    lines.push('  Max 4 items. These are the "wow" moments. What shows MATURITY beyond just using the tech?');
+    lines.push('  BAD:  "Adoption of TypeScript suggests strong typing knowledge."');
+    lines.push('  GOOD: "168 React components with consistent abstraction demonstrates solid component design thinking"');
+    lines.push('  GOOD: "Custom hook architecture (useAuthStore, useRecruiterDashboard) shows you separate concerns intentionally"');
+    lines.push('  GOOD: "React Query + Zustand combo means you separate server state from client state — a senior-level distinction"');
+    lines.push('');
+    lines.push('── growthAreas ──');
+    lines.push('  2-4 areas. Be honest but constructive. Every area needs: WHAT IS MISSING + HOW TO FIX IT + specific tools.');
+    lines.push('  "current" = facts, no shame. "suggestion" = exact steps, tool names, patterns.');
+    lines.push('  BAD current:  "Project currently has no tests."');
+    lines.push('  GOOD current: "Zero test files in 238-file codebase — zero safety net for refactoring."');
+    lines.push('  BAD suggestion: "Add tests."');
+    lines.push('  GOOD suggestion: "Start with Vitest + React Testing Library. Write tests for your top 5 custom hooks first — they\'re pure functions and easiest to test. Then add Playwright for critical user flows."');
+    lines.push('  impact: HIGH = blocks production readiness | MEDIUM = improves quality | LOW = nice polish');
+    lines.push('');
+    lines.push('── learningPath ──');
+    lines.push('  3-5 steps. Ordered: most important first. Each step = one concrete action with a specific outcome.');
+    lines.push('  These are the NEXT 3 things this developer should actually DO to level up.');
+    lines.push('  BAD:  "Implement Jest and React Testing Library for testing."');
+    lines.push('  GOOD: "Add Vitest + React Testing Library — start by testing your custom hooks, then critical components"');
+    lines.push('  GOOD: "Set up GitHub Actions CI to auto-run tests on every PR — keeps quality high automatically"');
+    lines.push('  GOOD: "Deploy to Vercel with preview deployments — show working URLs in your portfolio, not just code"');
+    lines.push('');
+    lines.push('── projectMaturity ──');
+    lines.push('  1 sentence. Where does this project sit RIGHT NOW? Be specific about why.');
+    lines.push('  BAD:  "This project is a prototype."');
+    lines.push('  GOOD: "Strong MVP — impressive breadth of features and architecture, but zero tests and no deployment pipeline means it\'s not production-ready yet."');
+    lines.push('');
+    lines.push('── recruiterVerdict.headline ──');
+    lines.push('  8-14 words. Make it sound like a LinkedIn recruiter wrote it.');
+    lines.push('  Format: "[Seniority] [Frontend/Backend/Full-Stack] Developer — [biggest strength], [biggest gap]"');
+    lines.push('  GOOD: "Junior Frontend Developer — Impressive React Architecture, Zero Testing Experience"');
+    lines.push('  GOOD: "Mid-Level React Engineer — Strong State Management Skills, Needs CI/CD Exposure"');
+    lines.push('');
+    lines.push('── recruiterVerdict.recommendation ──');
+    lines.push('  Strict data-driven criteria:');
+    lines.push('  STRONG_HIRE: fundamentals >70 AND engineering depth >70 AND testing >30 AND production-ready code');
+    lines.push('  HIRE: fundamentals >60 AND engineering depth >55 AND some tests OR strong architecture');
+    lines.push('  LEAN_HIRE: fundamentals >50 AND real skills proven even if testing/devops are missing');
+    lines.push('  NO_HIRE: fundamentals <50 OR no real skills proven OR tutorial-only code');
+    lines.push('');
+    lines.push('── recruiterVerdict.oneLineSummary ──');
+    lines.push('  25-35 words. The single most important thing a recruiter should know. Decision-driving.');
+    lines.push('  BAD:  "The candidate demonstrates proficiency with React, Next.js, TypeScript and related tools."');
+    lines.push('  GOOD: "Can build complex React apps with solid architecture and state management, but has never shipped to production or written a test — ideal for a junior role with mentorship."');
+    lines.push('');
+    lines.push('── recruiterVerdict.topStrengths ──');
+    lines.push('  Exactly 3. Include PROOF from the data. Make it scannable.');
+    lines.push('  BAD:  "Strong grasp of React and Next.js"');
+    lines.push('  GOOD: "React architecture mastery — 37 custom hooks and 168 components with clear separation of concerns"');
+    lines.push('  GOOD: "TypeScript fluency — 97% of 238 files written in TypeScript with strict types"');
+    lines.push('  GOOD: "Modern state management — correctly uses Zustand (global) + React Query (server) as separate layers"');
+    lines.push('');
+    lines.push('── recruiterVerdict.topConcerns ──');
+    lines.push('  2-3 concerns. State the risk clearly. WHY it matters for this hire.');
+    lines.push('  BAD:  "Lack of testing"');
+    lines.push('  GOOD: "Zero automated tests — can\'t verify refactoring safety or catch regressions"');
+    lines.push('  GOOD: "No deployment setup — unclear if they can ship code, not just write it"');
+    lines.push('');
+    lines.push('── recruiterVerdict.estimatedLevel ──');
+    lines.push('  Junior (0-2y) | Mid-Level (2-4y) | Senior (4-8y) | Staff/Principal (8+y)');
+    lines.push('  Base it on: pattern complexity, production-readiness indicators, architecture decisions, testing maturity.');
+    lines.push('  Format: "Junior (1-2 years)" or "Mid-Level (2-3 years)"');
+    lines.push('');
+    lines.push('── recruiterVerdict.interviewFocus ──');
+    lines.push('  3 topics. Make them ACTIONABLE for the interviewer. Specific, not generic.');
+    lines.push('  BAD:  "Testing methodologies and best practices"');
+    lines.push('  GOOD: "Testing philosophy: have they written tests before? What\'s their testing strategy?"');
+    lines.push('  GOOD: "Production deployment: have they deployed anything live? Vercel, AWS, or similar?"');
+    lines.push('  GOOD: "System design fundamentals: how would they scale this app to 10,000 users?"');
+    lines.push('');
+    lines.push('OUTPUT: Return ONLY a JSON object — no markdown, no explanation, no backticks. Just the JSON.');
     lines.push(`{
-  "projectTitle": "Short punchy title for this project",
-  "projectSummary": "2-3 sentences about the engineering quality",
-  "whatYouBuilt": "A warm, insightful paragraph explaining what this project is and what it demonstrates",
-  "techHighlights": ["Specific tech highlight 1", "Specific tech highlight 2", "...max 5"],
-  "impressivePatterns": ["Specific good pattern 1", "Specific good pattern 2", "...max 4"],
+  "projectTitle": "Descriptive product-like title (5-7 words)",
+  "projectSummary": "2-3 sentences: what it does + what's technically interesting",
+  "whatYouBuilt": "4-5 sentence mentor-style paragraph, warm and specific, addresses developer directly",
+  "techHighlights": [
+    "Specific decision + why it matters (up to 5)",
+    "..."
+  ],
+  "impressivePatterns": [
+    "What shows maturity beyond just using the tech (up to 4)",
+    "..."
+  ],
   "growthAreas": [
     {
-      "area": "Area name",
-      "current": "What the current state is",
-      "suggestion": "Specific actionable suggestion",
-      "impact": "HIGH" | "MEDIUM" | "LOW"
+      "area": "1-3 word category",
+      "current": "Objective facts about the gap",
+      "suggestion": "Specific tools + concrete next steps",
+      "impact": "HIGH"
     }
   ],
-  "learningPath": ["Concrete step 1", "Concrete step 2", "...3-5 items"],
-  "projectMaturity": "One sentence: where this project sits on the maturity spectrum",
+  "learningPath": [
+    "Concrete actionable step with specific tools (3-5 items)",
+    "..."
+  ],
+  "projectMaturity": "1 sentence: current maturity level + why",
   "recruiterVerdict": {
-    "headline": "One-line headline for recruiters",
-    "recommendation": "STRONG_HIRE" | "HIRE" | "LEAN_HIRE" | "NO_HIRE",
-    "confidenceLevel": "How confident in this assessment and why",
-    "oneLineSummary": "Single sentence TL;DR for the recruiter",
-    "topStrengths": ["Max 3 strengths"],
-    "topConcerns": ["Max 3 concerns"],
-    "estimatedLevel": "Junior/Mid/Senior/Staff + estimated years",
-    "interviewFocus": ["Question area 1", "Question area 2", "Question area 3"]
+    "headline": "8-14 word recruiter-style headline",
+    "recommendation": "STRONG_HIRE | HIRE | LEAN_HIRE | NO_HIRE",
+    "confidenceLevel": "High/Moderate/Low + reason based on evidence",
+    "oneLineSummary": "25-35 word decision-driving summary",
+    "topStrengths": ["Strength + proof from data (3 items)", "...", "..."],
+    "topConcerns": ["Concern + why it matters (2-3 items)", "..."],
+    "estimatedLevel": "Level (X-Y years)",
+    "interviewFocus": ["Specific topic to probe (3 items)", "...", "..."]
   }
 }`);
 
