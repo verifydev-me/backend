@@ -7,7 +7,7 @@ VerifyDev automatically **verifies developer skills** by analyzing their GitHub 
 ---
 
 ## 📋 Quick Links
-
+     
 - [Architecture Overview](#architecture-overview)
 - [Communication Architecture](#-communication-architecture-hybrid-http--grpc) - **gRPC Implementation**
 - [Performance Analysis](./PERFORMANCE.md) - **Latency Metrics & Benchmarks**
